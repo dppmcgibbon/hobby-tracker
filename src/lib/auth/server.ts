@@ -21,10 +21,6 @@ export const requireAuth = async () => {
 export const getProfile = cache(async () => {
   const user = await requireAuth();
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return profile;
 });

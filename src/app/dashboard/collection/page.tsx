@@ -1,12 +1,10 @@
 import { requireAuth } from "@/lib/auth/server";
+import { getMiniatures, getFactions } from "@/lib/queries/miniatures";
+import CollectionPageClient from "./collection-client";
 
 export default async function CollectionPage() {
-  await requireAuth();
+  const user = await requireAuth();
+  const [miniatures, factions] = await Promise.all([getMiniatures(user.id), getFactions()]);
 
-  return (
-    <div>
-      <h1 className="text-3xl font-bold">Collection</h1>
-      <p className="text-muted-foreground">Your miniature collection will appear here.</p>
-    </div>
-  );
+  return <CollectionPageClient miniatures={miniatures} factions={factions} />;
 }

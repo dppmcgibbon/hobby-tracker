@@ -1,0 +1,177 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useDropzone } from "react-dropzone";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { uploadMiniaturePhoto } from "@/app/actions/photos";
+import { Upload, X, Loader2 } from "lucide-react";
+
+interface PhotoUploadProps {
+  miniatureId: string;
+  onSuccess?: () => void;
+}
+
+export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
+  const router = useRouter();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [caption, setCaption] = useState("");
+  const [photoType, setPhotoType] = useState<string>("wip");
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const selectedFile = acceptedFiles[0];
+      setFile(selectedFile);
+      setError(null);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    maxFiles: 1,
+    maxSize: 5 * 1024 * 1024, // 5MB
+  });
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("caption", caption);
+      formData.append("photo_type", photoType);
+
+      await uploadMiniaturePhoto(miniatureId, formData);
+
+      // Reset form
+      setFile(null);
+      setPreview(null);
+      setCaption("");
+      setPhotoType("wip");
+
+      if (onSuccess) {
+        onSuccess();
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
+    setError(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {!preview ? (
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            isDragActive
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 hover:border-muted-foreground/50"
+          }`}
+        >
+          <input {...getInputProps()} />
+          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isDragActive ? "Drop the image here" : "Drag & drop an image here, or click to select"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 5MB)</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="relative h-64">
+            <Image
+              src={preview}
+              alt="Preview"
+              fill
+              className="object-cover rounded-lg"
+              unoptimized
+            />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2"
+              onClick={clearFile}
+              disabled={uploading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="caption">Caption (optional)</Label>
+            <Input
+              id="caption"
+              placeholder="Add a caption..."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              disabled={uploading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="photo_type">Photo Type</Label>
+            <Select value={photoType} onValueChange={setPhotoType} disabled={uploading}>
+              <SelectTrigger id="photo_type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="wip">Work in Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="detail">Detail Shot</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button onClick={handleUpload} disabled={uploading} className="w-full">
+            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {uploading ? "Uploading..." : "Upload Photo"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

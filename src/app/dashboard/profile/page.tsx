@@ -24,9 +24,7 @@ export default async function ProfilePage() {
           </div>
           <div>
             <label className="text-sm font-medium">Display Name</label>
-            <p className="text-sm text-muted-foreground">
-              {profile?.display_name || "Not set"}
-            </p>
+            <p className="text-sm text-muted-foreground">{profile?.display_name || "Not set"}</p>
           </div>
           <div>
             <label className="text-sm font-medium">Member Since</label>

@@ -1,5 +1,4 @@
 import { requireAuth, getProfile } from "@/lib/auth/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
