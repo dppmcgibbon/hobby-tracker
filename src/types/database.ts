@@ -1,16 +1,8 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {
-    Tables: {
-      // Will be populated after migrations
-    };
+    Tables: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     Views: {
       [_ in never]: never;
     };
