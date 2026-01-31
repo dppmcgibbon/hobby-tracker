@@ -1,18 +1,23 @@
 export type { Database } from "./database";
+import type { Database } from "./database";
 
-export interface User {
-  id: string;
-  email: string;
-  created_at: string;
-}
+// Helper types
+export type Tables<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Row"];
 
-export interface Miniature {
-  id: string;
-  user_id: string;
-  name: string;
-  faction_id: string;
-  created_at: string;
-  updated_at: string;
-}
+export type Inserts<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Insert"];
 
-// Additional types will be added as we build features
+export type Updates<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Update"];
+
+// Convenience types
+export type Profile = Tables<"profiles">;
+export type Faction = Tables<"factions">;
+export type Miniature = Tables<"miniatures">;
+export type MiniatureStatus = Tables<"miniature_status">;
+export type Paint = Tables<"paints">;
+export type PaintingRecipe = Tables<"painting_recipes">;
+export type RecipeStep = Tables<"recipe_steps">;
+export type MiniaturePhoto = Tables<"miniature_photos">;
+export type UserPaint = Tables<"user_paints">;
