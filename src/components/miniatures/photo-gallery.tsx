@@ -76,6 +76,7 @@ export function PhotoGallery({ photos }: PhotoGalleryProps) {
                 fill
                 className="object-cover transition-transform group-hover:scale-105"
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                unoptimized
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                 <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -126,6 +127,7 @@ export function PhotoGallery({ photos }: PhotoGalleryProps) {
               height={1200}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
+              unoptimized
             />
           </div>
           {selectedPhoto.caption && (
