@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireAuth } from "@/lib/auth/server";
 import { getMiniatureById } from "@/lib/queries/miniatures";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,10 @@ import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { DeleteMiniatureButton } from "@/components/miniatures/delete-miniature-button";
 import { StatusBadge } from "@/components/miniatures/status-badge";
 import { ArrowLeft, Edit, Calendar } from "lucide-react";
+import { getRecipes } from "@/lib/queries/recipes";
+import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
+import { unlinkRecipeFromMiniature } from "@/app/actions/recipes";
+import { BookOpen, X } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,12 +25,23 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
   const { id } = await params;
   const user = await requireAuth();
 
-  let miniature;
-  try {
-    miniature = await getMiniatureById(id, user.id);
-  } catch {
-    notFound();
-  }
+  const [miniature, recipes] = await Promise.all([
+    getMiniatureById(id, user.id),
+    getRecipes(user.id),
+  ]);
+
+  // Get the linked recipes
+  const supabase = await createClient();
+  const { data: miniatureRecipes } = await supabase
+    .from("miniature_recipes")
+    .select("recipe_id")
+    .eq("miniature_id", id);
+
+  const linkedRecipeIds = miniatureRecipes?.map((mr) => mr.recipe_id) || [];
+  const linkedRecipes = recipes.filter((r) => linkedRecipeIds.includes(r.id));
+
+  // Count linked recipes from miniature data
+  const linkedRecipeCount = miniature.recipes?.length || 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -142,7 +157,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
           <Tabs defaultValue="photos" className="space-y-6">
             <TabsList>
               <TabsTrigger value="photos">Photos ({miniature.photos?.length || 0})</TabsTrigger>
-              <TabsTrigger value="recipes">Recipes ({miniature.recipes?.length || 0})</TabsTrigger>
+              <TabsTrigger value="recipes">Recipes ({linkedRecipeCount})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="photos" className="space-y-6">
@@ -168,18 +183,59 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
             <TabsContent value="recipes">
               <Card>
                 <CardHeader>
-                  <CardTitle>Painting Recipes</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Linked Recipes ({linkedRecipes.length})
+                    </CardTitle>
+                    <LinkRecipeDialog
+                      miniatureId={id}
+                      recipes={recipes}
+                      linkedRecipeIds={linkedRecipeIds}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  {miniature.recipes?.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>No recipes attached yet.</p>
-                      <Button asChild className="mt-4">
-                        <Link href="/dashboard/recipes">Browse Recipes</Link>
-                      </Button>
-                    </div>
+                  {linkedRecipes.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No recipes linked to this miniature yet.
+                    </p>
                   ) : (
-                    <p className="text-muted-foreground">Recipe display coming in Phase 4</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {linkedRecipes.map((recipe) => (
+                        <div
+                          key={recipe.id}
+                          className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1">
+                              <Link
+                                href={`/dashboard/recipes/${recipe.id}`}
+                                className="font-semibold hover:underline"
+                              >
+                                {recipe.name}
+                              </Link>
+                              {recipe.faction && (
+                                <p className="text-sm text-muted-foreground">
+                                  {recipe.faction.name}
+                                </p>
+                              )}
+                            </div>
+                            <form
+                              action={async () => {
+                                "use server";
+                                await unlinkRecipeFromMiniature(id, recipe.id);
+                              }}
+                            >
+                              <Button variant="ghost" size="icon" type="submit">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </form>
+                          </div>
+                          <Badge variant="outline">{recipe.steps?.length || 0} steps</Badge>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
