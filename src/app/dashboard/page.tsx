@@ -1,207 +1,192 @@
 import { requireAuth } from "@/lib/auth/server";
-import { getMiniatures } from "@/lib/queries/miniatures";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getCollectionStatistics,
+  getRecentActivity,
+  getPaintStatistics,
+} from "@/lib/queries/statistics";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Package, Palette, CheckCircle2, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { StatusDistributionChart } from "@/components/dashboard/status-distribution-chart";
+import { CompletionChart } from "@/components/dashboard/completion-chart";
+import { FactionBreakdownChart } from "@/components/dashboard/faction-breakdown-chart";
+import { RecentActivity } from "@/components/dashboard/recent-activity";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Package, CheckCircle, Paintbrush, Plus, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default async function DashboardPage() {
   const user = await requireAuth();
-  const miniatures = await getMiniatures(user.id);
+  const [stats, activity, paintStats] = await Promise.all([
+    getCollectionStatistics(user.id),
+    getRecentActivity(user.id),
+    getPaintStatistics(user.id),
+  ]);
 
-  // Calculate statistics
-  const totalMiniatures = miniatures.length;
-  const completedCount = miniatures.filter((m) => m.status?.status === "completed").length;
-  const inProgressCount = miniatures.filter((m) => m.status?.status === "painting").length;
-  const backlogCount = miniatures.filter((m) => m.status?.status === "backlog").length;
-
-  const completionPercentage =
-    totalMiniatures > 0 ? Math.round((completedCount / totalMiniatures) * 100) : 0;
-
-  // Group by faction
-  const factionStats = miniatures.reduce(
-    (acc, miniature) => {
-      if (miniature.faction) {
-        const factionName = miniature.faction.name;
-        if (!acc[factionName]) {
-          acc[factionName] = { total: 0, completed: 0 };
-        }
-        acc[factionName].total++;
-        if (miniature.status?.status === "completed") {
-          acc[factionName].completed++;
-        }
-      }
-      return acc;
-    },
-    {} as Record<string, { total: number; completed: number }>
-  );
-
-  const topFactions = Object.entries(factionStats)
-    .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 5);
+  if (!stats) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome!</CardTitle>
+            <CardDescription>Start building your collection</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/dashboard/collection/add">Add Your First Miniature</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back to your collection</p>
-        </div>
-        <Button asChild>
-          <Link href="/dashboard/collection/add">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Miniature
-          </Link>
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">Welcome back! Here&apos;s your collection overview.</p>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Miniatures</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalMiniatures}</div>
-            <p className="text-xs text-muted-foreground">In your collection</p>
+            <div className="text-2xl font-bold">{stats.totalMiniatures}</div>
+            <p className="text-xs text-muted-foreground">{stats.uniqueModels} unique models</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{completedCount}</div>
-            <p className="text-xs text-muted-foreground">{completionPercentage}% of collection</p>
+            <div className="text-2xl font-bold">{stats.completed}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.completionPercentage.toFixed(1)}% of collection
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Paintbrush className="h-4 w-4 text-yellow-500" />
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{inProgressCount}</div>
+            <div className="text-2xl font-bold">{stats.painting}</div>
             <p className="text-xs text-muted-foreground">Currently painting</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Backlog</CardTitle>
-            <TrendingUp className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-sm font-medium">Paints</CardTitle>
+            <Palette className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{backlogCount}</div>
-            <p className="text-xs text-muted-foreground">Waiting to start</p>
+            <div className="text-2xl font-bold">{paintStats.paintCount}</div>
+            <p className="text-xs text-muted-foreground">In your inventory</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Overall Progress */}
+      {/* Progress Bar */}
       <Card>
         <CardHeader>
           <CardTitle>Collection Progress</CardTitle>
+          <CardDescription>Overall completion rate</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span>Overall Completion</span>
-              <span className="font-medium">{completionPercentage}%</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Overall Completion</span>
+              <span className="font-medium">{stats.completionPercentage.toFixed(1)}%</span>
             </div>
-            <Progress value={completionPercentage} className="h-2" />
+            <Progress value={stats.completionPercentage} />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-slate-500"></div>
-              <span>Backlog: {backlogCount}</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Backlog</p>
+              <p className="text-2xl font-bold">{stats.backlog}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span>
-                Assembled: {miniatures.filter((m) => m.status?.status === "assembled").length}
-              </span>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Assembled</p>
+              <p className="text-2xl font-bold">{stats.assembled}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-              <span>Primed: {miniatures.filter((m) => m.status?.status === "primed").length}</span>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Primed</p>
+              <p className="text-2xl font-bold">{stats.primed}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span>Painting: {inProgressCount}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Done: {completedCount}</span>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Painting</p>
+              <p className="text-2xl font-bold">{stats.painting}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Top Factions */}
-      {topFactions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Collection by Faction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topFactions.map(([faction, stats]) => {
-                const percentage = Math.round((stats.completed / stats.total) * 100);
-                return (
-                  <div key={faction} className="space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">{faction}</span>
-                      <span className="text-muted-foreground">
-                        {stats.completed}/{stats.total} ({percentage}%)
-                      </span>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <StatusDistributionChart data={stats.statusBreakdown} />
+        <FactionBreakdownChart factionBreakdown={stats.factionBreakdown} />
+      </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button asChild variant="outline" className="h-auto py-6">
-            <Link href="/dashboard/collection">
-              <div className="flex flex-col items-center gap-2">
-                <Package className="h-6 w-6" />
-                <span>View Collection</span>
+      <CompletionChart
+        completionsByMonth={stats.completionsByMonth}
+        additionsByMonth={stats.additionsByMonth}
+      />
+
+      {/* Recent Activity and Top Paints */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <RecentActivity
+          recentMiniatures={activity.recentMiniatures}
+          recentCompletions={activity.recentCompletions}
+          recentPhotos={activity.recentPhotos}
+        />
+
+        {paintStats.mostUsedPaints.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Most Used Paints</CardTitle>
+              <CardDescription>From your painting recipes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {paintStats.mostUsedPaints
+                  .slice(0, 10)
+                  .map(
+                    (
+                      paint: { name: string; brand: string; color_hex?: string; count: number },
+                      index: number
+                    ) => (
+                      <div key={paint.name + index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded border"
+                            style={{ backgroundColor: paint.color_hex || "#888" }}
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{paint.name}</p>
+                            <p className="text-xs text-muted-foreground">{paint.brand}</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline">{paint.count} uses</Badge>
+                      </div>
+                    )
+                  )}
               </div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto py-6">
-            <Link href="/dashboard/recipes">
-              <div className="flex flex-col items-center gap-2">
-                <Paintbrush className="h-6 w-6" />
-                <span>Paint Recipes</span>
-              </div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto py-6">
-            <Link href="/dashboard/paints">
-              <div className="flex flex-col items-center gap-2">
-                <TrendingUp className="h-6 w-6" />
-                <span>Paint Inventory</span>
-              </div>
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

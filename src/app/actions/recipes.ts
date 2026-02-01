@@ -142,11 +142,20 @@ export async function deleteRecipeStep(stepId: string) {
   // Get step to verify ownership
   const { data: step } = await supabase
     .from("recipe_steps")
-    .select("recipe_id, painting_recipes(user_id)")
+    .select("recipe_id, painting_recipes!inner(user_id)")
     .eq("id", stepId)
     .single();
 
-  if (!step || step.painting_recipes?.user_id !== user.id) {
+  // Type guard to handle the array type from Supabase
+  const paintingRecipes = step?.painting_recipes as
+    | { user_id: string }
+    | { user_id: string }[]
+    | undefined;
+  const recipeUserId = Array.isArray(paintingRecipes)
+    ? paintingRecipes[0]?.user_id
+    : paintingRecipes?.user_id;
+
+  if (!step || recipeUserId !== user.id) {
     throw new Error("Step not found or access denied");
   }
 

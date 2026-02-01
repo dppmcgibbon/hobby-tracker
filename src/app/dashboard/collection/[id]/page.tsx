@@ -175,7 +175,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                   <CardTitle>Photo Gallery</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <PhotoGallery photos={miniature.photos || []} />
+                  <PhotoGallery photos={miniature.photos || []} miniatureName={miniature.name} />
                 </CardContent>
               </Card>
             </TabsContent>

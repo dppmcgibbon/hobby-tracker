@@ -116,8 +116,11 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
           {recipe.steps && recipe.steps.length > 0 ? (
             <div className="space-y-4">
               {recipe.steps
-                .sort((a, b) => a.step_order - b.step_order)
-                .map((step, index) => (
+                .sort(
+                  (a: { step_order: number }, b: { step_order: number }) =>
+                    a.step_order - b.step_order
+                )
+                .map((step: { id: string; step_order: number }, index: number) => (
                   <div key={step.id}>
                     <RecipeStepDisplay step={step} stepNumber={index + 1} />
                     {index < recipe.steps.length - 1 && <Separator className="mt-4" />}

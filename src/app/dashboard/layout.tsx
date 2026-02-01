@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const initials = profile?.display_name
     ? profile.display_name
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .toUpperCase()
     : user.email?.substring(0, 2).toUpperCase() || "U";
