@@ -182,114 +182,12 @@ export function CollectionFilters({
     <div className="space-y-4">
       {/* Filters - Visible on all screen sizes */}
       <div className="space-y-3">
-        {/* Top Row - Game Filters (only show if games exist) */}
-        {games.length > 0 && (
-          <div className="flex gap-3 flex-wrap items-end">
-            {/* Game Filter */}
-            <div className="min-w-[200px] flex-1">
-              <Label htmlFor="game">Game</Label>
-              <Select
-                value={filters.gameId}
-                onValueChange={(v) => {
-                  updateFilter("gameId", v);
-                  if (v === "all") {
-                    updateFilter("editionId", "all");
-                    updateFilter("expansionId", "all");
-                  }
-                }}
-              >
-                <SelectTrigger id="game">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Games</SelectItem>
-                  {games.map((game) => (
-                    <SelectItem key={game.id} value={game.id}>
-                      {game.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Edition Filter - only show if game is selected */}
-            {filters.gameId !== "all" && editions.length > 0 && (
-              <div className="min-w-[200px] flex-1">
-                <Label htmlFor="edition">Edition</Label>
-                <Select
-                  value={filters.editionId}
-                  onValueChange={(v) => {
-                    updateFilter("editionId", v);
-                    if (v === "all") {
-                      updateFilter("expansionId", "all");
-                    }
-                  }}
-                >
-                  <SelectTrigger id="edition">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Editions</SelectItem>
-                    {editions.map((edition) => (
-                      <SelectItem key={edition.id} value={edition.id}>
-                        {edition.name}
-                        {edition.year && ` (${edition.year})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Expansion Filter - only show if edition is selected */}
-            {filters.editionId !== "all" && expansions.length > 0 && (
-              <div className="min-w-[200px] flex-1">
-                <Label htmlFor="expansion">Expansion</Label>
-                <Select
-                  value={filters.expansionId}
-                  onValueChange={(v) => updateFilter("expansionId", v)}
-                >
-                  <SelectTrigger id="expansion">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Expansions</SelectItem>
-                    {expansions.map((expansion) => (
-                      <SelectItem key={expansion.id} value={expansion.id}>
-                        {expansion.name}
-                        {expansion.year && ` (${expansion.year})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Bottom Row - Other Filters */}
         <div className="flex gap-4 flex-wrap items-end">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <Label htmlFor="search">Search</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="search"
-                type="text"
-                placeholder="Search by name..."
-                value={filters.search}
-                onChange={(e) => updateFilter("search", e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
-
           {/* Faction Filter */}
-          <div className="min-w-[180px]">
-            <Label htmlFor="faction">Faction</Label>
+          <div className="w-[220px]">
             <Select value={filters.factionId} onValueChange={(v) => updateFilter("factionId", v)}>
-              <SelectTrigger id="faction">
+              <SelectTrigger id="faction" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -304,10 +202,9 @@ export function CollectionFilters({
           </div>
 
           {/* Status Filter */}
-          <div className="min-w-[160px]">
-            <Label htmlFor="status">Status</Label>
+          <div className="w-[220px]">
             <Select value={filters.status} onValueChange={(v) => updateFilter("status", v)}>
-              <SelectTrigger id="status">
+              <SelectTrigger id="status" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -321,10 +218,9 @@ export function CollectionFilters({
           </div>
 
           {/* Tag Filter */}
-          <div className="min-w-[160px]">
-            <Label htmlFor="tag">Tag</Label>
+          <div className="w-[220px]">
             <Select value={filters.tagId} onValueChange={(v) => updateFilter("tagId", v)}>
-              <SelectTrigger id="tag">
+              <SelectTrigger id="tag" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -347,10 +243,9 @@ export function CollectionFilters({
           </div>
 
           {/* Sort By */}
-          <div className="min-w-[140px]">
-            <Label htmlFor="sortBy">Sort By</Label>
+          <div className="w-[220px]">
             <Select value={filters.sortBy} onValueChange={(v) => updateFilter("sortBy", v)}>
-              <SelectTrigger id="sortBy">
+              <SelectTrigger id="sortBy" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -364,13 +259,12 @@ export function CollectionFilters({
           </div>
 
           {/* Sort Order */}
-          <div className="min-w-[120px]">
-            <Label htmlFor="sortOrder">Order</Label>
+          <div className="w-[220px]">
             <Select
               value={filters.sortOrder}
               onValueChange={(v) => updateFilter("sortOrder", v as "asc" | "desc")}
             >
-              <SelectTrigger id="sortOrder">
+              <SelectTrigger id="sortOrder" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -378,6 +272,100 @@ export function CollectionFilters({
                 <SelectItem value="desc">Descending</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Game Filter - moved from top row */}
+          {games.length > 0 && (
+            <div className="w-[220px]">
+              <Select
+                value={filters.gameId}
+                onValueChange={(v) => {
+                  updateFilter("gameId", v);
+                  if (v === "all") {
+                    updateFilter("editionId", "all");
+                    updateFilter("expansionId", "all");
+                  }
+                }}
+              >
+                <SelectTrigger id="game" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Games</SelectItem>
+                  {games.map((game) => (
+                    <SelectItem key={game.id} value={game.id}>
+                      {game.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Edition Filter - only show if game is selected */}
+          {filters.gameId !== "all" && editions.length > 0 && (
+            <div className="w-[220px]">
+              <Select
+                value={filters.editionId}
+                onValueChange={(v) => {
+                  updateFilter("editionId", v);
+                  if (v === "all") {
+                    updateFilter("expansionId", "all");
+                  }
+                }}
+              >
+                <SelectTrigger id="edition" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Editions</SelectItem>
+                  {editions.map((edition) => (
+                    <SelectItem key={edition.id} value={edition.id}>
+                      {edition.name}
+                      {edition.year && ` (${edition.year})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Expansion Filter - only show if edition is selected */}
+          {filters.editionId !== "all" && expansions.length > 0 && (
+            <div className="w-[220px]">
+              <Select
+                value={filters.expansionId}
+                onValueChange={(v) => updateFilter("expansionId", v)}
+              >
+                <SelectTrigger id="expansion" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Expansions</SelectItem>
+                  {expansions.map((expansion) => (
+                    <SelectItem key={expansion.id} value={expansion.id}>
+                      {expansion.name}
+                      {expansion.year && ` (${expansion.year})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Search - moved to end */}
+          <div className="w-full sm:w-[300px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search"
+                type="text"
+                placeholder="Search by name..."
+                value={filters.search}
+                onChange={(e) => updateFilter("search", e.target.value)}
+                className="pl-9 w-full"
+              />
+            </div>
           </div>
 
           {/* Clear Filters */}

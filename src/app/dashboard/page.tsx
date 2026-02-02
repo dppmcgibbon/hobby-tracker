@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-full">
       <div className="border-l-4 border-primary pl-4">
         <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
           Command Center

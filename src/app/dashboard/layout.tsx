@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import { Home, Package, Palette, BookOpen, User, FolderOpen, Tag, Gamepad2 } from "lucide-react";
+import { Home, Package, Palette, BookOpen, User, FolderOpen, Tag, Gamepad2, Archive } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -62,6 +62,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               <FolderOpen className="h-4 w-4 inline-block mr-1.5" />
               Collections
+            </Link>
+            <Link
+              href="/dashboard/storage"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+            >
+              <Archive className="h-4 w-4 inline-block mr-1.5" />
+              Storage
             </Link>
             <Link
               href="/dashboard/tags"
@@ -127,10 +134,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       {/* Main Content */}
-      <main className="container py-8">
-        <div className="space-y-6">
-          {children}
-        </div>
+      <main className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 py-8 mx-auto max-w-[1600px]">
+        {children}
       </main>
     </div>
   );

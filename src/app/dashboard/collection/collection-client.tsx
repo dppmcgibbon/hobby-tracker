@@ -1,12 +1,13 @@
 "use client";
 
 import { MiniatureCard } from "@/components/miniatures/miniature-card";
+import { MiniatureTableView } from "@/components/miniatures/miniature-table-view";
 import { CollectionFilters, type FilterState } from "@/components/miniatures/collection-filters";
 import { TagManager } from "@/components/miniatures/tag-manager";
 import { BatchOperationsBar } from "@/components/miniatures/batch-operations-bar";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Tag } from "lucide-react";
+import { Plus, Package, Tag, Grid3x3, List } from "lucide-react";
 import { useState } from "react";
 
 interface MiniatureWithRelations {
@@ -56,6 +57,7 @@ export function CollectionClient({
   const [showTagManager, setShowTagManager] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   const handleSelectChange = (id: string, selected: boolean) => {
     setSelectedIds((prev) => {
@@ -88,16 +90,35 @@ export function CollectionClient({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">My Miniatures</h1>
+          <h1 className="text-3xl font-bold uppercase tracking-wider">My Miniatures</h1>
           <p className="text-muted-foreground">{miniatures.length} miniatures</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1 border border-primary/20 rounded-sm overflow-hidden">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("grid")}
+              className={viewMode === "grid" ? "btn-warhammer-primary" : ""}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("table")}
+              className={viewMode === "table" ? "btn-warhammer-primary" : ""}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             variant={selectionMode ? "default" : "outline"}
             onClick={handleToggleSelectionMode}
+            className={selectionMode ? "btn-warhammer-primary" : ""}
           >
             {selectionMode ? "Cancel Selection" : "Select Multiple"}
           </Button>
@@ -105,7 +126,7 @@ export function CollectionClient({
             <Tag className="mr-2 h-4 w-4" />
             Manage Tags
           </Button>
-          <Button asChild>
+          <Button asChild className="btn-warhammer-primary">
             <Link href="/dashboard/collection/add">
               <Plus className="mr-2 h-4 w-4" />
               Add Miniature
@@ -133,10 +154,10 @@ export function CollectionClient({
       {miniatures.length === 0 ? (
         <div className="text-center py-12">
           <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No miniatures found</h3>
+          <h3 className="mt-4 text-lg font-semibold uppercase tracking-wide">No miniatures found</h3>
           <p className="text-muted-foreground mt-2">Try adjusting your filters.</p>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {miniatures.map((miniature) => (
             <MiniatureCard
@@ -148,6 +169,13 @@ export function CollectionClient({
             />
           ))}
         </div>
+      ) : (
+        <MiniatureTableView
+          miniatures={miniatures}
+          selectable={selectionMode}
+          selectedIds={selectedIds}
+          onSelectChange={handleSelectChange}
+        />
       )}
 
       <BatchOperationsBar
