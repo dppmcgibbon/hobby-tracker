@@ -23,7 +23,7 @@
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:push": "supabase db push",
-    "supabase:reset": "supabase db reset"    
+    "supabase:reset": "supabase db reset"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -44,6 +44,8 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-pdf/renderer": "^4.3.2",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.3",
     "@tanstack/react-query": "^5.90.20",
@@ -53,6 +55,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
+    "file-saver": "^2.0.5",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.563.0",
@@ -70,7 +73,9 @@
     "recharts": "^2.15.4",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
+    "stl-viewer": "^0.12.0",
     "tailwind-merge": "^3.4.0",
+    "three": "^0.182.0",
     "tsx": "^4.21.0",
     "use-debounce": "^10.1.0",
     "zod": "^4.3.6"

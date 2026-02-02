@@ -1,11 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1";
-  };
   graphql_public: {
     Tables: {
       [_ in never]: never;
@@ -33,6 +28,75 @@ export type Database = {
   };
   public: {
     Tables: {
+      collection_miniatures: {
+        Row: {
+          collection_id: string;
+          created_at: string | null;
+          display_order: number | null;
+          miniature_id: string;
+        };
+        Insert: {
+          collection_id: string;
+          created_at?: string | null;
+          display_order?: number | null;
+          miniature_id: string;
+        };
+        Update: {
+          collection_id?: string;
+          created_at?: string | null;
+          display_order?: number | null;
+          miniature_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "collection_miniatures_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "collections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "collection_miniatures_miniature_id_fkey";
+            columns: ["miniature_id"];
+            isOneToOne: false;
+            referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      collections: {
+        Row: {
+          color: string | null;
+          created_at: string | null;
+          description: string | null;
+          id: string;
+          is_default: boolean | null;
+          name: string;
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          color?: string | null;
+          created_at?: string | null;
+          description?: string | null;
+          id?: string;
+          is_default?: boolean | null;
+          name: string;
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          color?: string | null;
+          created_at?: string | null;
+          description?: string | null;
+          id?: string;
+          is_default?: boolean | null;
+          name?: string;
+          updated_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       factions: {
         Row: {
           army_type: string;
@@ -57,6 +121,54 @@ export type Database = {
           description?: string | null;
           id?: string;
           name?: string;
+        };
+        Relationships: [];
+      };
+      materials: {
+        Row: {
+          brand: string | null;
+          color: string | null;
+          color_hex: string | null;
+          cost_per_unit: number | null;
+          created_at: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          quantity_grams: number | null;
+          quantity_ml: number | null;
+          type: string;
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          brand?: string | null;
+          color?: string | null;
+          color_hex?: string | null;
+          cost_per_unit?: number | null;
+          created_at?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          quantity_grams?: number | null;
+          quantity_ml?: number | null;
+          type: string;
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          brand?: string | null;
+          color?: string | null;
+          color_hex?: string | null;
+          cost_per_unit?: number | null;
+          created_at?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          quantity_grams?: number | null;
+          quantity_ml?: number | null;
+          type?: string;
+          updated_at?: string | null;
+          user_id?: string;
         };
         Relationships: [];
       };
@@ -177,6 +289,39 @@ export type Database = {
             columns: ["miniature_id"];
             isOneToOne: true;
             referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      miniature_tags: {
+        Row: {
+          created_at: string | null;
+          miniature_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          miniature_id: string;
+          tag_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          miniature_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "miniature_tags_miniature_id_fkey";
+            columns: ["miniature_id"];
+            isOneToOne: false;
+            referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "miniature_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "tags";
             referencedColumns: ["id"];
           },
         ];
@@ -305,6 +450,160 @@ export type Database = {
         };
         Relationships: [];
       };
+      print_profiles: {
+        Row: {
+          bottom_exposure_time_seconds: number | null;
+          bottom_layers: number | null;
+          created_at: string | null;
+          exposure_time_seconds: number | null;
+          id: string;
+          layer_height_mm: number | null;
+          lift_speed_mm_per_min: number | null;
+          material_id: string | null;
+          name: string;
+          notes: string | null;
+          printer_name: string | null;
+          retract_speed_mm_per_min: number | null;
+          temperature_celsius: number | null;
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          bottom_exposure_time_seconds?: number | null;
+          bottom_layers?: number | null;
+          created_at?: string | null;
+          exposure_time_seconds?: number | null;
+          id?: string;
+          layer_height_mm?: number | null;
+          lift_speed_mm_per_min?: number | null;
+          material_id?: string | null;
+          name: string;
+          notes?: string | null;
+          printer_name?: string | null;
+          retract_speed_mm_per_min?: number | null;
+          temperature_celsius?: number | null;
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          bottom_exposure_time_seconds?: number | null;
+          bottom_layers?: number | null;
+          created_at?: string | null;
+          exposure_time_seconds?: number | null;
+          id?: string;
+          layer_height_mm?: number | null;
+          lift_speed_mm_per_min?: number | null;
+          material_id?: string | null;
+          name?: string;
+          notes?: string | null;
+          printer_name?: string | null;
+          retract_speed_mm_per_min?: number | null;
+          temperature_celsius?: number | null;
+          updated_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "print_profiles_material_id_fkey";
+            columns: ["material_id"];
+            isOneToOne: false;
+            referencedRelation: "materials";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      prints: {
+        Row: {
+          completed_at: string | null;
+          created_at: string | null;
+          failure_reason: string | null;
+          id: string;
+          material_cost: number | null;
+          material_id: string | null;
+          material_used_ml: number | null;
+          miniature_id: string | null;
+          notes: string | null;
+          print_profile_id: string | null;
+          print_time_minutes: number | null;
+          quantity: number | null;
+          scale_factor: number | null;
+          started_at: string | null;
+          status: string;
+          stl_file_id: string | null;
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          completed_at?: string | null;
+          created_at?: string | null;
+          failure_reason?: string | null;
+          id?: string;
+          material_cost?: number | null;
+          material_id?: string | null;
+          material_used_ml?: number | null;
+          miniature_id?: string | null;
+          notes?: string | null;
+          print_profile_id?: string | null;
+          print_time_minutes?: number | null;
+          quantity?: number | null;
+          scale_factor?: number | null;
+          started_at?: string | null;
+          status?: string;
+          stl_file_id?: string | null;
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          completed_at?: string | null;
+          created_at?: string | null;
+          failure_reason?: string | null;
+          id?: string;
+          material_cost?: number | null;
+          material_id?: string | null;
+          material_used_ml?: number | null;
+          miniature_id?: string | null;
+          notes?: string | null;
+          print_profile_id?: string | null;
+          print_time_minutes?: number | null;
+          quantity?: number | null;
+          scale_factor?: number | null;
+          started_at?: string | null;
+          status?: string;
+          stl_file_id?: string | null;
+          updated_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "prints_material_id_fkey";
+            columns: ["material_id"];
+            isOneToOne: false;
+            referencedRelation: "materials";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "prints_miniature_id_fkey";
+            columns: ["miniature_id"];
+            isOneToOne: false;
+            referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "prints_print_profile_id_fkey";
+            columns: ["print_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "print_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "prints_stl_file_id_fkey";
+            columns: ["stl_file_id"];
+            isOneToOne: false;
+            referencedRelation: "stl_files";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_url: string | null;
@@ -377,6 +676,164 @@ export type Database = {
           },
         ];
       };
+      shared_miniatures: {
+        Row: {
+          created_at: string | null;
+          expires_at: string | null;
+          id: string;
+          is_public: boolean | null;
+          miniature_id: string;
+          share_token: string;
+          user_id: string;
+          view_count: number | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          is_public?: boolean | null;
+          miniature_id: string;
+          share_token: string;
+          user_id: string;
+          view_count?: number | null;
+        };
+        Update: {
+          created_at?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          is_public?: boolean | null;
+          miniature_id?: string;
+          share_token?: string;
+          user_id?: string;
+          view_count?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shared_miniatures_miniature_id_fkey";
+            columns: ["miniature_id"];
+            isOneToOne: true;
+            referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stl_files: {
+        Row: {
+          created_at: string | null;
+          description: string | null;
+          designer: string | null;
+          estimated_material_usage_ml: number | null;
+          estimated_print_time_minutes: number | null;
+          file_size_bytes: number | null;
+          id: string;
+          is_supported: boolean | null;
+          license: string | null;
+          name: string;
+          scale_factor: number | null;
+          source: string | null;
+          source_url: string | null;
+          storage_path: string;
+          thumbnail_path: string | null;
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          description?: string | null;
+          designer?: string | null;
+          estimated_material_usage_ml?: number | null;
+          estimated_print_time_minutes?: number | null;
+          file_size_bytes?: number | null;
+          id?: string;
+          is_supported?: boolean | null;
+          license?: string | null;
+          name: string;
+          scale_factor?: number | null;
+          source?: string | null;
+          source_url?: string | null;
+          storage_path: string;
+          thumbnail_path?: string | null;
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          description?: string | null;
+          designer?: string | null;
+          estimated_material_usage_ml?: number | null;
+          estimated_print_time_minutes?: number | null;
+          file_size_bytes?: number | null;
+          id?: string;
+          is_supported?: boolean | null;
+          license?: string | null;
+          name?: string;
+          scale_factor?: number | null;
+          source?: string | null;
+          source_url?: string | null;
+          storage_path?: string;
+          thumbnail_path?: string | null;
+          updated_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      stl_tags: {
+        Row: {
+          created_at: string | null;
+          stl_file_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          stl_file_id: string;
+          tag_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          stl_file_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stl_tags_stl_file_id_fkey";
+            columns: ["stl_file_id"];
+            isOneToOne: false;
+            referencedRelation: "stl_files";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stl_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "tags";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tags: {
+        Row: {
+          color: string | null;
+          created_at: string | null;
+          id: string;
+          name: string;
+          user_id: string;
+        };
+        Insert: {
+          color?: string | null;
+          created_at?: string | null;
+          id?: string;
+          name: string;
+          user_id: string;
+        };
+        Update: {
+          color?: string | null;
+          created_at?: string | null;
+          id?: string;
+          name?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_paints: {
         Row: {
           created_at: string | null;
@@ -420,7 +877,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      generate_share_token: { Args: never; Returns: string };
     };
     Enums: {
       [_ in never]: never;

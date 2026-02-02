@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["recharts", "lucide-react"],
+    serverActions: {
+      bodySizeLimit: "50mb", // Increase limit for STL file uploads
+    },
   },
 };
 
