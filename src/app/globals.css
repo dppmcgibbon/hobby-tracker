@@ -4,48 +4,55 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* Warhammer-inspired Dark Theme - Grimdark aesthetic */
+    --background: 0 0% 7%;
+    --foreground: 40 10% 85%;
+    --card: 0 0% 10%;
+    --card-foreground: 40 10% 85%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 40 10% 85%;
+    /* Imperial Gold accent */
+    --primary: 43 96% 56%;
+    --primary-foreground: 0 0% 10%;
+    /* Blood Red secondary */
+    --secondary: 0 65% 35%;
+    --secondary-foreground: 40 10% 95%;
+    /* Steel Gray muted */
+    --muted: 0 0% 18%;
+    --muted-foreground: 40 5% 60%;
+    /* Bronze accent */
+    --accent: 30 50% 45%;
+    --accent-foreground: 40 10% 95%;
+    /* Dark Red destructive */
+    --destructive: 0 75% 42%;
+    --destructive-foreground: 40 10% 95%;
+    /* Metallic borders */
+    --border: 0 0% 22%;
+    --input: 0 0% 18%;
+    --ring: 43 96% 56%;
+    --radius: 0.25rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 0 0% 7%;
+    --foreground: 40 10% 85%;
+    --card: 0 0% 10%;
+    --card-foreground: 40 10% 85%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 40 10% 85%;
+    --primary: 43 96% 56%;
+    --primary-foreground: 0 0% 10%;
+    --secondary: 0 65% 35%;
+    --secondary-foreground: 40 10% 95%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 40 5% 60%;
+    --accent: 30 50% 45%;
+    --accent-foreground: 40 10% 95%;
+    --destructive: 0 75% 42%;
+    --destructive-foreground: 40 10% 95%;
+    --border: 0 0% 22%;
+    --input: 0 0% 18%;
+    --ring: 43 96% 56%;
   }
 }
 
@@ -53,7 +60,120 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "kern" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Warhammer Gothic styling */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-wider;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Add subtle texture to background */
+  .warhammer-bg {
+    background-image: 
+      linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.05) 2px,
+        rgba(0, 0, 0, 0.05) 4px
+      );
+  }
+
+  /* Metallic gradient effects */
+  .metallic-border {
+    border-image: linear-gradient(
+      135deg,
+      hsl(0, 0%, 15%),
+      hsl(0, 0%, 35%),
+      hsl(0, 0%, 15%)
+    ) 1;
+  }
+
+  /* Gold accent glow */
+  .gold-glow {
+    text-shadow: 0 0 10px hsla(43, 96%, 56%, 0.3);
+  }
+
+  /* Battle-worn card styling */
+  .warhammer-card {
+    background: linear-gradient(
+      135deg,
+      hsl(0, 0%, 10%) 0%,
+      hsl(0, 0%, 12%) 50%,
+      hsl(0, 0%, 10%) 100%
+    );
+    border: 1px solid hsl(0, 0%, 22%);
+    box-shadow: 
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Imperial scrollwork divider */
+  .imperial-divider {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(43, 96%, 56%) 50%,
+      transparent
+    );
+    height: 1px;
+    position: relative;
+  }
+
+  .imperial-divider::before,
+  .imperial-divider::after {
+    content: "⚔";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(43, 96%, 56%);
+    font-size: 0.75rem;
+  }
+
+  .imperial-divider::before {
+    left: 0;
+  }
+
+  .imperial-divider::after {
+    right: 0;
+  }
+}
+
+@layer components {
+  /* Enhanced button styles */
+  .btn-warhammer {
+    @apply relative overflow-hidden;
+    background: linear-gradient(135deg, hsl(0, 0%, 18%), hsl(0, 0%, 14%));
+    border: 1px solid hsl(0, 0%, 28%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  .btn-warhammer:hover {
+    border-color: hsl(43, 96%, 56%);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+  }
+
+  .btn-warhammer-primary {
+    @apply btn-warhammer;
+    background: linear-gradient(135deg, hsl(43, 96%, 56%), hsl(43, 96%, 46%));
+    color: hsl(0, 0%, 10%);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-warhammer-primary:hover {
+    background: linear-gradient(135deg, hsl(43, 96%, 60%), hsl(43, 96%, 50%));
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
   }
 }

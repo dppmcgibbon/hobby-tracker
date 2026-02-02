@@ -84,51 +84,62 @@ export function RecentActivity({
   };
 
   const colors = {
-    added: "bg-blue-500",
-    completed: "bg-green-500",
-    photo: "bg-purple-500",
+    added: "bg-primary",
+    completed: "bg-accent",
+    photo: "bg-secondary",
   };
 
   if (activities.length === 0) {
     return (
-      <Card>
+      <Card className="warhammer-card border-primary/30">
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Your latest collection updates</CardDescription>
+          <CardTitle className="text-xl uppercase tracking-wide text-primary">
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Your latest force deployments</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">No recent activity</div>
+          <div className="text-center py-8 text-muted-foreground uppercase text-sm tracking-wide">
+            No recent activity
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="warhammer-card border-primary/30">
       <CardHeader>
-        <CardTitle>Recent Activity</CardTitle>
-        <CardDescription>Your latest collection updates</CardDescription>
+        <CardTitle className="text-xl uppercase tracking-wide text-primary">
+          Recent Activity
+        </CardTitle>
+        <CardDescription>Your latest force deployments</CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4">
+          <div className="space-y-2">
             {activities.map((activity, index) => {
               const Icon = icons[activity.type as keyof typeof icons];
               return (
                 <Link
                   key={`${activity.type}-${activity.id}-${index}`}
                   href={activity.link}
-                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-sm hover:bg-muted/30 transition-all border border-transparent hover:border-primary/30"
                 >
                   <div
-                    className={`${colors[activity.type as keyof typeof colors]} rounded-full p-2`}
+                    className={`${colors[activity.type as keyof typeof colors]} rounded-sm p-2 shadow-md`}
                   >
-                    <Icon className="h-4 w-4 text-white" />
+                    <Icon className="h-4 w-4 text-black" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-1">{activity.name}</p>
+                    <p className="text-sm font-bold line-clamp-1 uppercase tracking-wide">
+                      {activity.name}
+                    </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-primary/30 text-primary font-semibold uppercase tracking-wide"
+                      >
                         {labels[activity.type as keyof typeof labels]}
                       </Badge>
                       {activity.faction && (
@@ -136,7 +147,7 @@ export function RecentActivity({
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground font-semibold">
                     <Calendar className="h-3 w-3" />
                     {activity.date.toLocaleDateString()}
                   </div>

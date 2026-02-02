@@ -43,14 +43,16 @@ export function CompletionChart({ completionsByMonth, additionsByMonth }: Comple
 
   if (!hasData) {
     return (
-      <Card>
+      <Card className="warhammer-card border-primary/30">
         <CardHeader>
-          <CardTitle>Progress Over Time</CardTitle>
-          <CardDescription>Models added and completed per month</CardDescription>
+          <CardTitle className="text-xl uppercase tracking-wide text-primary">
+            Campaign Progress
+          </CardTitle>
+          <CardDescription>Units deployed and battle-ready per month</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            No completion data yet. Start painting!
+          <div className="text-center py-8 text-muted-foreground uppercase text-sm tracking-wide">
+            No campaign data yet. Deploy your forces!
           </div>
         </CardContent>
       </Card>
@@ -58,21 +60,41 @@ export function CompletionChart({ completionsByMonth, additionsByMonth }: Comple
   }
 
   return (
-    <Card>
+    <Card className="warhammer-card border-primary/30">
       <CardHeader>
-        <CardTitle>Progress Over Time</CardTitle>
-        <CardDescription>Models added and completed per month (last 6 months)</CardDescription>
+        <CardTitle className="text-xl uppercase tracking-wide text-primary">
+          Campaign Progress
+        </CardTitle>
+        <CardDescription>Units deployed and battle-ready per month (last 6 months)</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="added" fill="#3b82f6" name="Added" />
-            <Bar dataKey="completed" fill="#22c55e" name="Completed" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 22%)" />
+            <XAxis
+              dataKey="month"
+              stroke="hsl(40, 10%, 85%)"
+              style={{ fontSize: "0.75rem", fontWeight: "bold" }}
+            />
+            <YAxis stroke="hsl(40, 10%, 85%)" />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(0, 0%, 10%)",
+                border: "1px solid hsl(43, 96%, 56%, 0.3)",
+                borderRadius: "0.25rem",
+                color: "hsl(40, 10%, 85%)",
+              }}
+            />
+            <Legend
+              wrapperStyle={{
+                color: "hsl(40, 10%, 85%)",
+                fontWeight: "bold",
+                textTransform: "uppercase",
+                fontSize: "0.75rem",
+              }}
+            />
+            <Bar dataKey="added" fill="hsl(0, 0%, 45%)" name="Deployed" />
+            <Bar dataKey="completed" fill="hsl(43, 96%, 56%)" name="Battle Ready" />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

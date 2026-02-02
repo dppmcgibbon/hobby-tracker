@@ -27,92 +27,99 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
-              <span className="font-bold">Hobby Tracker</span>
+      {/* Header - Warhammer Gothic Style */}
+      <header className="sticky top-0 z-50 w-full border-b-2 border-primary/30 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-lg shadow-black/50">
+        <div className="container flex h-16 items-center">
+          <div className="mr-8 flex">
+            <Link href="/dashboard" className="flex items-center space-x-3 group">
+              <div className="h-10 w-10 bg-gradient-to-br from-primary via-primary/80 to-primary/60 rounded-sm flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-all">
+                <span className="text-black font-black text-xl">⚔</span>
+              </div>
+              <span className="font-black text-xl tracking-wider uppercase gold-glow text-primary">
+                Hobby Tracker
+              </span>
             </Link>
           </div>
 
-          <nav className="flex items-center space-x-6 text-sm font-medium flex-1">
+          <nav className="flex items-center space-x-1 text-xs font-bold flex-1 uppercase tracking-wide">
             <Link
               href="/dashboard"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <Home className="h-4 w-4 inline-block mr-1" />
+              <Home className="h-4 w-4 inline-block mr-1.5" />
               Dashboard
             </Link>
             <Link
               href="/dashboard/collection"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <Package className="h-4 w-4 inline-block mr-1" />
+              <Package className="h-4 w-4 inline-block mr-1.5" />
               Miniatures
             </Link>
             <Link
               href="/dashboard/collections"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <FolderOpen className="h-4 w-4 inline-block mr-1" />
+              <FolderOpen className="h-4 w-4 inline-block mr-1.5" />
               Collections
             </Link>
             <Link
               href="/dashboard/tags"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <Tag className="h-4 w-4 inline-block mr-1" />
+              <Tag className="h-4 w-4 inline-block mr-1.5" />
               Tags
             </Link>
             <Link
               href="/dashboard/games"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <Gamepad2 className="h-4 w-4 inline-block mr-1" />
+              <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
               Games
             </Link>
             <Link
               href="/dashboard/recipes"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <BookOpen className="h-4 w-4 inline-block mr-1" />
+              <BookOpen className="h-4 w-4 inline-block mr-1.5" />
               Recipes
             </Link>
             <Link
               href="/dashboard/paints"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
-              <Palette className="h-4 w-4 inline-block mr-1" />
+              <Palette className="h-4 w-4 inline-block mr-1.5" />
               Paints
             </Link>
           </nav>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{initials}</AvatarFallback>
+              <Button variant="ghost" className="relative h-9 w-9 rounded-sm border border-primary/20 hover:border-primary hover:bg-primary/10 transition-all">
+                <Avatar className="h-9 w-9 rounded-sm">
+                  <AvatarFallback className="rounded-sm bg-gradient-to-br from-primary to-primary/70 text-black font-black">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
+            <DropdownMenuContent className="w-56 bg-card border-primary/30" align="end" forceMount>
+              <DropdownMenuLabel className="font-bold uppercase text-xs tracking-wide text-primary">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
+                  <p className="text-sm font-bold leading-none">
                     {profile?.display_name || "User"}
                   </p>
-                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  <p className="text-xs leading-none text-muted-foreground normal-case">{user.email}</p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+              <DropdownMenuSeparator className="bg-primary/20" />
+              <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer">
                 <Link href="/dashboard/profile">
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-primary/20" />
               <LogoutButton />
             </DropdownMenuContent>
           </DropdownMenu>
@@ -120,7 +127,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       {/* Main Content */}
-      <main className="container py-6">{children}</main>
+      <main className="container py-8">
+        <div className="space-y-6">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

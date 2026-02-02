@@ -51,55 +51,65 @@ export default function LoginPage() {
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">Login</CardTitle>
-        <CardDescription>Enter your credentials to access your collection</CardDescription>
+    <Card className="warhammer-card border-primary/30">
+      <CardHeader className="space-y-1 border-b border-primary/20">
+        <CardTitle className="text-3xl font-black uppercase tracking-wider text-primary gold-glow">
+          Access Command
+        </CardTitle>
+        <CardDescription className="text-base">
+          Enter your credentials to access your forces
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="uppercase text-xs tracking-wide font-bold">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               {...register("email")}
               disabled={isLoading}
+              className="bg-muted/30 border-primary/20 focus:border-primary"
             />
             {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="uppercase text-xs tracking-wide font-bold">
+              Password
+            </Label>
             <Input
               id="password"
               type="password"
               placeholder="••••••••"
               {...register("password")}
               disabled={isLoading}
+              className="bg-muted/30 border-primary/20 focus:border-primary"
             />
             {errors.password && (
               <p className="text-sm text-destructive">{errors.password.message}</p>
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full btn-warhammer-primary" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign In
           </Button>
         </form>
       </CardContent>
-      <CardFooter className="flex flex-col space-y-2">
+      <CardFooter className="flex flex-col space-y-2 border-t border-primary/20 pt-6">
         <div className="text-sm text-muted-foreground text-center">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary hover:underline">
+          <Link href="/auth/signup" className="text-primary hover:text-primary/80 font-bold uppercase tracking-wide">
             Sign up
           </Link>
         </div>

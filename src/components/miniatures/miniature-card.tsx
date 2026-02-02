@@ -2,12 +2,15 @@
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import Image from "next/image";
 import { StatusBadge } from "./status-badge";
+import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { createClient } from "@/lib/supabase/client";
 import type { MiniatureStatus } from "@/types";
+import { Copy } from "lucide-react";
 
 interface MiniatureCardProps {
   miniature: {
@@ -61,7 +64,7 @@ export function MiniatureCard({
   }
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow relative">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow relative group">
       {selectable && (
         <div
           className="absolute top-2 left-2 z-50 bg-white dark:bg-gray-800 rounded-md p-2 shadow-lg border-2 border-primary"
@@ -86,6 +89,21 @@ export function MiniatureCard({
           Selectable
         </div>
       )}
+      {/* Duplicate button - shows on hover */}
+      <div 
+        className="absolute top-2 right-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <DuplicateMiniatureButton 
+          miniatureId={miniature.id} 
+          variant="default"
+          size="icon"
+          showLabel={false}
+        />
+      </div>
       <Link href={`/dashboard/collection/${miniature.id}`}>
         <div className="relative aspect-square bg-muted">
           <Image

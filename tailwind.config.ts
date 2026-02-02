@@ -50,6 +50,27 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: [
+          "Inter",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
+      },
+      boxShadow: {
+        "warhammer": "0 4px 12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+        "warhammer-lg": "0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+        "gold": "0 0 16px rgba(251, 191, 36, 0.4)",
+        "gold-strong": "0 0 24px rgba(251, 191, 36, 0.6)",
+      },
+      backgroundImage: {
+        "metallic-gradient": "linear-gradient(135deg, hsl(0, 0%, 18%), hsl(0, 0%, 14%), hsl(0, 0%, 18%))",
+        "gold-gradient": "linear-gradient(135deg, hsl(43, 96%, 56%), hsl(43, 96%, 46%), hsl(43, 96%, 56%))",
+        "steel-gradient": "linear-gradient(135deg, hsl(0, 0%, 25%), hsl(0, 0%, 15%), hsl(0, 0%, 25%))",
+      },
     },
   },
   plugins: [tailwindcssAnimate],

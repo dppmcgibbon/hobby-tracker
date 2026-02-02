@@ -8,11 +8,11 @@ interface StatusDistributionChartProps {
 }
 
 const COLORS = {
-  backlog: "#64748b",
-  assembled: "#3b82f6",
-  primed: "#a855f7",
-  painting: "#eab308",
-  completed: "#22c55e",
+  backlog: "hsl(0, 0%, 45%)", // Steel gray
+  assembled: "hsl(43, 96%, 56%)", // Imperial gold
+  primed: "hsl(30, 50%, 45%)", // Bronze
+  painting: "hsl(0, 65%, 35%)", // Blood red
+  completed: "hsl(43, 96%, 56%)", // Imperial gold (completed)
 };
 
 const STATUS_LABELS = {
@@ -34,23 +34,29 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
 
   if (chartData.length === 0) {
     return (
-      <Card>
+      <Card className="warhammer-card border-primary/30">
         <CardHeader>
-          <CardTitle>Status Distribution</CardTitle>
-          <CardDescription>Breakdown by painting status</CardDescription>
+          <CardTitle className="text-xl uppercase tracking-wide text-primary">
+            Force Composition
+          </CardTitle>
+          <CardDescription>Battle readiness by status</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">No data available</div>
+          <div className="text-center py-8 text-muted-foreground uppercase text-sm tracking-wide">
+            No data available
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="warhammer-card border-primary/30">
       <CardHeader>
-        <CardTitle>Status Distribution</CardTitle>
-        <CardDescription>Breakdown by painting status</CardDescription>
+        <CardTitle className="text-xl uppercase tracking-wide text-primary">
+          Force Composition
+        </CardTitle>
+        <CardDescription>Battle readiness by status</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -64,6 +70,8 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
               outerRadius={80}
               fill="#8884d8"
               dataKey="value"
+              stroke="hsl(0, 0%, 7%)"
+              strokeWidth={2}
             >
               {chartData.map((entry) => (
                 <Cell
@@ -72,7 +80,14 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
                 />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(0, 0%, 10%)",
+                border: "1px solid hsl(43, 96%, 56%, 0.3)",
+                borderRadius: "0.25rem",
+                color: "hsl(40, 10%, 85%)",
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

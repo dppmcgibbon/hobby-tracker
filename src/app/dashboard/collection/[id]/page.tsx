@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PhotoUpload } from "@/components/miniatures/photo-upload";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { DeleteMiniatureButton } from "@/components/miniatures/delete-miniature-button";
+import { DuplicateMiniatureButton } from "@/components/miniatures/duplicate-miniature-button";
 import { StatusBadge } from "@/components/miniatures/status-badge";
 import { TagManager } from "@/components/miniatures/tag-manager";
 import { ArrowLeft, Edit, Calendar } from "lucide-react";
@@ -78,6 +79,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
           </Link>
         </Button>
         <div className="flex gap-2">
+          <DuplicateMiniatureButton miniatureId={id} />
           <Button variant="outline" asChild>
             <Link href={`/dashboard/collection/${id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />

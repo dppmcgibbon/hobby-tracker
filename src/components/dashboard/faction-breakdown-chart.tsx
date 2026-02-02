@@ -18,32 +18,51 @@ export function FactionBreakdownChart({ factionBreakdown }: FactionBreakdownChar
 
   if (chartData.length === 0) {
     return (
-      <Card>
+      <Card className="warhammer-card border-primary/30">
         <CardHeader>
-          <CardTitle>Faction Breakdown</CardTitle>
-          <CardDescription>Top 10 armies in your collection</CardDescription>
+          <CardTitle className="text-xl uppercase tracking-wide text-primary">
+            Army Distribution
+          </CardTitle>
+          <CardDescription>Top 10 forces in your collection</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">No faction data available</div>
+          <div className="text-center py-8 text-muted-foreground uppercase text-sm tracking-wide">
+            No faction data available
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="warhammer-card border-primary/30">
       <CardHeader>
-        <CardTitle>Faction Breakdown</CardTitle>
-        <CardDescription>Top 10 armies in your collection</CardDescription>
+        <CardTitle className="text-xl uppercase tracking-wide text-primary">
+          Army Distribution
+        </CardTitle>
+        <CardDescription>Top 10 forces in your collection</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="faction" type="category" width={100} />
-            <Tooltip />
-            <Bar dataKey="count" fill="#8b5cf6" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 22%)" />
+            <XAxis type="number" stroke="hsl(40, 10%, 85%)" />
+            <YAxis
+              dataKey="faction"
+              type="category"
+              width={100}
+              stroke="hsl(40, 10%, 85%)"
+              style={{ fontSize: "0.75rem", fontWeight: "bold" }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(0, 0%, 10%)",
+                border: "1px solid hsl(43, 96%, 56%, 0.3)",
+                borderRadius: "0.25rem",
+                color: "hsl(40, 10%, 85%)",
+              }}
+            />
+            <Bar dataKey="count" fill="hsl(43, 96%, 56%)" />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

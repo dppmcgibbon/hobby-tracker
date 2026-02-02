@@ -203,3 +203,61 @@ export async function getMiniaturesExcludingCollection(collectionId: string) {
 
   return { success: true, miniatures: availableMiniatures };
 }
+
+export async function duplicateMiniature(id: string) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Get the original miniature
+  const { data: original, error: fetchError } = await supabase
+    .from("miniatures")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !original) {
+    throw new Error("Miniature not found");
+  }
+
+  // Get the original status
+  const { data: originalStatus } = await supabase
+    .from("miniature_status")
+    .select("*")
+    .eq("miniature_id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  // Create duplicate with modified name
+  const { id: _, user_id: __, created_at: ___, updated_at: ____, ...miniatureData } = original;
+  
+  const { data: duplicate, error: createError } = await supabase
+    .from("miniatures")
+    .insert({
+      ...miniatureData,
+      name: `${original.name} (Copy)`,
+      user_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    throw new Error(createError.message);
+  }
+
+  // Create status for duplicate (copy status but reset completion date)
+  const { error: statusError } = await supabase.from("miniature_status").insert({
+    miniature_id: duplicate.id,
+    user_id: user.id,
+    status: originalStatus?.status || "backlog",
+    magnetised: originalStatus?.magnetised || false,
+    based: originalStatus?.based || false,
+  });
+
+  if (statusError) {
+    throw new Error(statusError.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true, miniature: duplicate };
+}
