@@ -1,0 +1,62 @@
+brand,name,type,color_hex
+Citadel,Abaddon Black,base,#000000
+Citadel,Averland Sunset,base,#FDB825
+Citadel,Balthasar Gold,base,#A47552
+Citadel,Bugman's Glow,base,#834437
+Citadel,Caliban Green,base,#00401F
+Citadel,Caledor Sky,base,#396E9A
+Citadel,Castellan Green,base,#264715
+Citadel,Catachan Green,base,#424B0F
+Citadel,Celestra Grey,base,#90A8A0
+Citadel,Ceramite White,base,#FFFFFF
+Citadel,Corax White,base,#FFFFFF
+Citadel,Death Guard Green,base,#556229
+Citadel,Leadbelcher,base,#888D8F
+Citadel,Mephiston Red,base,#960C09
+Citadel,Mournfang Brown,base,#622A0E
+Citadel,Naggaroth Night,base,#3D0C5C
+Citadel,Rakarth Flesh,base,#ABABAB
+Citadel,Rhinox Hide,base,#402D20
+Citadel,Screamer Pink,base,#811241
+Citadel,Steel Legion Drab,base,#5B4F31
+Citadel,Administratum Grey,layer,#949B9B
+Citadel,Ahriman Blue,layer,#1F8C9C
+Citadel,Alaitoc Blue,layer,#2A5582
+Citadel,Auric Armour Gold,layer,#FFC300
+Citadel,Baharroth Blue,layer,#58C1CD
+Citadel,Agrax Earthshade,shade,#694D2E
+Citadel,Athonian Camoshade,shade,#414837
+Citadel,Biel-Tan Green,shade,#1BA169
+Citadel,Carroburg Crimson,shade,#A4282D
+Citadel,Casandora Yellow,shade,#FFC31B
+Citadel,Coelia Greenshade,shade,#067E4A
+Citadel,Drakenhof Nightshade,shade,#125899
+Citadel,Druchii Violet,shade,#674C7D
+Citadel,Fuegan Orange,shade,#EA8426
+Citadel,Nuln Oil,shade,#14100D
+Citadel,Reikland Fleshshade,shade,#CA6C4D
+Citadel,Seraphim Sepia,shade,#5E4D30
+Citadel,Chronus Blue,dry,#6799BC
+Citadel,Dawnstone,dry,#6D6D6D
+Citadel,Eldar Flesh,dry,#ECC384
+Citadel,Golden Griffon,dry,#C1A880
+Citadel,Hexos Palesun,dry,#FFF571
+Citadel,Kindleflame,dry,#F79646
+Citadel,Longbeard Grey,dry,#CECED0
+Citadel,Lucius Lilac,dry,#B39AC7
+Citadel,Necron Compound,dry,#9B9B9B
+Citadel,Nurgling Green,dry,#9C9E25
+Citadel,Praxeti White,dry,#FFFFFF
+Citadel,Ryza Rust,dry,#EC631E
+Citadel,Aggaros Dunes,contrast,#C4A14D
+Citadel,Akelian Green,contrast,#00695C
+Citadel,Apothecary White,contrast,#E0E0E0
+Citadel,Asurmen Blue,contrast,#0A5796
+Citadel,Bad Moon Yellow,contrast,#FFE900
+Citadel,Basilicanum Grey,contrast,#606D75
+Citadel,Black Templar,contrast,#1C1C1C
+Citadel,Blood Angels Red,contrast,#A40000
+Citadel,Creed Camo,contrast,#687C55
+Citadel,Cygor Brown,contrast,#694233
+Citadel,Dark Angels Green,contrast,#004225
+Citadel,Flesh Tearers Red,contrast,#C51618
