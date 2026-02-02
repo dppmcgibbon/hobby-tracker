@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Select,
@@ -30,6 +30,15 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
   );
   const [magnetised, setMagnetised] = useState(status?.magnetised || false);
   const [based, setBased] = useState(status?.based || false);
+
+  // Sync local state with props when they change (e.g., after bulk update)
+  useEffect(() => {
+    if (status) {
+      setCurrentStatus((status.status as StatusType) || "backlog");
+      setMagnetised(status.magnetised || false);
+      setBased(status.based || false);
+    }
+  }, [status]);
 
   const handleStatusChange = async (newStatus: string) => {
     setUpdating(true);

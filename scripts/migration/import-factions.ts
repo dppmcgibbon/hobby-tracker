@@ -59,7 +59,7 @@ async function importFactions(csvPath: string) {
         for (let i = 0; i < toInsert.length; i += batchSize) {
           const batch = toInsert.slice(i, i + batchSize);
 
-          const { data, error } = await supabase.from("factions").insert(batch).select();
+          const { error } = await supabase.from("factions").insert(batch).select();
 
           if (error) {
             console.error(`Error inserting batch ${i / batchSize + 1}:`, error);

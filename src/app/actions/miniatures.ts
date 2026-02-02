@@ -107,3 +107,99 @@ export async function updateMiniatureStatus(miniatureId: string, data: Miniature
   revalidatePath(`/dashboard/collection/${miniatureId}`);
   return { success: true, status };
 }
+
+export async function bulkUpdateStatus(miniatureIds: string[], status: string) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // Update status in miniature_status table
+  const { error } = await supabase
+    .from("miniature_status")
+    .update({ status })
+    .in("miniature_id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
+export async function bulkDelete(miniatureIds: string[]) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  const { error } = await supabase.from("miniatures").delete().in("id", miniatureIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
+export async function getMiniaturesExcludingCollection(collectionId: string) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Get all miniatures not in the specified collection
+  const { data: miniatures, error } = await supabase
+    .from("miniatures")
+    .select(
+      `
+      id,
+      name,
+      factions!inner (name)
+    `
+    )
+    .eq("user_id", user.id)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // Get miniatures already in the collection
+  const { data: collectionMiniatures } = await supabase
+    .from("collection_miniatures")
+    .select("miniature_id")
+    .eq("collection_id", collectionId);
+
+  const collectionMiniatureIds = new Set(collectionMiniatures?.map((cm) => cm.miniature_id) || []);
+
+  // Filter out miniatures already in the collection and transform the data
+  const availableMiniatures = (miniatures || [])
+    .filter((m) => !collectionMiniatureIds.has(m.id))
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
+    }));
+
+  return { success: true, miniatures: availableMiniatures };
+}

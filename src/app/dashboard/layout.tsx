@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import { Home, Package, Palette, BookOpen, User } from "lucide-react";
+import { Home, Package, Palette, BookOpen, User, FolderOpen, Tag } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -32,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex">
             <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
-              <span className="font-bold">Warhammer Tracker</span>
+              <span className="font-bold">Hobby Tracker</span>
             </Link>
           </div>
 
@@ -49,7 +49,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               <Package className="h-4 w-4 inline-block mr-1" />
-              Collection
+              Miniatures
+            </Link>
+            <Link
+              href="/dashboard/collections"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              <FolderOpen className="h-4 w-4 inline-block mr-1" />
+              Collections
+            </Link>
+            <Link
+              href="/dashboard/tags"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              <Tag className="h-4 w-4 inline-block mr-1" />
+              Tags
             </Link>
             <Link
               href="/dashboard/recipes"

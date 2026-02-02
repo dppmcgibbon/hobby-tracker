@@ -2,9 +2,12 @@
 
 import { MiniatureCard } from "@/components/miniatures/miniature-card";
 import { CollectionFilters, type FilterState } from "@/components/miniatures/collection-filters";
+import { TagManager } from "@/components/miniatures/tag-manager";
+import { BatchOperationsBar } from "@/components/miniatures/batch-operations-bar";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, Tag } from "lucide-react";
+import { useState } from "react";
 
 interface MiniatureWithRelations {
   id: string;
@@ -18,30 +21,102 @@ interface MiniatureWithRelations {
   miniature_photos: { id: string; storage_path: string }[];
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+interface Collection {
+  id: string;
+  name: string;
+}
+
 interface CollectionClientProps {
   miniatures: MiniatureWithRelations[];
   factions: { id: string; name: string }[];
+  tags: Tag[];
+  collections: Collection[];
   initialFilters: FilterState;
 }
 
-export function CollectionClient({ miniatures, factions, initialFilters }: CollectionClientProps) {
+export function CollectionClient({
+  miniatures,
+  factions,
+  tags,
+  collections,
+  initialFilters,
+}: CollectionClientProps) {
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  const handleSelectChange = (id: string, selected: boolean) => {
+    setSelectedIds((prev) => {
+      if (selected) {
+        return [...prev, id];
+      } else {
+        return prev.filter((prevId) => prevId !== id);
+      }
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+    setSelectionMode(false);
+  };
+
+  const handleToggleSelectionMode = () => {
+    const newMode = !selectionMode;
+    console.log("🔄 TOGGLING SELECTION MODE:", { from: selectionMode, to: newMode });
+    setSelectionMode(newMode);
+    if (selectionMode) {
+      setSelectedIds([]);
+    }
+  };
+
+  console.log("📦 CollectionClient render:", {
+    selectionMode,
+    selectedIdsCount: selectedIds.length,
+    miniaturesCount: miniatures.length,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">My Collection</h1>
+          <h1 className="text-3xl font-bold">My Miniatures</h1>
           <p className="text-muted-foreground">{miniatures.length} miniatures</p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/collection/add">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Miniature
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={selectionMode ? "default" : "outline"}
+            onClick={handleToggleSelectionMode}
+          >
+            {selectionMode ? "Cancel Selection" : "Select Multiple"}
+          </Button>
+          <Button variant="outline" onClick={() => setShowTagManager(!showTagManager)}>
+            <Tag className="mr-2 h-4 w-4" />
+            Manage Tags
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/collection/add">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Miniature
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {showTagManager && (
+        <div className="border rounded-lg p-6 bg-card">
+          <TagManager tags={tags} />
+        </div>
+      )}
 
       <CollectionFilters
         factions={factions}
+        tags={tags}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />
@@ -55,10 +130,23 @@ export function CollectionClient({ miniatures, factions, initialFilters }: Colle
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {miniatures.map((miniature) => (
-            <MiniatureCard key={miniature.id} miniature={miniature} />
+            <MiniatureCard
+              key={miniature.id}
+              miniature={miniature}
+              selectable={selectionMode}
+              selected={selectedIds.includes(miniature.id)}
+              onSelectChange={handleSelectChange}
+            />
           ))}
         </div>
       )}
+
+      <BatchOperationsBar
+        selectedIds={selectedIds}
+        onClearSelection={handleClearSelection}
+        tags={tags}
+        collections={collections}
+      />
     </div>
   );
 }

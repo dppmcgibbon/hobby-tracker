@@ -11,7 +11,7 @@ export const miniatureSchema = z.object({
   year: z.coerce
     .number()
     .int()
-    .min(1987, "Warhammer 40K started in 1987")
+    .min(1900, "Year must be 1900 or later")
     .max(new Date().getFullYear())
     .optional()
     .nullable(),

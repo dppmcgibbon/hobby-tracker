@@ -26,6 +26,7 @@ import {
 
 interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
+  tags: { id: string; name: string; color: string | null }[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
 }
@@ -34,6 +35,7 @@ export interface FilterState {
   search: string;
   factionId: string;
   status: string;
+  tagId: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -57,6 +59,7 @@ const SORT_OPTIONS = [
 
 export function CollectionFilters({
   factions,
+  tags,
   onFiltersChange,
   initialFilters,
 }: CollectionFiltersProps) {
@@ -69,6 +72,7 @@ export function CollectionFilters({
     search: searchParams.get("search") || initialFilters?.search || "",
     factionId: searchParams.get("faction") || initialFilters?.factionId || "all",
     status: searchParams.get("status") || initialFilters?.status || "all",
+    tagId: searchParams.get("tag") || initialFilters?.tagId || "all",
     sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "created_at",
     sortOrder:
       (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "desc",
@@ -84,6 +88,7 @@ export function CollectionFilters({
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (filters.factionId !== "all") params.set("faction", filters.factionId);
     if (filters.status !== "all") params.set("status", filters.status);
+    if (filters.tagId !== "all") params.set("tag", filters.tagId);
     if (filters.sortBy !== "created_at") params.set("sortBy", filters.sortBy);
     if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
 
@@ -98,7 +103,14 @@ export function CollectionFilters({
       search: debouncedSearch,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, filters.factionId, filters.status, filters.sortBy, filters.sortOrder]);
+  }, [
+    debouncedSearch,
+    filters.factionId,
+    filters.status,
+    filters.tagId,
+    filters.sortBy,
+    filters.sortOrder,
+  ]);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -109,6 +121,7 @@ export function CollectionFilters({
       search: "",
       factionId: "all",
       status: "all",
+      tagId: "all",
       sortBy: "created_at",
       sortOrder: "desc",
     };
@@ -119,6 +132,7 @@ export function CollectionFilters({
     filters.search ||
     filters.factionId !== "all" ||
     filters.status !== "all" ||
+    filters.tagId !== "all" ||
     filters.sortBy !== "created_at" ||
     filters.sortOrder !== "desc";
 
@@ -126,6 +140,7 @@ export function CollectionFilters({
     filters.search,
     filters.factionId !== "all",
     filters.status !== "all",
+    filters.tagId !== "all",
     filters.sortBy !== "created_at" || filters.sortOrder !== "desc",
   ].filter(Boolean).length;
 
@@ -178,6 +193,32 @@ export function CollectionFilters({
               {STATUS_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Tag Filter */}
+        <div className="min-w-[180px]">
+          <Label htmlFor="tag">Tag</Label>
+          <Select value={filters.tagId} onValueChange={(v) => updateFilter("tagId", v)}>
+            <SelectTrigger id="tag">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tags</SelectItem>
+              {tags.map((tag) => (
+                <SelectItem key={tag.id} value={tag.id}>
+                  <div className="flex items-center gap-2">
+                    {tag.color && (
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                    )}
+                    {tag.name}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -299,6 +340,32 @@ export function CollectionFilters({
                   </Select>
                 </div>
 
+                {/* Tag */}
+                <div>
+                  <Label htmlFor="mobile-tag">Tag</Label>
+                  <Select value={filters.tagId} onValueChange={(v) => updateFilter("tagId", v)}>
+                    <SelectTrigger id="mobile-tag">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tags</SelectItem>
+                      {tags.map((tag) => (
+                        <SelectItem key={tag.id} value={tag.id}>
+                          <div className="flex items-center gap-2">
+                            {tag.color && (
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: tag.color }}
+                              />
+                            )}
+                            {tag.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Sort By */}
                 <div>
                   <Label htmlFor="mobile-sortBy">Sort By</Label>
@@ -381,6 +448,17 @@ export function CollectionFilters({
               Status: {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
               <button
                 onClick={() => updateFilter("status", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.tagId !== "all" && (
+            <Badge variant="secondary">
+              Tag: {tags.find((t) => t.id === filters.tagId)?.name || filters.tagId}
+              <button
+                onClick={() => updateFilter("tagId", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

@@ -58,8 +58,9 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
           const { data } = supabase.storage
             .from("miniature-photos")
             .getPublicUrl(photo.storage_path);
-          
-          const isLocalSupabase = data.publicUrl.includes("127.0.0.1") || data.publicUrl.includes("localhost");
+
+          const isLocalSupabase =
+            data.publicUrl.includes("127.0.0.1") || data.publicUrl.includes("localhost");
 
           return (
             <button

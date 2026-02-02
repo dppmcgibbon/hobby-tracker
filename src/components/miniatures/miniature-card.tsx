@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import Image from "next/image";
 import { StatusBadge } from "./status-badge";
@@ -23,17 +24,29 @@ interface MiniatureCardProps {
     } | null;
     miniature_photos: { storage_path: string }[];
   };
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (id: string, selected: boolean) => void;
 }
 
-export function MiniatureCard({ miniature }: MiniatureCardProps) {
+export function MiniatureCard({
+  miniature,
+  selectable,
+  selected,
+  onSelectChange,
+}: MiniatureCardProps) {
   const supabase = createClient();
   const photos = miniature.miniature_photos || [];
   const firstPhoto = photos[0];
 
-  console.log("Miniature photos:", {
-    miniatureId: miniature.id,
-    photosCount: photos.length,
-    firstPhoto,
+  // DEBUG: Log when component renders
+  console.log(`MiniatureCard ${miniature.id}:`, { selectable, selected });
+
+  // Format date consistently for SSR/Client hydration
+  const formattedDate = new Date(miniature.created_at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 
   let imageUrl = "/placeholder-miniature.png";
@@ -48,8 +61,32 @@ export function MiniatureCard({ miniature }: MiniatureCardProps) {
   }
 
   return (
-    <Link href={`/dashboard/collection/${miniature.id}`}>
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow relative">
+      {selectable && (
+        <div
+          className="absolute top-2 left-2 z-50 bg-white dark:bg-gray-800 rounded-md p-2 shadow-lg border-2 border-primary"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Checkbox wrapper clicked");
+          }}
+        >
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(checked) => {
+              console.log("Checkbox changed:", { miniatureId: miniature.id, checked });
+              onSelectChange?.(miniature.id, !!checked);
+            }}
+          />
+        </div>
+      )}
+      {/* DEBUG: Visual indicator when selectable is true */}
+      {selectable && (
+        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-bl z-40">
+          Selectable
+        </div>
+      )}
+      <Link href={`/dashboard/collection/${miniature.id}`}>
         <div className="relative aspect-square bg-muted">
           <Image
             src={imageUrl}
@@ -80,11 +117,10 @@ export function MiniatureCard({ miniature }: MiniatureCardProps) {
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Quantity: {miniature.quantity} • Added{" "}
-            {new Date(miniature.created_at).toLocaleDateString()}
+            Quantity: {miniature.quantity} • Added {formattedDate}
           </p>
         </CardFooter>
-      </Card>
-    </Link>
+      </Link>
+    </Card>
   );
 }

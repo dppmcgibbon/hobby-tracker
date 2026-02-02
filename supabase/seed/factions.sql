@@ -1,4 +1,6 @@
--- Seed Warhammer 40K Factions
+-- Seed Common Tabletop Wargame Factions
+-- This file seeds some example factions from Warhammer 40K
+-- Feel free to modify or add your own factions for other game systems
 INSERT INTO public.factions (name, army_type, description, color_hex) VALUES
   -- Space Marines (Loyalist)
   ('Ultramarines', 'loyalist', 'The greatest of all Space Marine Chapters', '#0055AA'),

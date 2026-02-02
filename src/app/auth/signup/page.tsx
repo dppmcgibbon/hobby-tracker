@@ -75,7 +75,7 @@ export default function SignupPage() {
     <Card>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
-        <CardDescription>Start tracking your Warhammer 40K collection</CardDescription>
+        <CardDescription>Start tracking your miniature collection</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -148,7 +148,7 @@ export default function SignupPage() {
       <CardFooter className="flex flex-col space-y-2">
         <div className="text-sm text-muted-foreground text-center">
           Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
+          <Link href="/auth/login" className="text-primary hover:underline">
             Sign in
           </Link>
         </div>

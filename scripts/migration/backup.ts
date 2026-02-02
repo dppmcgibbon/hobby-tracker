@@ -12,10 +12,7 @@ async function backup() {
 
   // Backup factions
   const { data: factions } = await supabase.from("factions").select("*");
-  fs.writeFileSync(
-    `${backupDir}/factions.json`,
-    JSON.stringify(factions, null, 2)
-  );
+  fs.writeFileSync(`${backupDir}/factions.json`, JSON.stringify(factions, null, 2));
   console.log(`✅ Backed up ${factions?.length || 0} factions`);
 
   // Backup paints
@@ -25,10 +22,7 @@ async function backup() {
 
   // Backup miniatures (all users)
   const { data: miniatures } = await supabase.from("miniatures").select("*");
-  fs.writeFileSync(
-    `${backupDir}/miniatures.json`,
-    JSON.stringify(miniatures, null, 2)
-  );
+  fs.writeFileSync(`${backupDir}/miniatures.json`, JSON.stringify(miniatures, null, 2));
   console.log(`✅ Backed up ${miniatures?.length || 0} miniatures`);
 
   // Backup recipes

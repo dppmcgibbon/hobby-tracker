@@ -2,16 +2,25 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { CollectionClient } from "./collection-client";
 
+// Force dynamic rendering - don't cache this page
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function CollectionPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined };
+  searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const user = await requireAuth();
   const supabase = await createClient();
+  const params = await searchParams;
 
-  // Fetch factions for filter dropdown
-  const { data: factions } = await supabase.from("factions").select("id, name").order("name");
+  // Fetch factions and tags for filter dropdown
+  const [{ data: factions }, { data: tags }, { data: collections }] = await Promise.all([
+    supabase.from("factions").select("id, name").order("name"),
+    supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
+    supabase.from("collections").select("id, name").eq("user_id", user.id).order("name"),
+  ]);
 
   // Build query with filters
   let query = supabase
@@ -30,24 +39,37 @@ export default async function CollectionPage({
     .eq("user_id", user.id);
 
   // Apply search filter
-  if (searchParams.search) {
-    query = query.ilike("name", `%${searchParams.search}%`);
+  if (params.search) {
+    query = query.ilike("name", `%${params.search}%`);
   }
 
   // Apply faction filter
-  if (searchParams.faction && searchParams.faction !== "all") {
-    query = query.eq("faction_id", searchParams.faction);
+  if (params.faction && params.faction !== "all") {
+    query = query.eq("faction_id", params.faction);
   }
 
   // Apply status filter
-  if (searchParams.status && searchParams.status !== "all") {
+  if (params.status && params.status !== "all") {
     // Note: This requires a join or separate query for status
     // For now, we'll filter client-side or adjust the query structure
   }
 
+  // Apply tag filter (we'll do this client-side after fetching miniature_tags)
+  let tagFilteredMiniatureIds: Set<string> | null = null;
+  if (params.tag && params.tag !== "all") {
+    const { data: taggedMiniatures } = await supabase
+      .from("miniature_tags")
+      .select("miniature_id")
+      .eq("tag_id", params.tag);
+
+    if (taggedMiniatures) {
+      tagFilteredMiniatureIds = new Set(taggedMiniatures.map((t) => t.miniature_id));
+    }
+  }
+
   // Apply sorting
-  const sortBy = searchParams.sortBy || "created_at";
-  const sortOrder = (searchParams.sortOrder || "desc") as "asc" | "desc";
+  const sortBy = params.sortBy || "created_at";
+  const sortOrder = (params.sortOrder || "desc") as "asc" | "desc";
 
   if (sortBy === "name") {
     query = query.order("name", { ascending: sortOrder === "asc" });
@@ -78,10 +100,16 @@ export default async function CollectionPage({
     miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
   }));
 
-  if (searchParams.status && searchParams.status !== "all") {
+  // Apply tag filter
+  if (tagFilteredMiniatureIds) {
+    filteredMiniatures = filteredMiniatures.filter((m) => tagFilteredMiniatureIds.has(m.id));
+  }
+
+  // Apply status filter
+  if (params.status && params.status !== "all") {
     filteredMiniatures = filteredMiniatures.filter((m) => {
       const status = m.miniature_status?.status || "backlog";
-      return status === searchParams.status;
+      return status === params.status;
     });
   }
 
@@ -89,12 +117,15 @@ export default async function CollectionPage({
     <CollectionClient
       miniatures={filteredMiniatures}
       factions={factions || []}
+      tags={tags || []}
+      collections={collections || []}
       initialFilters={{
-        search: searchParams.search || "",
-        factionId: searchParams.faction || "all",
-        status: searchParams.status || "all",
-        sortBy: searchParams.sortBy || "created_at",
-        sortOrder: (searchParams.sortOrder as "asc" | "desc") || "desc",
+        search: params.search || "",
+        factionId: params.faction || "all",
+        status: params.status || "all",
+        tagId: params.tag || "all",
+        sortBy: params.sortBy || "created_at",
+        sortOrder: (params.sortOrder as "asc" | "desc") || "desc",
       }}
     />
   );

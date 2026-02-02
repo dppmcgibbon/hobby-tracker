@@ -11,6 +11,7 @@ import { PhotoUpload } from "@/components/miniatures/photo-upload";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { DeleteMiniatureButton } from "@/components/miniatures/delete-miniature-button";
 import { StatusBadge } from "@/components/miniatures/status-badge";
+import { TagManager } from "@/components/miniatures/tag-manager";
 import { ArrowLeft, Edit, Calendar } from "lucide-react";
 import { getRecipes } from "@/lib/queries/recipes";
 import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
@@ -30,15 +31,23 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
     getRecipes(user.id),
   ]);
 
-  // Get the linked recipes
+  // Get the linked recipes and tags
   const supabase = await createClient();
-  const { data: miniatureRecipes } = await supabase
-    .from("miniature_recipes")
-    .select("recipe_id")
-    .eq("miniature_id", id);
+  const [{ data: miniatureRecipes }, { data: allTags }, { data: miniatureTags }] =
+    await Promise.all([
+      supabase.from("miniature_recipes").select("recipe_id").eq("miniature_id", id),
+      supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
+      supabase
+        .from("miniature_tags")
+        .select("tag_id, tags(id, name, color)")
+        .eq("miniature_id", id),
+    ]);
 
   const linkedRecipeIds = miniatureRecipes?.map((mr) => mr.recipe_id) || [];
   const linkedRecipes = recipes.filter((r) => linkedRecipeIds.includes(r.id));
+
+  // Get selected tag IDs
+  const selectedTagIds = miniatureTags?.map((mt) => mt.tag_id) || [];
 
   // Count linked recipes from miniature data
   const linkedRecipeCount = miniature.recipes?.length || 0;
@@ -50,7 +59,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
         <Button variant="ghost" asChild>
           <Link href="/dashboard/collection">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Collection
+            Back to Miniatures
           </Link>
         </Button>
         <div className="flex gap-2">
@@ -79,6 +88,13 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
               <div>
                 <h4 className="text-sm font-medium mb-2">Status</h4>
                 <StatusBadge miniatureId={id} status={miniature.status} />
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="text-sm font-medium mb-2">Tags</h4>
+                <TagManager tags={allTags || []} miniatureId={id} selectedTags={selectedTagIds} />
               </div>
 
               <Separator />

@@ -50,11 +50,7 @@ async function uploadImage(
   return photo;
 }
 
-async function uploadImagesFromDirectory(
-  directory: string,
-  userId: string,
-  miniatureId: string
-) {
+async function uploadImagesFromDirectory(directory: string, userId: string, miniatureId: string) {
   console.log(`Uploading images from: ${directory}`);
 
   const files = fs.readdirSync(directory);

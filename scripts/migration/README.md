@@ -1,6 +1,6 @@
 # Data Migration Scripts
 
-This directory contains scripts for importing data into the Warhammer 40K Tracker.
+This directory contains scripts for importing data into the Hobby Tracker.
 
 ## Prerequisites
 

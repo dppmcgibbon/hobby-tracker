@@ -15,10 +15,7 @@ async function verify() {
     .from("paints")
     .select("*", { count: "exact", head: true });
 
-  const { data: paintsByType } = await supabase
-    .from("paints")
-    .select("type")
-    .order("type");
+  const { data: paintsByType } = await supabase.from("paints").select("type").order("type");
 
   const typeBreakdown = paintsByType?.reduce(
     (acc, p) => {
@@ -50,7 +47,9 @@ async function verify() {
   console.log(`✅ Miniature Status: ${statusCount} records`);
 
   if (miniatureCount !== statusCount) {
-    console.warn(`⚠️  Warning: Miniature count (${miniatureCount}) doesn't match status count (${statusCount})`);
+    console.warn(
+      `⚠️  Warning: Miniature count (${miniatureCount}) doesn't match status count (${statusCount})`
+    );
   }
 
   // Check photos

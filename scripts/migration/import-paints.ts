@@ -45,14 +45,10 @@ async function importPaints(csvPath: string) {
 
         // Check existing paints
         const { data: existing } = await supabase.from("paints").select("brand, name");
-        const existingKeys = new Set(
-          existing?.map((p) => `${p.brand}|${p.name}`) || []
-        );
+        const existingKeys = new Set(existing?.map((p) => `${p.brand}|${p.name}`) || []);
 
         // Filter out duplicates
-        const toInsert = paints.filter(
-          (p) => !existingKeys.has(`${p.brand}|${p.name}`)
-        );
+        const toInsert = paints.filter((p) => !existingKeys.has(`${p.brand}|${p.name}`));
 
         if (toInsert.length === 0) {
           console.log("All paints already exist. No import needed.");
@@ -70,7 +66,7 @@ async function importPaints(csvPath: string) {
         for (let i = 0; i < toInsert.length; i += batchSize) {
           const batch = toInsert.slice(i, i + batchSize);
 
-          const { data, error } = await supabase.from("paints").insert(batch).select();
+          const { error } = await supabase.from("paints").insert(batch).select();
 
           if (error) {
             console.error(`Error inserting batch ${i / batchSize + 1}:`, error);
