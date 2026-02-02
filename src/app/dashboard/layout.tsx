@@ -11,19 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import {
-  Home,
-  Package,
-  Palette,
-  BookOpen,
-  User,
-  FolderOpen,
-  Tag,
-  Printer,
-  Box,
-  Droplet,
-  Gamepad2,
-} from "lucide-react";
+import { Home, Package, Palette, BookOpen, User, FolderOpen, Tag, Gamepad2 } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -98,35 +86,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Palette className="h-4 w-4 inline-block mr-1" />
               Paints
             </Link>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="transition-colors hover:text-foreground/80 text-foreground/60 flex items-center">
-                  <Printer className="h-4 w-4 inline-block mr-1" />
-                  3D Printing
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/stl" className="cursor-pointer">
-                    <Box className="mr-2 h-4 w-4" />
-                    STL Library
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/materials" className="cursor-pointer">
-                    <Droplet className="mr-2 h-4 w-4" />
-                    Materials
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/prints" className="cursor-pointer">
-                    <Printer className="mr-2 h-4 w-4" />
-                    Print Queue
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </nav>
 
           <DropdownMenu>
