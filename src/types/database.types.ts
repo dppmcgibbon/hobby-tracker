@@ -97,6 +97,88 @@ export type Database = {
         };
         Relationships: [];
       };
+      editions: {
+        Row: {
+          created_at: string | null;
+          description: string | null;
+          game_id: string;
+          id: string;
+          name: string;
+          sequence: number;
+          updated_at: string | null;
+          year: number | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          description?: string | null;
+          game_id: string;
+          id?: string;
+          name: string;
+          sequence: number;
+          updated_at?: string | null;
+          year?: number | null;
+        };
+        Update: {
+          created_at?: string | null;
+          description?: string | null;
+          game_id?: string;
+          id?: string;
+          name?: string;
+          sequence?: number;
+          updated_at?: string | null;
+          year?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "editions_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "games";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expansions: {
+        Row: {
+          created_at: string | null;
+          description: string | null;
+          edition_id: string;
+          id: string;
+          name: string;
+          sequence: number;
+          updated_at: string | null;
+          year: number | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          description?: string | null;
+          edition_id: string;
+          id?: string;
+          name: string;
+          sequence: number;
+          updated_at?: string | null;
+          year?: number | null;
+        };
+        Update: {
+          created_at?: string | null;
+          description?: string | null;
+          edition_id?: string;
+          id?: string;
+          name?: string;
+          sequence?: number;
+          updated_at?: string | null;
+          year?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expansions_edition_id_fkey";
+            columns: ["edition_id"];
+            isOneToOne: false;
+            referencedRelation: "editions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       factions: {
         Row: {
           army_type: string;
@@ -121,6 +203,33 @@ export type Database = {
           description?: string | null;
           id?: string;
           name?: string;
+        };
+        Relationships: [];
+      };
+      games: {
+        Row: {
+          created_at: string | null;
+          description: string | null;
+          id: string;
+          name: string;
+          publisher: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          description?: string | null;
+          id?: string;
+          name: string;
+          publisher?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          publisher?: string | null;
+          updated_at?: string | null;
         };
         Relationships: [];
       };
@@ -171,6 +280,59 @@ export type Database = {
           user_id?: string;
         };
         Relationships: [];
+      };
+      miniature_games: {
+        Row: {
+          created_at: string | null;
+          edition_id: string | null;
+          expansion_id: string | null;
+          game_id: string;
+          miniature_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          edition_id?: string | null;
+          expansion_id?: string | null;
+          game_id: string;
+          miniature_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          edition_id?: string | null;
+          expansion_id?: string | null;
+          game_id?: string;
+          miniature_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "miniature_games_edition_id_fkey";
+            columns: ["edition_id"];
+            isOneToOne: false;
+            referencedRelation: "editions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "miniature_games_expansion_id_fkey";
+            columns: ["expansion_id"];
+            isOneToOne: false;
+            referencedRelation: "expansions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "miniature_games_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "games";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "miniature_games_miniature_id_fkey";
+            columns: ["miniature_id"];
+            isOneToOne: false;
+            referencedRelation: "miniatures";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       miniature_photos: {
         Row: {

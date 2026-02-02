@@ -17,6 +17,7 @@ import { getRecipes } from "@/lib/queries/recipes";
 import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
 import { unlinkRecipeFromMiniature } from "@/app/actions/recipes";
 import { BookOpen, X } from "lucide-react";
+import { GameLinkManager } from "@/components/games/game-link-manager";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,17 +32,31 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
     getRecipes(user.id),
   ]);
 
-  // Get the linked recipes and tags
+  // Get the linked recipes, tags, and games
   const supabase = await createClient();
-  const [{ data: miniatureRecipes }, { data: allTags }, { data: miniatureTags }] =
-    await Promise.all([
-      supabase.from("miniature_recipes").select("recipe_id").eq("miniature_id", id),
-      supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
-      supabase
-        .from("miniature_tags")
-        .select("tag_id, tags(id, name, color)")
-        .eq("miniature_id", id),
-    ]);
+  const [
+    { data: miniatureRecipes },
+    { data: allTags },
+    { data: miniatureTags },
+    { data: miniatureGames },
+  ] = await Promise.all([
+    supabase.from("miniature_recipes").select("recipe_id").eq("miniature_id", id),
+    supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
+    supabase.from("miniature_tags").select("tag_id, tags(id, name, color)").eq("miniature_id", id),
+    supabase
+      .from("miniature_games")
+      .select(
+        `
+        game_id,
+        edition_id,
+        expansion_id,
+        games(id, name, publisher),
+        editions:edition_id(id, name, year),
+        expansions:expansion_id(id, name, year)
+      `
+      )
+      .eq("miniature_id", id),
+  ]);
 
   const linkedRecipeIds = miniatureRecipes?.map((mr) => mr.recipe_id) || [];
   const linkedRecipes = recipes.filter((r) => linkedRecipeIds.includes(r.id));
@@ -166,6 +181,9 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Game Links */}
+          <GameLinkManager miniatureId={id} currentLinks={miniatureGames || []} />
         </div>
 
         {/* Right Column - Photos & Recipes */}

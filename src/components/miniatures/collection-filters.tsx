@@ -27,6 +27,9 @@ import {
 interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
   tags: { id: string; name: string; color: string | null }[];
+  games: { id: string; name: string }[];
+  editions: { id: string; name: string; year: number | null }[];
+  expansions: { id: string; name: string; year: number | null }[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
 }
@@ -36,6 +39,9 @@ export interface FilterState {
   factionId: string;
   status: string;
   tagId: string;
+  gameId: string;
+  editionId: string;
+  expansionId: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -60,6 +66,9 @@ const SORT_OPTIONS = [
 export function CollectionFilters({
   factions,
   tags,
+  games,
+  editions,
+  expansions,
   onFiltersChange,
   initialFilters,
 }: CollectionFiltersProps) {
@@ -73,6 +82,9 @@ export function CollectionFilters({
     factionId: searchParams.get("faction") || initialFilters?.factionId || "all",
     status: searchParams.get("status") || initialFilters?.status || "all",
     tagId: searchParams.get("tag") || initialFilters?.tagId || "all",
+    gameId: searchParams.get("game") || initialFilters?.gameId || "all",
+    editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
+    expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
     sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "created_at",
     sortOrder:
       (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "desc",
@@ -89,6 +101,9 @@ export function CollectionFilters({
     if (filters.factionId !== "all") params.set("faction", filters.factionId);
     if (filters.status !== "all") params.set("status", filters.status);
     if (filters.tagId !== "all") params.set("tag", filters.tagId);
+    if (filters.gameId !== "all") params.set("game", filters.gameId);
+    if (filters.editionId !== "all") params.set("edition", filters.editionId);
+    if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
     if (filters.sortBy !== "created_at") params.set("sortBy", filters.sortBy);
     if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
 
@@ -108,6 +123,9 @@ export function CollectionFilters({
     filters.factionId,
     filters.status,
     filters.tagId,
+    filters.gameId,
+    filters.editionId,
+    filters.expansionId,
     filters.sortBy,
     filters.sortOrder,
   ]);
@@ -122,6 +140,9 @@ export function CollectionFilters({
       factionId: "all",
       status: "all",
       tagId: "all",
+      gameId: "all",
+      editionId: "all",
+      expansionId: "all",
       sortBy: "created_at",
       sortOrder: "desc",
     };
@@ -133,6 +154,9 @@ export function CollectionFilters({
     filters.factionId !== "all" ||
     filters.status !== "all" ||
     filters.tagId !== "all" ||
+    filters.gameId !== "all" ||
+    filters.editionId !== "all" ||
+    filters.expansionId !== "all" ||
     filters.sortBy !== "created_at" ||
     filters.sortOrder !== "desc";
 
@@ -141,6 +165,9 @@ export function CollectionFilters({
     filters.factionId !== "all",
     filters.status !== "all",
     filters.tagId !== "all",
+    filters.gameId !== "all",
+    filters.editionId !== "all",
+    filters.expansionId !== "all",
     filters.sortBy !== "created_at" || filters.sortOrder !== "desc",
   ].filter(Boolean).length;
 
@@ -224,6 +251,86 @@ export function CollectionFilters({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Game Filter */}
+        <div className="min-w-[180px]">
+          <Label htmlFor="game">Game</Label>
+          <Select
+            value={filters.gameId}
+            onValueChange={(v) => {
+              updateFilter("gameId", v);
+              if (v === "all") {
+                updateFilter("editionId", "all");
+                updateFilter("expansionId", "all");
+              }
+            }}
+          >
+            <SelectTrigger id="game">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Games</SelectItem>
+              {games.map((game) => (
+                <SelectItem key={game.id} value={game.id}>
+                  {game.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Edition Filter - only show if game is selected */}
+        {filters.gameId !== "all" && editions.length > 0 && (
+          <div className="min-w-[180px]">
+            <Label htmlFor="edition">Edition</Label>
+            <Select
+              value={filters.editionId}
+              onValueChange={(v) => {
+                updateFilter("editionId", v);
+                if (v === "all") {
+                  updateFilter("expansionId", "all");
+                }
+              }}
+            >
+              <SelectTrigger id="edition">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Editions</SelectItem>
+                {editions.map((edition) => (
+                  <SelectItem key={edition.id} value={edition.id}>
+                    {edition.name}
+                    {edition.year && ` (${edition.year})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Expansion Filter - only show if edition is selected */}
+        {filters.editionId !== "all" && expansions.length > 0 && (
+          <div className="min-w-[180px]">
+            <Label htmlFor="expansion">Expansion</Label>
+            <Select
+              value={filters.expansionId}
+              onValueChange={(v) => updateFilter("expansionId", v)}
+            >
+              <SelectTrigger id="expansion">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Expansions</SelectItem>
+                {expansions.map((expansion) => (
+                  <SelectItem key={expansion.id} value={expansion.id}>
+                    {expansion.name}
+                    {expansion.year && ` (${expansion.year})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Sort By */}
         <div className="min-w-[160px]">
@@ -366,6 +473,86 @@ export function CollectionFilters({
                   </Select>
                 </div>
 
+                {/* Game */}
+                <div>
+                  <Label htmlFor="mobile-game">Game</Label>
+                  <Select
+                    value={filters.gameId}
+                    onValueChange={(v) => {
+                      updateFilter("gameId", v);
+                      if (v === "all") {
+                        updateFilter("editionId", "all");
+                        updateFilter("expansionId", "all");
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="mobile-game">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Games</SelectItem>
+                      {games.map((game) => (
+                        <SelectItem key={game.id} value={game.id}>
+                          {game.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Edition - only show if game is selected */}
+                {filters.gameId !== "all" && editions.length > 0 && (
+                  <div>
+                    <Label htmlFor="mobile-edition">Edition</Label>
+                    <Select
+                      value={filters.editionId}
+                      onValueChange={(v) => {
+                        updateFilter("editionId", v);
+                        if (v === "all") {
+                          updateFilter("expansionId", "all");
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="mobile-edition">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Editions</SelectItem>
+                        {editions.map((edition) => (
+                          <SelectItem key={edition.id} value={edition.id}>
+                            {edition.name}
+                            {edition.year && ` (${edition.year})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Expansion - only show if edition is selected */}
+                {filters.editionId !== "all" && expansions.length > 0 && (
+                  <div>
+                    <Label htmlFor="mobile-expansion">Expansion</Label>
+                    <Select
+                      value={filters.expansionId}
+                      onValueChange={(v) => updateFilter("expansionId", v)}
+                    >
+                      <SelectTrigger id="mobile-expansion">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Expansions</SelectItem>
+                        {expansions.map((expansion) => (
+                          <SelectItem key={expansion.id} value={expansion.id}>
+                            {expansion.name}
+                            {expansion.year && ` (${expansion.year})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Sort By */}
                 <div>
                   <Label htmlFor="mobile-sortBy">Sort By</Label>
@@ -459,6 +646,47 @@ export function CollectionFilters({
               Tag: {tags.find((t) => t.id === filters.tagId)?.name || filters.tagId}
               <button
                 onClick={() => updateFilter("tagId", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.gameId !== "all" && (
+            <Badge variant="secondary">
+              Game: {games.find((g) => g.id === filters.gameId)?.name || filters.gameId}
+              <button
+                onClick={() => {
+                  updateFilter("gameId", "all");
+                  updateFilter("editionId", "all");
+                  updateFilter("expansionId", "all");
+                }}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.editionId !== "all" && (
+            <Badge variant="secondary">
+              Edition: {editions.find((e) => e.id === filters.editionId)?.name || filters.editionId}
+              <button
+                onClick={() => {
+                  updateFilter("editionId", "all");
+                  updateFilter("expansionId", "all");
+                }}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.expansionId !== "all" && (
+            <Badge variant="secondary">
+              Expansion:{" "}
+              {expansions.find((e) => e.id === filters.expansionId)?.name || filters.expansionId}
+              <button
+                onClick={() => updateFilter("expansionId", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

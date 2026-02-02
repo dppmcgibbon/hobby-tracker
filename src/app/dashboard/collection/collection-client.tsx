@@ -37,6 +37,9 @@ interface CollectionClientProps {
   factions: { id: string; name: string }[];
   tags: Tag[];
   collections: Collection[];
+  games: { id: string; name: string }[];
+  editions: { id: string; name: string; year: number | null }[];
+  expansions: { id: string; name: string; year: number | null }[];
   initialFilters: FilterState;
 }
 
@@ -45,6 +48,9 @@ export function CollectionClient({
   factions,
   tags,
   collections,
+  games,
+  editions,
+  expansions,
   initialFilters,
 }: CollectionClientProps) {
   const [showTagManager, setShowTagManager] = useState(false);
@@ -117,6 +123,9 @@ export function CollectionClient({
       <CollectionFilters
         factions={factions}
         tags={tags}
+        games={games}
+        editions={editions}
+        expansions={expansions}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />

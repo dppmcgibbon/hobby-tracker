@@ -15,12 +15,14 @@ export default async function CollectionPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  // Fetch factions and tags for filter dropdown
-  const [{ data: factions }, { data: tags }, { data: collections }] = await Promise.all([
-    supabase.from("factions").select("id, name").order("name"),
-    supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
-    supabase.from("collections").select("id, name").eq("user_id", user.id).order("name"),
-  ]);
+  // Fetch factions, tags, collections, and games for filter dropdown
+  const [{ data: factions }, { data: tags }, { data: collections }, { data: games }] =
+    await Promise.all([
+      supabase.from("factions").select("id, name").order("name"),
+      supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
+      supabase.from("collections").select("id, name").eq("user_id", user.id).order("name"),
+      supabase.from("games").select("id, name").order("name"),
+    ]);
 
   // Build query with filters
   let query = supabase
@@ -67,6 +69,53 @@ export default async function CollectionPage({
     }
   }
 
+  // Apply game filter (we'll do this client-side after fetching miniature_games)
+  let gameFilteredMiniatureIds: Set<string> | null = null;
+  if (params.game && params.game !== "all") {
+    let gameQuery = supabase
+      .from("miniature_games")
+      .select("miniature_id")
+      .eq("game_id", params.game);
+
+    // Add edition filter if specified
+    if (params.edition && params.edition !== "all") {
+      gameQuery = gameQuery.eq("edition_id", params.edition);
+    }
+
+    // Add expansion filter if specified
+    if (params.expansion && params.expansion !== "all") {
+      gameQuery = gameQuery.eq("expansion_id", params.expansion);
+    }
+
+    const { data: gameMiniatures } = await gameQuery;
+
+    if (gameMiniatures) {
+      gameFilteredMiniatureIds = new Set(gameMiniatures.map((g) => g.miniature_id));
+    }
+  }
+
+  // Fetch editions if game filter is active
+  let editions: { id: string; name: string; year: number | null }[] = [];
+  if (params.game && params.game !== "all") {
+    const { data: editionsData } = await supabase
+      .from("editions")
+      .select("id, name, year")
+      .eq("game_id", params.game)
+      .order("sequence");
+    editions = editionsData || [];
+  }
+
+  // Fetch expansions if edition filter is active
+  let expansions: { id: string; name: string; year: number | null }[] = [];
+  if (params.edition && params.edition !== "all") {
+    const { data: expansionsData } = await supabase
+      .from("expansions")
+      .select("id, name, year")
+      .eq("edition_id", params.edition)
+      .order("sequence");
+    expansions = expansionsData || [];
+  }
+
   // Apply sorting
   const sortBy = params.sortBy || "created_at";
   const sortOrder = (params.sortOrder || "desc") as "asc" | "desc";
@@ -105,6 +154,11 @@ export default async function CollectionPage({
     filteredMiniatures = filteredMiniatures.filter((m) => tagFilteredMiniatureIds.has(m.id));
   }
 
+  // Apply game filter
+  if (gameFilteredMiniatureIds) {
+    filteredMiniatures = filteredMiniatures.filter((m) => gameFilteredMiniatureIds.has(m.id));
+  }
+
   // Apply status filter
   if (params.status && params.status !== "all") {
     filteredMiniatures = filteredMiniatures.filter((m) => {
@@ -119,11 +173,17 @@ export default async function CollectionPage({
       factions={factions || []}
       tags={tags || []}
       collections={collections || []}
+      games={games || []}
+      editions={editions}
+      expansions={expansions}
       initialFilters={{
         search: params.search || "",
         factionId: params.faction || "all",
         status: params.status || "all",
         tagId: params.tag || "all",
+        gameId: params.game || "all",
+        editionId: params.edition || "all",
+        expansionId: params.expansion || "all",
         sortBy: params.sortBy || "created_at",
         sortOrder: (params.sortOrder as "asc" | "desc") || "desc",
       }}

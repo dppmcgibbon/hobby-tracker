@@ -26,3 +26,7 @@ export type StlFile = Tables<"stl_files">;
 export type PrintProfile = Tables<"print_profiles">;
 export type Print = Tables<"prints">;
 export type StlTag = Tables<"stl_tags">;
+export type Game = Tables<"games">;
+export type Edition = Tables<"editions">;
+export type Expansion = Tables<"expansions">;
+export type MiniatureGame = Tables<"miniature_games">;

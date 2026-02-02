@@ -22,6 +22,7 @@ import {
   Printer,
   Box,
   Droplet,
+  Gamepad2,
 } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -75,6 +76,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               <Tag className="h-4 w-4 inline-block mr-1" />
               Tags
+            </Link>
+            <Link
+              href="/dashboard/games"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              <Gamepad2 className="h-4 w-4 inline-block mr-1" />
+              Games
             </Link>
             <Link
               href="/dashboard/recipes"
