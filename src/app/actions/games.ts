@@ -204,7 +204,10 @@ export async function linkMiniatureToGame(data: MiniatureGameInput) {
     throw new Error("Miniature not found");
   }
 
-  const { error } = await supabase.from("miniature_games").insert(validated);
+  // Use upsert to insert or update if the link already exists
+  const { error } = await supabase.from("miniature_games").upsert(validated, {
+    onConflict: "miniature_id,game_id",
+  });
 
   if (error) {
     throw new Error(error.message);

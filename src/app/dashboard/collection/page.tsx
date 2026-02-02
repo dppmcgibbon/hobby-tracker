@@ -34,7 +34,7 @@ export default async function CollectionPage({
       quantity,
       created_at,
       factions (id, name),
-      miniature_status (status, completed_at),
+      miniature_status (status, completed_at, magnetised, based),
       miniature_photos (id, storage_path)
     `
     )

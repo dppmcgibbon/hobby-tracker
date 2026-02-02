@@ -28,15 +28,25 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
   const [currentStatus, setCurrentStatus] = useState<StatusType>(
     (status?.status as StatusType) || "backlog"
   );
-  const [magnetised, setMagnetised] = useState(status?.magnetised || false);
-  const [based, setBased] = useState(status?.based || false);
+  const [magnetised, setMagnetised] = useState(status?.magnetised ?? false);
+  const [based, setBased] = useState(status?.based ?? false);
+
+  console.log("StatusBadge render:", {
+    miniatureId,
+    status,
+    magnetised,
+    based,
+    statusMagnetised: status?.magnetised,
+    statusBased: status?.based,
+  });
 
   // Sync local state with props when they change (e.g., after bulk update)
   useEffect(() => {
     if (status) {
+      console.log("StatusBadge useEffect updating from status:", status);
       setCurrentStatus((status.status as StatusType) || "backlog");
-      setMagnetised(status.magnetised || false);
-      setBased(status.based || false);
+      setMagnetised(status.magnetised ?? false);
+      setBased(status.based ?? false);
     }
   }, [status]);
 

@@ -9,7 +9,7 @@ export async function getMiniatures(userId: string) {
       `
       *,
       faction:factions(*),
-      status:miniature_status(*),
+      status:miniature_status!miniature_id(*),
       photos:miniature_photos(*)
     `
     )
@@ -18,6 +18,15 @@ export async function getMiniatures(userId: string) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  // Ensure status is a single object, not an array for each miniature
+  if (data) {
+    data.forEach((miniature) => {
+      if (Array.isArray(miniature.status)) {
+        miniature.status = miniature.status[0] || null;
+      }
+    });
   }
 
   return data;
@@ -32,7 +41,7 @@ export async function getMiniatureById(id: string, userId: string) {
       `
       *,
       faction:factions(*),
-      status:miniature_status(*),
+      status:miniature_status!miniature_id(*),
       photos:miniature_photos(*),
       recipes:miniature_recipes(
         recipe:painting_recipes(
@@ -51,6 +60,18 @@ export async function getMiniatureById(id: string, userId: string) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  console.log("getMiniatureById - status data:", {
+    id,
+    status: data.status,
+    statusType: typeof data.status,
+    statusIsArray: Array.isArray(data.status),
+  });
+
+  // Ensure status is a single object, not an array
+  if (Array.isArray(data.status)) {
+    data.status = data.status[0] || null;
   }
 
   return data;
