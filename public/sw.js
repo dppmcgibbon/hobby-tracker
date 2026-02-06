@@ -1,4 +1,4 @@
-const CACHE_NAME = "hobby-tracker-v1";
+const CACHE_NAME = "hobby-tracker-v2";
 const urlsToCache = ["/", "/dashboard", "/dashboard/collection", "/offline"];
 
 // Install event

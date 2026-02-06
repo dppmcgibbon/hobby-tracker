@@ -23,7 +23,21 @@ export const miniatureSchema = z.object({
 });
 
 export const miniatureStatusSchema = z.object({
-  status: z.enum(["backlog", "assembled", "primed", "painting", "completed"]),
+  status: z.enum([
+    "unknown",
+    "missing",
+    "needs_stripped",
+    "backlog",
+    "built",
+    "primed",
+    "painting_started",
+    "needs_repair",
+    "sub_assembled",
+    "missing_arm",
+    "missing_leg",
+    "missing_head",
+    "complete",
+  ]),
   magnetised: z.boolean().default(false),
   based: z.boolean().default(false),
 });

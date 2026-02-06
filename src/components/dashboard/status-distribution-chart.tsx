@@ -2,32 +2,17 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants/miniature-status";
 
 interface StatusDistributionChartProps {
   data: Record<string, number>;
 }
 
-const COLORS = {
-  backlog: "hsl(0, 0%, 45%)", // Steel gray
-  assembled: "hsl(43, 96%, 56%)", // Imperial gold
-  primed: "hsl(30, 50%, 45%)", // Bronze
-  painting: "hsl(0, 65%, 35%)", // Blood red
-  completed: "hsl(43, 96%, 56%)", // Imperial gold (completed)
-};
-
-const STATUS_LABELS = {
-  backlog: "Backlog",
-  assembled: "Assembled",
-  primed: "Primed",
-  painting: "In Progress",
-  completed: "Completed",
-};
-
 export function StatusDistributionChart({ data }: StatusDistributionChartProps) {
   const chartData = Object.entries(data)
     .filter(([, value]) => value > 0)
     .map(([status, value]) => ({
-      name: STATUS_LABELS[status as keyof typeof STATUS_LABELS],
+      name: STATUS_LABELS[status] || status,
       value,
       status,
     }));
@@ -76,7 +61,7 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
               {chartData.map((entry) => (
                 <Cell
                   key={`cell-${entry.status}`}
-                  fill={COLORS[entry.status as keyof typeof COLORS]}
+                  fill={STATUS_COLORS[entry.status] || "hsl(0, 0%, 50%)"}
                 />
               ))}
             </Pie>

@@ -31,10 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="sticky top-0 z-50 w-full border-b-2 border-primary/30 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-lg shadow-black/50">
         <div className="container flex h-16 items-center">
           <div className="mr-8 flex">
-            <Link href="/dashboard" className="flex items-center space-x-3 group">
-              <div className="h-10 w-10 bg-gradient-to-br from-primary via-primary/80 to-primary/60 rounded-sm flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-all">
-                <span className="text-black font-black text-xl">⚔</span>
-              </div>
+            <Link href="/dashboard" className="flex items-center group">
               <span className="font-black text-xl tracking-wider uppercase gold-glow text-primary">
                 Hobby Tracker
               </span>

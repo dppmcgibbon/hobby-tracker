@@ -165,3 +165,18 @@ export async function getBaseTypes() {
 
   return data || [];
 }
+
+export async function getMiniatureStatuses() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("miniature_statuses")
+    .select("*")
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}

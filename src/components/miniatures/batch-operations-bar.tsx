@@ -302,11 +302,19 @@ export function BatchOperationsBar({
                 <SelectValue placeholder="Update status..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="missing">Missing</SelectItem>
+                <SelectItem value="needs_stripped">Needs Stripped</SelectItem>
                 <SelectItem value="backlog">Backlog</SelectItem>
-                <SelectItem value="assembled">Assembled</SelectItem>
+                <SelectItem value="built">Built</SelectItem>
                 <SelectItem value="primed">Primed</SelectItem>
-                <SelectItem value="painting">Painting</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="painting_started">Painting Started</SelectItem>
+                <SelectItem value="needs_repair">Needs Repair</SelectItem>
+                <SelectItem value="sub_assembled">Sub-Assembled</SelectItem>
+                <SelectItem value="missing_arm">Missing Arm</SelectItem>
+                <SelectItem value="missing_leg">Missing Leg</SelectItem>
+                <SelectItem value="missing_head">Missing Head</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
               </SelectContent>
             </Select>
             <Button size="sm" onClick={handleUpdateStatus} disabled={!selectedStatus || isPending}>

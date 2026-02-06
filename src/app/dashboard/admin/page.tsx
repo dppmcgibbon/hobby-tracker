@@ -1,8 +1,9 @@
 import { requireAuth } from "@/lib/auth/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Archive, Tag, Gamepad2, Settings, BookOpen } from "lucide-react";
+import { Archive, Tag, Gamepad2, Settings, BookOpen, Database } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 
 export default async function AdminPage() {
   await requireAuth();
@@ -40,13 +41,16 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8 max-w-full">
-      <div className="border-l-4 border-primary pl-4">
-        <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
-          Admin Center
-        </h1>
-        <p className="text-muted-foreground mt-2 text-base">
-          Manage your system configuration and organizational tools
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="border-l-4 border-primary pl-4">
+          <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
+            Admin Center
+          </h1>
+          <p className="text-muted-foreground mt-2 text-base">
+            Manage your system configuration and organizational tools
+          </p>
+        </div>
+        <DatabaseBackupButton />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

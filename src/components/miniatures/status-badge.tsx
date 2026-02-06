@@ -18,7 +18,20 @@ interface StatusBadgeProps {
   status: MiniatureStatus | null;
 }
 
-type StatusType = "backlog" | "assembled" | "primed" | "painting" | "completed";
+type StatusType = 
+  | "unknown"
+  | "missing"
+  | "needs_stripped"
+  | "backlog"
+  | "built"
+  | "primed"
+  | "painting_started"
+  | "needs_repair"
+  | "sub_assembled"
+  | "missing_arm"
+  | "missing_leg"
+  | "missing_head"
+  | "complete";
 
 export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
   const router = useRouter();
@@ -58,11 +71,19 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="unknown">Unknown</SelectItem>
+          <SelectItem value="missing">Missing</SelectItem>
+          <SelectItem value="needs_stripped">Needs Stripped</SelectItem>
           <SelectItem value="backlog">Backlog</SelectItem>
-          <SelectItem value="assembled">Assembled</SelectItem>
+          <SelectItem value="built">Built</SelectItem>
           <SelectItem value="primed">Primed</SelectItem>
-          <SelectItem value="painting">In Progress</SelectItem>
-          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="painting_started">Painting Started</SelectItem>
+          <SelectItem value="needs_repair">Needs Repair</SelectItem>
+          <SelectItem value="sub_assembled">Sub-Assembled</SelectItem>
+          <SelectItem value="missing_arm">Missing Arm</SelectItem>
+          <SelectItem value="missing_leg">Missing Leg</SelectItem>
+          <SelectItem value="missing_head">Missing Head</SelectItem>
+          <SelectItem value="complete">Complete</SelectItem>
         </SelectContent>
       </Select>
 

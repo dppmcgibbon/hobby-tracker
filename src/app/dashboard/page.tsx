@@ -11,7 +11,6 @@ import { StatusDistributionChart } from "@/components/dashboard/status-distribut
 import { CompletionChart } from "@/components/dashboard/completion-chart";
 import { FactionBreakdownChart } from "@/components/dashboard/faction-breakdown-chart";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +28,7 @@ export default async function DashboardPage() {
       <div className="space-y-6">
         <div className="border-l-4 border-primary pl-4">
           <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
-            Command Center
+            Dashboard
           </h1>
         </div>
         <Card className="warhammer-card border-primary/30">
@@ -53,16 +52,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-full">
-      <div className="flex items-start justify-between gap-4">
-        <div className="border-l-4 border-primary pl-4">
-          <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
-            Command Center
-          </h1>
-          <p className="text-muted-foreground mt-2 text-base">
-            Strategic overview of your forces and campaign progress
-          </p>
-        </div>
-        <DatabaseBackupButton />
+      <div className="border-l-4 border-primary pl-4">
+        <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
+          Dashboard
+        </h1>
+        <p className="text-muted-foreground mt-2 text-base">
+          Strategic overview of your forces and campaign progress
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -145,7 +141,7 @@ export default async function DashboardPage() {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">
-                Assembled
+                Built
               </p>
               <p className="text-2xl font-black text-foreground">{stats.assembled}</p>
             </div>

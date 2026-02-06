@@ -50,11 +50,19 @@ export interface FilterState {
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
+  { value: "unknown", label: "Unknown" },
+  { value: "missing", label: "Missing" },
+  { value: "needs_stripped", label: "Needs Stripped" },
   { value: "backlog", label: "Backlog" },
-  { value: "assembled", label: "Assembled" },
+  { value: "built", label: "Built" },
   { value: "primed", label: "Primed" },
-  { value: "painting", label: "In Progress" },
-  { value: "completed", label: "Completed" },
+  { value: "painting_started", label: "Painting Started" },
+  { value: "needs_repair", label: "Needs Repair" },
+  { value: "sub_assembled", label: "Sub-Assembled" },
+  { value: "missing_arm", label: "Missing Arm" },
+  { value: "missing_leg", label: "Missing Leg" },
+  { value: "missing_head", label: "Missing Head" },
+  { value: "complete", label: "Complete" },
 ];
 
 const SORT_OPTIONS = [
