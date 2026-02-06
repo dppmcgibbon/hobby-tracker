@@ -120,3 +120,48 @@ export async function getStorageBoxes(userId: string) {
 
   return data || [];
 }
+
+export async function getBases() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("bases")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+export async function getBaseShapes() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("base_shapes")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+export async function getBaseTypes() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("base_types")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}

@@ -54,9 +54,15 @@ export default async function CollectionPage({
       created_at,
       storage_box_id,
       unit_type,
+      base_id,
+      base_shape_id,
+      base_type_id,
       factions (id, name),
       miniature_status (status, completed_at, magnetised, based),
-      miniature_photos (id, storage_path)
+      miniature_photos (id, storage_path),
+      bases (id, name),
+      base_shapes (id, name),
+      base_types (id, name)
     `
     )
     .eq("user_id", user.id);
@@ -208,6 +214,9 @@ export default async function CollectionPage({
       : m.miniature_status,
     miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
     storage_box: Array.isArray(m.storage_boxes) ? m.storage_boxes[0] : m.storage_boxes,
+    bases: Array.isArray(m.bases) ? m.bases[0] : m.bases,
+    base_shapes: Array.isArray(m.base_shapes) ? m.base_shapes[0] : m.base_shapes,
+    base_types: Array.isArray(m.base_types) ? m.base_types[0] : m.base_types,
   }));
 
   // Apply tag filter

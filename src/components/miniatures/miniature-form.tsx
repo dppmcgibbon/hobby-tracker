@@ -36,10 +36,28 @@ interface Recipe {
   faction?: { name: string } | null;
 }
 
+interface Base {
+  id: string;
+  name: string;
+}
+
+interface BaseShape {
+  id: string;
+  name: string;
+}
+
+interface BaseType {
+  id: string;
+  name: string;
+}
+
 interface MiniatureFormProps {
   factions: Faction[];
   storageBoxes?: StorageBox[];
   recipes?: Recipe[];
+  bases?: Base[];
+  baseShapes?: BaseShape[];
+  baseTypes?: BaseType[];
   existingRecipeIds?: string[];
   miniature?: Miniature;
   onSuccess?: () => void;
@@ -49,6 +67,9 @@ export function MiniatureForm({
   factions,
   storageBoxes = [],
   recipes = [],
+  bases = [],
+  baseShapes = [],
+  baseTypes = [],
   existingRecipeIds = [],
   miniature,
   onSuccess,
@@ -74,6 +95,9 @@ export function MiniatureForm({
           quantity: miniature.quantity,
           material: miniature.material || undefined,
           base_size: miniature.base_size || undefined,
+          base_id: (miniature as any).base_id || undefined,
+          base_shape_id: (miniature as any).base_shape_id || undefined,
+          base_type_id: (miniature as any).base_type_id || undefined,
           sculptor: miniature.sculptor || undefined,
           year: miniature.year || undefined,
           notes: miniature.notes || undefined,
@@ -89,6 +113,12 @@ export function MiniatureForm({
   const factionId = watch("faction_id");
   // eslint-disable-next-line react-hooks/incompatible-library
   const storageBoxId = watch("storage_box_id");
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const baseId = watch("base_id");
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const baseShapeId = watch("base_shape_id");
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const baseTypeId = watch("base_type_id");
 
   const onSubmit = async (data: MiniatureInput) => {
     setIsLoading(true);
@@ -250,19 +280,6 @@ export function MiniatureForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="base_size">Base Size</Label>
-          <Input
-            id="base_size"
-            placeholder="e.g., 32mm"
-            {...register("base_size")}
-            disabled={isLoading}
-          />
-          {errors.base_size && (
-            <p className="text-sm text-destructive">{errors.base_size.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="material">Material</Label>
           <Input
             id="material"
@@ -271,6 +288,80 @@ export function MiniatureForm({
             disabled={isLoading}
           />
           {errors.material && <p className="text-sm text-destructive">{errors.material.message}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="base_id">Base</Label>
+          <Select
+            value={baseId || "none"}
+            onValueChange={(value) => setValue("base_id", value === "none" ? null : value)}
+            disabled={isLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select base" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No base</SelectItem>
+              {bases.map((base) => (
+                <SelectItem key={base.id} value={base.id}>
+                  {base.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.base_id && (
+            <p className="text-sm text-destructive">{errors.base_id.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="base_shape_id">Base Shape</Label>
+          <Select
+            value={baseShapeId || "none"}
+            onValueChange={(value) => setValue("base_shape_id", value === "none" ? null : value)}
+            disabled={isLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select shape" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No shape</SelectItem>
+              {baseShapes.map((shape) => (
+                <SelectItem key={shape.id} value={shape.id}>
+                  {shape.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.base_shape_id && (
+            <p className="text-sm text-destructive">{errors.base_shape_id.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="base_type_id">Base Type</Label>
+          <Select
+            value={baseTypeId || "none"}
+            onValueChange={(value) => setValue("base_type_id", value === "none" ? null : value)}
+            disabled={isLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No type</SelectItem>
+              {baseTypes.map((type) => (
+                <SelectItem key={type.id} value={type.id}>
+                  {type.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.base_type_id && (
+            <p className="text-sm text-destructive">{errors.base_type_id.message}</p>
+          )}
         </div>
       </div>
 

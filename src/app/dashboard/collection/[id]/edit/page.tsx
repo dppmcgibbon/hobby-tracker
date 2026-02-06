@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth/server";
-import { getMiniatureById, getFactions, getStorageBoxes } from "@/lib/queries/miniatures";
+import { getMiniatureById, getFactions, getStorageBoxes, getBases, getBaseShapes, getBaseTypes } from "@/lib/queries/miniatures";
 import { getRecipes } from "@/lib/queries/recipes";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,10 +21,13 @@ export default async function EditMiniaturePage({ params }: PageProps) {
     notFound();
   }
 
-  const [factions, storageBoxes, recipes] = await Promise.all([
+  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes] = await Promise.all([
     getFactions(),
     getStorageBoxes(user.id),
     getRecipes(user.id),
+    getBases(),
+    getBaseShapes(),
+    getBaseTypes(),
   ]);
 
   // Get existing recipe links
@@ -53,6 +56,9 @@ export default async function EditMiniaturePage({ params }: PageProps) {
             factions={factions}
             storageBoxes={storageBoxes}
             recipes={recipes}
+            bases={bases}
+            baseShapes={baseShapes}
+            baseTypes={baseTypes}
             existingRecipeIds={existingRecipeIds}
             miniature={miniature}
           />

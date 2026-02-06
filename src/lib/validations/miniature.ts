@@ -7,6 +7,9 @@ export const miniatureSchema = z.object({
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1").default(1),
   material: z.string().max(50).optional().nullable(),
   base_size: z.string().max(50).optional().nullable(),
+  base_id: z.string().uuid("Invalid base").optional().nullable(),
+  base_shape_id: z.string().uuid("Invalid base shape").optional().nullable(),
+  base_type_id: z.string().uuid("Invalid base type").optional().nullable(),
   sculptor: z.string().max(100).optional().nullable(),
   year: z.coerce
     .number()

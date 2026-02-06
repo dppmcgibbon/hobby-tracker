@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
 import Image from "next/image";
 import { StatusBadge } from "./status-badge";
@@ -24,6 +25,9 @@ interface MiniatureWithRelations {
   created_at: string;
   faction_id?: string | null;
   unit_type?: string | null;
+  base_id?: string | null;
+  base_shape_id?: string | null;
+  base_type_id?: string | null;
   factions: { id: string; name: string } | null;
   miniature_status: {
     status: string;
@@ -33,6 +37,9 @@ interface MiniatureWithRelations {
   } | null;
   miniature_photos: { id: string; storage_path: string }[];
   storage_box?: { id: string; name: string; location?: string | null } | null;
+  bases?: { id: string; name: string } | null;
+  base_shapes?: { id: string; name: string } | null;
+  base_types?: { id: string; name: string } | null;
 }
 
 interface MiniatureTableViewProps {
@@ -53,6 +60,22 @@ export function MiniatureTableView({
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
   const [selectedMiniature, setSelectedMiniature] = useState<MiniatureWithRelations | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+
+  const getBaseTooltip = (miniature: MiniatureWithRelations) => {
+    const baseParts: string[] = [];
+    
+    if (miniature.bases?.name) {
+      baseParts.push(`Base: ${miniature.bases.name}`);
+    }
+    if (miniature.base_shapes?.name) {
+      baseParts.push(`Shape: ${miniature.base_shapes.name}`);
+    }
+    if (miniature.base_types?.name) {
+      baseParts.push(`Type: ${miniature.base_types.name}`);
+    }
+    
+    return baseParts.length > 0 ? baseParts.join(", ") : null;
+  };
 
   const handleToggle = async (
     miniatureId: string,
@@ -99,9 +122,10 @@ export function MiniatureTableView({
 
   return (
     <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-primary/20 hover:bg-muted/30">
+      <TooltipProvider>
+        <Table>
+          <TableHeader>
+            <TableRow className="border-primary/20 hover:bg-muted/30">
             {selectable && (
               <TableHead className="w-12 font-bold uppercase text-xs tracking-wide text-primary">
                 Select
@@ -139,11 +163,13 @@ export function MiniatureTableView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {miniatures.map((miniature) => (
-            <TableRow
-              key={miniature.id}
-              className="border-primary/10 hover:bg-muted/20 transition-colors"
-            >
+          {miniatures.map((miniature) => {
+            const baseTooltip = getBaseTooltip(miniature);
+            const RowContent = (
+              <TableRow
+                key={miniature.id}
+                className="border-primary/10 hover:bg-muted/20 transition-colors"
+              >
               {selectable && (
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
@@ -232,9 +258,24 @@ export function MiniatureTableView({
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            );
+
+            return baseTooltip ? (
+              <Tooltip key={miniature.id}>
+                <TooltipTrigger asChild>
+                  {RowContent}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-sm font-medium">{baseTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              RowContent
+            );
+          })}
         </TableBody>
       </Table>
+      </TooltipProvider>
 
       {/* Photo Gallery Dialog */}
       {selectedMiniature && (
