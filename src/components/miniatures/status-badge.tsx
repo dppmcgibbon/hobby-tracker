@@ -9,8 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import { Loader2 } from "lucide-react";
 import type { MiniatureStatus } from "@/types";
@@ -28,25 +26,11 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
   const [currentStatus, setCurrentStatus] = useState<StatusType>(
     (status?.status as StatusType) || "backlog"
   );
-  const [magnetised, setMagnetised] = useState(status?.magnetised ?? false);
-  const [based, setBased] = useState(status?.based ?? false);
-
-  console.log("StatusBadge render:", {
-    miniatureId,
-    status,
-    magnetised,
-    based,
-    statusMagnetised: status?.magnetised,
-    statusBased: status?.based,
-  });
 
   // Sync local state with props when they change (e.g., after bulk update)
   useEffect(() => {
     if (status) {
-      console.log("StatusBadge useEffect updating from status:", status);
       setCurrentStatus((status.status as StatusType) || "backlog");
-      setMagnetised(status.magnetised ?? false);
-      setBased(status.based ?? false);
     }
   }, [status]);
 
@@ -55,8 +39,8 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
     try {
       await updateMiniatureStatus(miniatureId, {
         status: newStatus as StatusType,
-        magnetised,
-        based,
+        magnetised: status?.magnetised ?? false,
+        based: status?.based ?? false,
       });
       setCurrentStatus(newStatus as StatusType);
       router.refresh();
@@ -67,64 +51,20 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
     }
   };
 
-  const handleToggle = async (field: "magnetised" | "based", value: boolean) => {
-    setUpdating(true);
-    try {
-      const newData = {
-        status: currentStatus,
-        magnetised: field === "magnetised" ? value : magnetised,
-        based: field === "based" ? value : based,
-      };
-      await updateMiniatureStatus(miniatureId, newData);
-      if (field === "magnetised") setMagnetised(value);
-      if (field === "based") setBased(value);
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to update status:", error);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="status" className="mb-2 block">
-          Status
-        </Label>
-        <Select value={currentStatus} onValueChange={handleStatusChange} disabled={updating}>
-          <SelectTrigger id="status">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="backlog">Backlog</SelectItem>
-            <SelectItem value="assembled">Assembled</SelectItem>
-            <SelectItem value="primed">Primed</SelectItem>
-            <SelectItem value="painting">In Progress</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Label htmlFor="magnetised">Magnetised</Label>
-        <Switch
-          id="magnetised"
-          checked={magnetised}
-          onCheckedChange={(checked) => handleToggle("magnetised", checked)}
-          disabled={updating}
-        />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Label htmlFor="based">Based</Label>
-        <Switch
-          id="based"
-          checked={based}
-          onCheckedChange={(checked) => handleToggle("based", checked)}
-          disabled={updating}
-        />
-      </div>
+    <div className="space-y-2">
+      <Select value={currentStatus} onValueChange={handleStatusChange} disabled={updating}>
+        <SelectTrigger id="status">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="backlog">Backlog</SelectItem>
+          <SelectItem value="assembled">Assembled</SelectItem>
+          <SelectItem value="primed">Primed</SelectItem>
+          <SelectItem value="painting">In Progress</SelectItem>
+          <SelectItem value="completed">Completed</SelectItem>
+        </SelectContent>
+      </Select>
 
       {updating && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

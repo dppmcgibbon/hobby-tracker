@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { Edit, Trash2 } from "lucide-react";
+import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import type { MiniatureStatus } from "@/types";
 
 interface MiniatureWithRelations {
@@ -41,12 +45,28 @@ export function MiniatureTableView({
   selectedIds = [],
   onSelectChange,
 }: MiniatureTableViewProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const router = useRouter();
+  const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
+
+  const handleToggle = async (
+    miniatureId: string,
+    field: "magnetised" | "based",
+    value: boolean,
+    currentStatus: MiniatureStatus | null
+  ) => {
+    setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: true }));
+    try {
+      await updateMiniatureStatus(miniatureId, {
+        status: (currentStatus?.status as any) || "backlog",
+        magnetised: field === "magnetised" ? value : currentStatus?.magnetised ?? false,
+        based: field === "based" ? value : currentStatus?.based ?? false,
+      });
+      router.refresh();
+    } catch (error) {
+      console.error(`Failed to update ${field}:`, error);
+    } finally {
+      setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: false }));
+    }
   };
 
   return (
@@ -60,13 +80,13 @@ export function MiniatureTableView({
               </TableHead>
             )}
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Name
-            </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
               Faction
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Unit Type
+              Unit
+            </TableHead>
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
+              Name
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
               Qty
@@ -74,11 +94,11 @@ export function MiniatureTableView({
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
               Status
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Storage
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
+              Magnetised
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Added
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
+              Based
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-right">
               Actions
@@ -101,29 +121,19 @@ export function MiniatureTableView({
                   />
                 </TableCell>
               )}
-              <TableCell>
-                <Link
-                  href={`/dashboard/collection/${miniature.id}`}
-                  className="font-bold hover:text-primary transition-colors uppercase tracking-wide"
-                >
-                  {miniature.name}
-                </Link>
-                {miniature.miniature_status?.based && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    Based
-                  </Badge>
-                )}
-                {miniature.miniature_status?.magnetised && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    Magnetised
-                  </Badge>
-                )}
-              </TableCell>
               <TableCell className="text-muted-foreground">
                 {miniature.factions?.name || "-"}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {miniature.unit_type || "-"}
+              </TableCell>
+              <TableCell>
+                <Link
+                  href={`/dashboard/collection/${miniature.id}`}
+                  className="font-bold hover:text-primary transition-colors tracking-wide"
+                >
+                  {miniature.name}
+                </Link>
               </TableCell>
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
@@ -134,20 +144,25 @@ export function MiniatureTableView({
                   status={miniature.miniature_status as MiniatureStatus | null}
                 />
               </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {miniature.storage_box ? (
-                  <Link
-                    href={`/dashboard/storage/${miniature.storage_box.id}`}
-                    className="hover:text-primary hover:underline"
-                  >
-                    {miniature.storage_box.name}
-                  </Link>
-                ) : (
-                  "-"
-                )}
+              <TableCell className="text-center">
+                <Switch
+                  checked={miniature.miniature_status?.magnetised ?? false}
+                  onCheckedChange={(checked) =>
+                    handleToggle(miniature.id, "magnetised", checked, miniature.miniature_status)
+                  }
+                  disabled={updatingStates[`${miniature.id}-magnetised`]}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {formatDate(miniature.created_at)}
+              <TableCell className="text-center">
+                <Switch
+                  checked={miniature.miniature_status?.based ?? false}
+                  onCheckedChange={(checked) =>
+                    handleToggle(miniature.id, "based", checked, miniature.miniature_status)
+                  }
+                  disabled={updatingStates[`${miniature.id}-based`]}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-end gap-1">

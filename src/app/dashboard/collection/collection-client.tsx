@@ -73,7 +73,7 @@ export function CollectionClient({
   const [showTagManager, setShowTagManager] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
 
   const handleSelectChange = (id: string, selected: boolean) => {
     setSelectedIds((prev) => {
