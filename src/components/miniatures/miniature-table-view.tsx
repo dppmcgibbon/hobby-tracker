@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
+import Image from "next/image";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Image as ImageIcon, ChevronLeft, ChevronRight, X, Magnet, Sprout, Activity, Hash } from "lucide-react";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
+import { createClient } from "@/lib/supabase/client";
 import type { MiniatureStatus } from "@/types";
 
 interface MiniatureWithRelations {
@@ -46,7 +49,10 @@ export function MiniatureTableView({
   onSelectChange,
 }: MiniatureTableViewProps) {
   const router = useRouter();
+  const supabase = createClient();
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
+  const [selectedMiniature, setSelectedMiniature] = useState<MiniatureWithRelations | null>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   const handleToggle = async (
     miniatureId: string,
@@ -69,6 +75,28 @@ export function MiniatureTableView({
     }
   };
 
+  const openGallery = (miniature: MiniatureWithRelations) => {
+    setSelectedMiniature(miniature);
+    setSelectedPhotoIndex(0);
+  };
+
+  const closeGallery = () => {
+    setSelectedMiniature(null);
+    setSelectedPhotoIndex(0);
+  };
+
+  const goToPrevious = () => {
+    if (selectedPhotoIndex > 0) {
+      setSelectedPhotoIndex(selectedPhotoIndex - 1);
+    }
+  };
+
+  const goToNext = () => {
+    if (selectedMiniature && selectedPhotoIndex < selectedMiniature.miniature_photos.length - 1) {
+      setSelectedPhotoIndex(selectedPhotoIndex + 1);
+    }
+  };
+
   return (
     <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
       <Table>
@@ -88,20 +116,25 @@ export function MiniatureTableView({
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
               Name
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
-              Qty
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Quantity">
+              <Hash className="h-4 w-4 mx-auto" />
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Status
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary" title="Status">
+              <div className="flex justify-center">
+                <Activity className="h-4 w-4" />
+              </div>
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
-              Magnetised
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Magnetised">
+              <Magnet className="h-4 w-4 mx-auto" />
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center">
-              Based
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Based">
+              <Sprout className="h-4 w-4 mx-auto" />
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-right">
-              Actions
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
+            </TableHead>
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
+            </TableHead>
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -138,7 +171,7 @@ export function MiniatureTableView({
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
               </TableCell>
-              <TableCell>
+              <TableCell className="text-center">
                 <StatusBadge
                   miniatureId={miniature.id}
                   status={miniature.miniature_status as MiniatureStatus | null}
@@ -164,29 +197,121 @@ export function MiniatureTableView({
                   onClick={(e) => e.stopPropagation()}
                 />
               </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end gap-1">
-                  <DuplicateMiniatureButton
-                    miniatureId={miniature.id}
-                    variant="ghost"
-                    size="icon"
-                    showLabel={false}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    asChild
-                  >
-                    <Link href={`/dashboard/collection/${miniature.id}/edit`}>
-                      <Edit className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+              <TableCell className="text-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openGallery(miniature)}
+                  disabled={miniature.miniature_photos.length === 0}
+                  title={
+                    miniature.miniature_photos.length === 0
+                      ? "No photos"
+                      : `View ${miniature.miniature_photos.length} photo(s)`
+                  }
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+              </TableCell>
+              <TableCell className="text-center">
+                <DuplicateMiniatureButton
+                  miniatureId={miniature.id}
+                  variant="ghost"
+                  size="icon"
+                  showLabel={false}
+                />
+              </TableCell>
+              <TableCell className="text-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                >
+                  <Link href={`/dashboard/collection/${miniature.id}/edit`}>
+                    <Edit className="h-4 w-4" />
+                  </Link>
+                </Button>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {/* Photo Gallery Dialog */}
+      {selectedMiniature && (
+        <Dialog open={!!selectedMiniature} onOpenChange={closeGallery}>
+          <DialogContent className="max-w-4xl p-0">
+            <DialogTitle className="sr-only">
+              {selectedMiniature.miniature_photos[selectedPhotoIndex]
+                ? `${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`
+                : selectedMiniature.name}
+            </DialogTitle>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 z-10"
+                onClick={closeGallery}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+
+              {selectedMiniature.miniature_photos.length > 0 ? (
+                <>
+                  <div className="relative w-full h-[70vh]">
+                    <Image
+                      src={
+                        supabase.storage
+                          .from("miniature-photos")
+                          .getPublicUrl(
+                            selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+                          ).data.publicUrl
+                      }
+                      alt={`${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 896px"
+                      className="object-contain"
+                      priority
+                      unoptimized
+                    />
+                  </div>
+
+                  {/* Navigation */}
+                  {selectedMiniature.miniature_photos.length > 1 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute left-2 top-1/2 -translate-y-1/2"
+                        onClick={goToPrevious}
+                        disabled={selectedPhotoIndex === 0}
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                        onClick={goToNext}
+                        disabled={selectedPhotoIndex === selectedMiniature.miniature_photos.length - 1}
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </Button>
+                    </>
+                  )}
+
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur px-3 py-1 rounded-full text-sm">
+                    {selectedPhotoIndex + 1} / {selectedMiniature.miniature_photos.length}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
+                  No photos available
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

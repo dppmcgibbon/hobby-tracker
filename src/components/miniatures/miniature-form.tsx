@@ -81,6 +81,7 @@ export function MiniatureForm({
         }
       : {
           quantity: 1,
+          sculptor: "Unknown",
         },
   });
 
