@@ -187,12 +187,20 @@ export function CollectionClient({
           ))}
         </div>
       ) : (
-        <MiniatureTableView
-          miniatures={miniatures}
-          selectable={selectionMode}
-          selectedIds={selectedIds}
-          onSelectChange={handleSelectChange}
-        />
+        <>
+          <div className="flex items-center justify-end mb-4">
+            <p className="text-sm text-muted-foreground">
+              Displaying <span className="font-semibold text-primary">{miniatures.length}</span> miniature
+              {miniatures.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <MiniatureTableView
+            miniatures={miniatures}
+            selectable={selectionMode}
+            selectedIds={selectedIds}
+            onSelectChange={handleSelectChange}
+          />
+        </>
       )}
 
       <BatchOperationsBar

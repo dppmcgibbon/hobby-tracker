@@ -3,6 +3,7 @@ import {
   getCollectionStatistics,
   getRecentActivity,
   getPaintStatistics,
+  getGameStatistics,
 } from "@/lib/queries/statistics";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Palette, CheckCircle2, Clock } from "lucide-react";
@@ -10,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { StatusDistributionChart } from "@/components/dashboard/status-distribution-chart";
 import { CompletionChart } from "@/components/dashboard/completion-chart";
 import { FactionBreakdownChart } from "@/components/dashboard/faction-breakdown-chart";
+import { GameStatisticsCard } from "@/components/dashboard/game-statistics-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -17,10 +19,11 @@ import { Badge } from "@/components/ui/badge";
 
 export default async function DashboardPage() {
   const user = await requireAuth();
-  const [stats, activity, paintStats] = await Promise.all([
+  const [stats, activity, paintStats, gameStats] = await Promise.all([
     getCollectionStatistics(user.id),
     getRecentActivity(user.id),
     getPaintStatistics(user.id),
+    getGameStatistics(user.id),
   ]);
 
   if (!stats) {
@@ -225,6 +228,15 @@ export default async function DashboardPage() {
           </Card>
         )}
       </div>
+
+      {/* Game Statistics */}
+      {gameStats.gameBreakdown.length > 0 && (
+        <GameStatisticsCard
+          gameBreakdown={gameStats.gameBreakdown}
+          totalGames={gameStats.totalGames}
+          totalLinkedMiniatures={gameStats.totalLinkedMiniatures}
+        />
+      )}
     </div>
   );
 }

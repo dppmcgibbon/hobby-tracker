@@ -204,3 +204,81 @@ export async function getPaintStatistics(userId: string) {
     mostUsedPaints,
   };
 }
+
+export async function getGameStatistics(userId: string) {
+  const supabase = await createClient();
+
+  // Get all miniature-game links with game details
+  const { data: miniatureGames } = await supabase
+    .from("miniature_games")
+    .select(
+      `
+      miniature_id,
+      game_id,
+      edition_id,
+      expansion_id,
+      games(id, name, publisher),
+      editions(id, name, year),
+      expansions(id, name, year)
+    `
+    );
+
+  // Get all user's miniatures to count quantities
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id, quantity")
+    .eq("user_id", userId);
+
+  if (!miniatureGames || !miniatures) {
+    return {
+      gameBreakdown: [],
+      totalGames: 0,
+      totalLinkedMiniatures: 0,
+    };
+  }
+
+  // Create a map of miniature IDs to quantities
+  const miniatureQuantities = new Map(miniatures.map((m) => [m.id, m.quantity]));
+
+  // Count miniatures per game
+  const gameCount: Record<string, { name: string; count: number; editions: Set<string> }> = {};
+
+  miniatureGames.forEach((mg) => {
+    const game = Array.isArray(mg.games) ? mg.games[0] : mg.games;
+    if (game) {
+      const quantity = miniatureQuantities.get(mg.miniature_id) || 1;
+      
+      if (!gameCount[game.id]) {
+        gameCount[game.id] = {
+          name: game.name,
+          count: 0,
+          editions: new Set(),
+        };
+      }
+      
+      gameCount[game.id].count += quantity;
+      
+      // Track editions
+      if (mg.edition_id) {
+        gameCount[game.id].editions.add(mg.edition_id);
+      }
+    }
+  });
+
+  const gameBreakdown = Object.entries(gameCount)
+    .map(([id, data]) => ({
+      id,
+      name: data.name,
+      count: data.count,
+      editionCount: data.editions.size,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const totalLinkedMiniatures = gameBreakdown.reduce((sum, g) => sum + g.count, 0);
+
+  return {
+    gameBreakdown,
+    totalGames: gameBreakdown.length,
+    totalLinkedMiniatures,
+  };
+}

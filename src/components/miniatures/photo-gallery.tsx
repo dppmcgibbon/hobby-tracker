@@ -3,9 +3,22 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { deleteMiniaturePhoto } from "@/app/actions/photos";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Photo {
   id: string;
@@ -21,7 +34,10 @@ interface PhotoGalleryProps {
 
 export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<Photo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const supabase = createClient();
+  const router = useRouter();
 
   const openLightbox = (index: number) => {
     setSelectedIndex(index);
@@ -40,6 +56,24 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
   const goToNext = () => {
     if (selectedIndex !== null && selectedIndex < photos.length - 1) {
       setSelectedIndex(selectedIndex + 1);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!photoToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path);
+      toast.success("Photo deleted successfully");
+      setPhotoToDelete(null);
+      setSelectedIndex(null);
+      router.refresh();
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete photo");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -90,14 +124,24 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
               {photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`}
             </DialogTitle>
             <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 z-10"
-                onClick={closeLightbox}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="absolute top-2 right-2 z-10 flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 backdrop-blur hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => setPhotoToDelete(photos[selectedIndex])}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 backdrop-blur"
+                  onClick={closeLightbox}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
 
               <div className="relative w-full h-[70vh]">
                 <Image
@@ -154,6 +198,28 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!photoToDelete} onOpenChange={() => setPhotoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this photo? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
