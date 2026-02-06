@@ -11,6 +11,7 @@ import { StatusDistributionChart } from "@/components/dashboard/status-distribut
 import { CompletionChart } from "@/components/dashboard/completion-chart";
 import { FactionBreakdownChart } from "@/components/dashboard/faction-breakdown-chart";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,13 +53,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-full">
-      <div className="border-l-4 border-primary pl-4">
-        <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
-          Command Center
-        </h1>
-        <p className="text-muted-foreground mt-2 text-base">
-          Strategic overview of your forces and campaign progress
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="border-l-4 border-primary pl-4">
+          <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
+            Command Center
+          </h1>
+          <p className="text-muted-foreground mt-2 text-base">
+            Strategic overview of your forces and campaign progress
+          </p>
+        </div>
+        <DatabaseBackupButton />
       </div>
 
       {/* Stats Cards */}
