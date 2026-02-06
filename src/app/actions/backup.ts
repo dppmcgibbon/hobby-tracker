@@ -34,6 +34,57 @@ function convertToCSV(data: any[], tableName: string): string {
   return [csvHeaders, ...csvRows].join("\n");
 }
 
+// Helper function to parse CSV back to array of objects
+function parseCSV(csv: string): any[] {
+  if (!csv || csv.trim().length === 0) return [];
+
+  const lines = csv.split("\n").filter((line) => line.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const data: any[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values: string[] = [];
+    let currentValue = "";
+    let insideQuotes = false;
+
+    // Parse CSV line handling quoted values
+    for (let j = 0; j < lines[i].length; j++) {
+      const char = lines[i][j];
+
+      if (char === '"') {
+        if (insideQuotes && lines[i][j + 1] === '"') {
+          // Escaped quote
+          currentValue += '"';
+          j++;
+        } else {
+          // Toggle quote state
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === "," && !insideQuotes) {
+        values.push(currentValue.trim());
+        currentValue = "";
+      } else {
+        currentValue += char;
+      }
+    }
+    values.push(currentValue.trim());
+
+    // Create object from values
+    const row: any = {};
+    headers.forEach((header, index) => {
+      const value = values[index] || "";
+      // Convert empty strings to null
+      row[header] = value === "" ? null : value;
+    });
+
+    data.push(row);
+  }
+
+  return data;
+}
+
 export async function createDatabaseBackup() {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -62,9 +113,13 @@ export async function createDatabaseBackup() {
       "editions",
       "expansions",
       "paints",
+      "bases",
+      "base_shapes",
+      "base_types",
     ];
 
     const backups: Array<{ tableName: string; csv: string; rowCount: number }> = [];
+    const photoFiles: Array<{ path: string; blob: Blob }> = [];
 
     // Fetch data for each table
     for (const table of tables) {
@@ -150,16 +205,308 @@ export async function createDatabaseBackup() {
           csv,
           rowCount: data.length,
         });
+
+        // Download actual photo files if this is the miniature_photos table
+        if (table === "miniature_photos") {
+          for (const photo of data) {
+            if (photo.storage_path) {
+              try {
+                const { data: fileData, error: downloadError } = await supabase.storage
+                  .from("miniature-photos")
+                  .download(photo.storage_path);
+
+                if (!downloadError && fileData) {
+                  photoFiles.push({
+                    path: photo.storage_path,
+                    blob: fileData,
+                  });
+                } else {
+                  console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
+                }
+              } catch (downloadError) {
+                console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
+              }
+            }
+          }
+        }
       }
     }
 
     return {
       success: true,
       backups,
+      photoFiles,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
     console.error("Database backup error:", error);
+    throw error;
+  }
+}
+
+export async function importDatabaseBackup(backupData: {
+  [tableName: string]: string;
+}) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  try {
+    // Define table order for import (respecting foreign key dependencies)
+    // NOTE: We skip reference tables (factions, paints, games, editions, expansions)
+    // as these are system-wide data that users shouldn't modify
+    const importOrder = [
+      // User-owned tables
+      "tags",
+      "storage_boxes",
+      "miniatures",
+      "miniature_status",
+      "miniature_photos",
+      "painting_recipes",
+      "recipe_steps",
+      "collections",
+      "collection_miniatures",
+      "user_paints",
+      // Junction tables last
+      "miniature_tags",
+      "miniature_recipes",
+      "miniature_games",
+      "shared_miniatures",
+    ];
+
+    const results: { [table: string]: number } = {};
+
+    // Build mappings for reference tables (old UUID -> new UUID)
+    const factionMapping: { [oldId: string]: string | null } = {};
+    const paintMapping: { [oldId: string]: string | null } = {};
+    const gameMapping: { [oldId: string]: string | null } = {};
+    const editionMapping: { [oldId: string]: string | null } = {};
+    const expansionMapping: { [oldId: string]: string | null } = {};
+    const baseMapping: { [oldId: string]: string | null } = {};
+    const baseShapeMapping: { [oldId: string]: string | null } = {};
+    const baseTypeMapping: { [oldId: string]: string | null } = {};
+
+    // Map factions by name
+    if (backupData.factions) {
+      const backupFactions = parseCSV(backupData.factions);
+      const { data: currentFactions } = await supabase.from("factions").select("id, name");
+      
+      if (currentFactions) {
+        const factionNameMap = new Map(currentFactions.map((f) => [f.name, f.id]));
+        backupFactions.forEach((oldFaction) => {
+          const newId = factionNameMap.get(oldFaction.name) || null;
+          factionMapping[oldFaction.id] = newId;
+        });
+      }
+    }
+
+    // Map paints by brand and name
+    if (backupData.paints) {
+      const backupPaints = parseCSV(backupData.paints);
+      const { data: currentPaints } = await supabase.from("paints").select("id, brand, name");
+      
+      if (currentPaints) {
+        const paintKeyMap = new Map(currentPaints.map((p) => [`${p.brand}:${p.name}`, p.id]));
+        backupPaints.forEach((oldPaint) => {
+          const key = `${oldPaint.brand}:${oldPaint.name}`;
+          const newId = paintKeyMap.get(key) || null;
+          paintMapping[oldPaint.id] = newId;
+        });
+      }
+    }
+
+    // Map games by name
+    if (backupData.games) {
+      const backupGames = parseCSV(backupData.games);
+      const { data: currentGames } = await supabase.from("games").select("id, name");
+      
+      if (currentGames) {
+        const gameNameMap = new Map(currentGames.map((g) => [g.name, g.id]));
+        backupGames.forEach((oldGame) => {
+          const newId = gameNameMap.get(oldGame.name) || null;
+          gameMapping[oldGame.id] = newId;
+        });
+      }
+    }
+
+    // Map bases by name
+    if (backupData.bases) {
+      const backupBases = parseCSV(backupData.bases);
+      const { data: currentBases } = await supabase.from("bases").select("id, name");
+      
+      if (currentBases) {
+        const baseNameMap = new Map(currentBases.map((b) => [b.name, b.id]));
+        backupBases.forEach((oldBase) => {
+          const newId = baseNameMap.get(oldBase.name) || null;
+          baseMapping[oldBase.id] = newId;
+        });
+      }
+    }
+
+    // Map base_shapes by name
+    if (backupData.base_shapes) {
+      const backupBaseShapes = parseCSV(backupData.base_shapes);
+      const { data: currentBaseShapes } = await supabase.from("base_shapes").select("id, name");
+      
+      if (currentBaseShapes) {
+        const baseShapeNameMap = new Map(currentBaseShapes.map((bs) => [bs.name, bs.id]));
+        backupBaseShapes.forEach((oldBaseShape) => {
+          const newId = baseShapeNameMap.get(oldBaseShape.name) || null;
+          baseShapeMapping[oldBaseShape.id] = newId;
+        });
+      }
+    }
+
+    // Map base_types by name
+    if (backupData.base_types) {
+      const backupBaseTypes = parseCSV(backupData.base_types);
+      const { data: currentBaseTypes } = await supabase.from("base_types").select("id, name");
+      
+      if (currentBaseTypes) {
+        const baseTypeNameMap = new Map(currentBaseTypes.map((bt) => [bt.name, bt.id]));
+        backupBaseTypes.forEach((oldBaseType) => {
+          const newId = baseTypeNameMap.get(oldBaseType.name) || null;
+          baseTypeMapping[oldBaseType.id] = newId;
+        });
+      }
+    }
+
+    // Map editions by game and name
+    if (backupData.editions && backupData.games) {
+      const backupEditions = parseCSV(backupData.editions);
+      const backupGames = parseCSV(backupData.games);
+      const { data: currentEditions } = await supabase.from("editions").select("id, game_id, name");
+      
+      if (currentEditions) {
+        // Create a map of old game_id -> game name
+        const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+        
+        // Create a map of (game_name, edition_name) -> edition_id
+        const editionKeyMap = new Map();
+        for (const edition of currentEditions) {
+          const { data: game } = await supabase.from("games").select("name").eq("id", edition.game_id).single();
+          if (game) {
+            editionKeyMap.set(`${game.name}:${edition.name}`, edition.id);
+          }
+        }
+        
+        backupEditions.forEach((oldEdition) => {
+          const gameName = gameIdToName.get(oldEdition.game_id);
+          if (gameName) {
+            const key = `${gameName}:${oldEdition.name}`;
+            const newId = editionKeyMap.get(key) || null;
+            editionMapping[oldEdition.id] = newId;
+          }
+        });
+      }
+    }
+
+    // Delete existing user data first
+    const userTables = [
+      "miniatures",
+      "miniature_status",
+      "miniature_photos",
+      "collections",
+      "painting_recipes",
+      "user_paints",
+      "tags",
+      "shared_miniatures",
+      "storage_boxes",
+    ];
+
+    for (const table of userTables) {
+      const { error } = await supabase.from(table).delete().eq("user_id", user.id);
+      if (error) {
+        console.error(`Error deleting ${table}:`, error);
+      }
+    }
+
+    // Import data in order
+    for (const tableName of importOrder) {
+      if (!backupData[tableName]) continue;
+
+      const csvData = backupData[tableName];
+      const rows = parseCSV(csvData);
+
+      if (rows.length === 0) continue;
+
+      // Replace user_id with current user's ID and map foreign keys
+      const processedRows = rows.map((row) => {
+        const processedRow = { ...row };
+        
+        // Replace user_id for user-owned tables
+        if (userTables.includes(tableName) && processedRow.user_id) {
+          processedRow.user_id = user.id;
+        }
+
+        // Map foreign keys for miniatures
+        if (tableName === "miniatures") {
+          if (processedRow.faction_id && factionMapping[processedRow.faction_id] !== undefined) {
+            processedRow.faction_id = factionMapping[processedRow.faction_id];
+          }
+          if (processedRow.base_id && baseMapping[processedRow.base_id] !== undefined) {
+            processedRow.base_id = baseMapping[processedRow.base_id];
+          }
+          if (processedRow.base_shape_id && baseShapeMapping[processedRow.base_shape_id] !== undefined) {
+            processedRow.base_shape_id = baseShapeMapping[processedRow.base_shape_id];
+          }
+          if (processedRow.base_type_id && baseTypeMapping[processedRow.base_type_id] !== undefined) {
+            processedRow.base_type_id = baseTypeMapping[processedRow.base_type_id];
+          }
+        }
+
+        // Map foreign keys for recipe_steps
+        if (tableName === "recipe_steps") {
+          if (processedRow.paint_id && paintMapping[processedRow.paint_id] !== undefined) {
+            processedRow.paint_id = paintMapping[processedRow.paint_id];
+          }
+        }
+
+        // Map foreign keys for miniature_games
+        if (tableName === "miniature_games") {
+          if (processedRow.game_id && gameMapping[processedRow.game_id] !== undefined) {
+            processedRow.game_id = gameMapping[processedRow.game_id];
+          }
+          if (processedRow.edition_id && editionMapping[processedRow.edition_id] !== undefined) {
+            processedRow.edition_id = editionMapping[processedRow.edition_id];
+          }
+        }
+
+        // Map foreign keys for user_paints
+        if (tableName === "user_paints") {
+          if (processedRow.paint_id && paintMapping[processedRow.paint_id] !== undefined) {
+            processedRow.paint_id = paintMapping[processedRow.paint_id];
+          }
+        }
+
+        return processedRow;
+      });
+
+      // Insert data in batches of 100 to avoid timeouts
+      const batchSize = 100;
+      let insertedCount = 0;
+
+      for (let i = 0; i < processedRows.length; i += batchSize) {
+        const batch = processedRows.slice(i, i + batchSize);
+        const { error } = await supabase.from(tableName).insert(batch);
+
+        if (error) {
+          console.error(`Error importing ${tableName} (batch ${i / batchSize + 1}):`, error);
+          throw new Error(`Failed to import ${tableName}: ${error.message}`);
+        }
+
+        insertedCount += batch.length;
+      }
+
+      results[tableName] = insertedCount;
+    }
+
+    return {
+      success: true,
+      results,
+      totalRows: Object.values(results).reduce((sum, count) => sum + count, 0),
+    };
+  } catch (error) {
+    console.error("Database import error:", error);
     throw error;
   }
 }

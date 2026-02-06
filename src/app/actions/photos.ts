@@ -39,7 +39,12 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     });
 
   if (uploadError) {
-    throw new Error(uploadError.message);
+    console.error("Storage upload error:", uploadError);
+    throw new Error(`Failed to upload photo: ${uploadError.message || "Unknown storage error"}`);
+  }
+
+  if (!uploadData || !uploadData.path) {
+    throw new Error("Upload succeeded but no path was returned");
   }
 
   // Save photo record to database
