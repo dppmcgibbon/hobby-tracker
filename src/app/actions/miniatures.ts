@@ -228,6 +228,12 @@ export async function duplicateMiniature(id: string) {
     .eq("user_id", user.id)
     .single();
 
+  // Get the original game links
+  const { data: originalGames } = await supabase
+    .from("miniature_games")
+    .select("*")
+    .eq("miniature_id", id);
+
   // Create duplicate with modified name
   const { id: _, user_id: __, created_at: ___, updated_at: ____, ...miniatureData } = original;
   
@@ -256,6 +262,25 @@ export async function duplicateMiniature(id: string) {
 
   if (statusError) {
     throw new Error(statusError.message);
+  }
+
+  // Copy game links if any exist
+  if (originalGames && originalGames.length > 0) {
+    const gameLinks = originalGames.map((link) => ({
+      miniature_id: duplicate.id,
+      game_id: link.game_id,
+      edition_id: link.edition_id,
+      expansion_id: link.expansion_id,
+    }));
+
+    const { error: gamesError } = await supabase
+      .from("miniature_games")
+      .insert(gameLinks);
+
+    if (gamesError) {
+      console.error("Error copying game links:", gamesError);
+      // Don't throw - we still want the duplicate to succeed even if game links fail
+    }
   }
 
   revalidatePath("/dashboard/collection");

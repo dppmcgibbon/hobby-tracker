@@ -75,6 +75,7 @@ New client component with:
 - Status (backlog/assembled/primed/painting/completed)
 - Magnetised flag
 - Based flag
+- **Game links** (game, edition, expansion associations)
 
 ### Data NOT Copied
 - ID (new UUID generated)
@@ -82,6 +83,8 @@ New client component with:
 - Created/Updated timestamps (new timestamps)
 - Photos (intentionally excluded)
 - Completion date (reset even if status is "completed")
+- Recipe links (not copied)
+- Tag associations (not copied)
 
 ## Benefits
 

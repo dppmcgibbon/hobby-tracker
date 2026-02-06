@@ -9,20 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GameFormDialog } from "@/components/games/game-form-dialog";
 import { EditionFormDialog } from "@/components/games/edition-form-dialog";
 import { ExpansionFormDialog } from "@/components/games/expansion-form-dialog";
-import { deleteEdition, deleteExpansion } from "@/app/actions/games";
-import { Gamepad2, Edit, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { DeleteEditionButton } from "@/components/games/delete-edition-button";
+import { DeleteExpansionButton } from "@/components/games/delete-expansion-button";
+import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 async function GameDetailsContent({ id }: { id: string }) {
   const supabase = await createClient();
@@ -170,6 +160,15 @@ function EditionCard({
             </div>
           </div>
           <div className="flex gap-1">
+            <ExpansionFormDialog 
+              editionId={edition.id}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Expansion
+                </Button>
+              }
+            />
             <EditionFormDialog
               gameId={gameId}
               edition={edition}
@@ -179,33 +178,7 @@ function EditionCard({
                 </Button>
               }
             />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Edition?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete {edition.name} and all its expansions. This action
-                    cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={async () => {
-                      await deleteEdition(edition.id);
-                    }}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteEditionButton editionId={edition.id} editionName={edition.name} />
           </div>
         </div>
       </div>
@@ -213,10 +186,7 @@ function EditionCard({
       {expansionCount > 0 && (
         <CollapsibleContent>
           <div className="border-t px-4 pb-4">
-            <div className="flex items-center justify-between py-3">
-              <h4 className="text-sm font-medium">Expansions</h4>
-              <ExpansionFormDialog editionId={edition.id} />
-            </div>
+            <h4 className="text-sm font-medium py-3">Expansions</h4>
             <div className="space-y-2">
               {edition.expansions?.map((expansion) => (
                 <div
@@ -244,33 +214,10 @@ function EditionCard({
                         </Button>
                       }
                     />
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Expansion?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete {expansion.name}. This action cannot be
-                            undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={async () => {
-                              await deleteExpansion(expansion.id);
-                            }}
-                            className="bg-destructive hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <DeleteExpansionButton
+                      expansionId={expansion.id}
+                      expansionName={expansion.name}
+                    />
                   </div>
                 </div>
               ))}

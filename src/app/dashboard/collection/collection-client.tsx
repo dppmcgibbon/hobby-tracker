@@ -183,6 +183,9 @@ export function CollectionClient({
         onClearSelection={handleClearSelection}
         tags={tags}
         collections={collections}
+        games={games}
+        editions={editions}
+        expansions={expansions}
       />
     </div>
   );

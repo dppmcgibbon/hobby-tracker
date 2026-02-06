@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Trash2, Tag, FolderPlus, X } from "lucide-react";
+import { Check, Trash2, Tag, FolderPlus, X, Gamepad2 } from "lucide-react";
 import { toast } from "sonner";
 import { bulkUpdateStatus, bulkDelete } from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
+import { bulkLinkMinaturesToGame } from "@/app/actions/games";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -27,6 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { createClient } from "@/lib/supabase/client";
 
 interface Tag {
   id: string;
@@ -39,11 +41,31 @@ interface Collection {
   name: string;
 }
 
+interface Game {
+  id: string;
+  name: string;
+}
+
+interface Edition {
+  id: string;
+  name: string;
+  year: number | null;
+}
+
+interface Expansion {
+  id: string;
+  name: string;
+  year: number | null;
+}
+
 interface BatchOperationsBarProps {
   selectedIds: string[];
   onClearSelection: () => void;
   tags: Tag[];
   collections: Collection[];
+  games?: Game[];
+  editions?: Edition[];
+  expansions?: Expansion[];
 }
 
 export function BatchOperationsBar({
@@ -51,12 +73,69 @@ export function BatchOperationsBar({
   onClearSelection,
   tags,
   collections,
+  games = [],
+  editions = [],
+  expansions = [],
 }: BatchOperationsBarProps) {
   const router = useRouter();
+  const supabase = createClient();
   const [isPending, startTransition] = useTransition();
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+  const [selectedGameId, setSelectedGameId] = useState<string>("");
+  const [selectedEditionId, setSelectedEditionId] = useState<string>("");
+  const [selectedExpansionId, setSelectedExpansionId] = useState<string>("");
+  const [availableEditions, setAvailableEditions] = useState<Edition[]>([]);
+  const [availableExpansions, setAvailableExpansions] = useState<Expansion[]>([]);
+
+  // Fetch editions when game is selected
+  useEffect(() => {
+    if (selectedGameId) {
+      console.log("Fetching editions for game:", selectedGameId);
+      supabase
+        .from("editions")
+        .select("id, name, year")
+        .eq("game_id", selectedGameId)
+        .order("sequence")
+        .then(({ data, error }) => {
+          console.log("Editions fetched:", { data, error, count: data?.length });
+          setAvailableEditions(data || []);
+          // Initialize edition selection
+          if (!selectedEditionId) {
+            setSelectedEditionId("none");
+          }
+        });
+    } else {
+      console.log("Clearing editions");
+      setAvailableEditions([]);
+      setSelectedEditionId("none");
+    }
+  }, [selectedGameId, supabase]);
+
+  // Fetch expansions when edition is selected
+  useEffect(() => {
+    if (selectedEditionId && selectedEditionId !== "none") {
+      console.log("Fetching expansions for edition:", selectedEditionId);
+      supabase
+        .from("expansions")
+        .select("id, name, year")
+        .eq("edition_id", selectedEditionId)
+        .order("sequence")
+        .then(({ data, error }) => {
+          console.log("Expansions fetched:", { data, error, count: data?.length });
+          setAvailableExpansions(data || []);
+          // Initialize expansion selection
+          if (!selectedExpansionId) {
+            setSelectedExpansionId("none");
+          }
+        });
+    } else {
+      console.log("Clearing expansions, selectedEditionId:", selectedEditionId);
+      setAvailableExpansions([]);
+      setSelectedExpansionId("none");
+    }
+  }, [selectedEditionId, supabase]);
 
   if (selectedIds.length === 0) return null;
 
@@ -124,6 +203,29 @@ export function BatchOperationsBar({
         router.refresh(); // Force refresh to remove deleted items
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to delete");
+      }
+    });
+  };
+
+  const handleLinkGame = () => {
+    if (!selectedGameId) return;
+
+    startTransition(async () => {
+      try {
+        await bulkLinkMinaturesToGame(
+          selectedIds,
+          selectedGameId,
+          selectedEditionId && selectedEditionId !== "none" ? selectedEditionId : null,
+          selectedExpansionId && selectedExpansionId !== "none" ? selectedExpansionId : null
+        );
+        toast.success(`Linked ${selectedIds.length} miniature(s) to game`);
+        onClearSelection();
+        setSelectedGameId("");
+        setSelectedEditionId("");
+        setSelectedExpansionId("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to link game");
       }
     });
   };
@@ -198,6 +300,77 @@ export function BatchOperationsBar({
             <FolderPlus className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Link to Game */}
+        {games.length > 0 && (
+          <>
+            <div className="h-8 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedGameId}
+                onValueChange={(v) => {
+                  setSelectedGameId(v);
+                  setSelectedEditionId("");
+                  setSelectedExpansionId("");
+                }}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Link to game..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {games.map((game) => (
+                    <SelectItem key={game.id} value={game.id}>
+                      {game.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Edition selector - only show if game selected */}
+              {selectedGameId && availableEditions.length > 0 && (
+                <Select value={selectedEditionId} onValueChange={setSelectedEditionId}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Edition..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No edition</SelectItem>
+                    {availableEditions.map((edition) => (
+                      <SelectItem key={edition.id} value={edition.id}>
+                        {edition.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Expansion selector - only show if edition selected */}
+              {selectedEditionId && selectedEditionId !== "none" && (
+                <Select value={selectedExpansionId} onValueChange={setSelectedExpansionId}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Expansion..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No expansion</SelectItem>
+                    {availableExpansions.map((expansion) => (
+                      <SelectItem key={expansion.id} value={expansion.id}>
+                        {expansion.name}
+                      </SelectItem>
+                    ))}
+                    {availableExpansions.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        No expansions available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Button size="sm" onClick={handleLinkGame} disabled={!selectedGameId || isPending}>
+                <Gamepad2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
 
         <div className="h-8 w-px bg-border" />
 

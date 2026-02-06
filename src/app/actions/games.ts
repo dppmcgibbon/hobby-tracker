@@ -280,3 +280,44 @@ export async function updateMiniatureGame(
   revalidatePath(`/dashboard/collection/${miniatureId}`);
   return { success: true };
 }
+
+export async function bulkLinkMinaturesToGame(
+  miniatureIds: string[],
+  gameId: string,
+  editionId?: string | null,
+  expansionId?: string | null
+) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // Create game links for all miniatures
+  const gameLinks = miniatureIds.map((miniatureId) => ({
+    miniature_id: miniatureId,
+    game_id: gameId,
+    edition_id: editionId || null,
+    expansion_id: expansionId || null,
+  }));
+
+  // Use upsert to handle existing links
+  const { error } = await supabase.from("miniature_games").upsert(gameLinks, {
+    onConflict: "miniature_id,game_id",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true, count: miniatureIds.length };
+}
