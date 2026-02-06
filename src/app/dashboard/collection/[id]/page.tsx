@@ -129,6 +129,20 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                   <p className="font-medium">{miniature.quantity}</p>
                 </div>
 
+                {(miniature as any).storage_box && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Storage Location</p>
+                    <Link
+                      href={`/dashboard/storage/${(miniature as any).storage_box.id}`}
+                      className="font-medium hover:text-primary hover:underline"
+                    >
+                      {(miniature as any).storage_box.name}
+                      {(miniature as any).storage_box.location &&
+                        ` (${(miniature as any).storage_box.location})`}
+                    </Link>
+                  </div>
+                )}
+
                 {miniature.base_size && (
                   <div>
                     <p className="text-sm text-muted-foreground">Base Size</p>

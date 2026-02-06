@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { miniatureSchema, type MiniatureInput } from "@/lib/validations/miniature";
 import { createMiniature, updateMiniature } from "@/app/actions/miniatures";
+import { linkRecipeToMiniature, unlinkRecipeFromMiniature } from "@/app/actions/recipes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,18 +20,43 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { RecipeSelector } from "@/components/recipes/recipe-selector";
 import type { Faction, Miniature } from "@/types";
+import { toast } from "sonner";
+
+interface StorageBox {
+  id: string;
+  name: string;
+  location?: string | null;
+}
+
+interface Recipe {
+  id: string;
+  name: string;
+  faction?: { name: string } | null;
+}
 
 interface MiniatureFormProps {
   factions: Faction[];
+  storageBoxes?: StorageBox[];
+  recipes?: Recipe[];
+  existingRecipeIds?: string[];
   miniature?: Miniature;
   onSuccess?: () => void;
 }
 
-export function MiniatureForm({ factions, miniature, onSuccess }: MiniatureFormProps) {
+export function MiniatureForm({
+  factions,
+  storageBoxes = [],
+  recipes = [],
+  existingRecipeIds = [],
+  miniature,
+  onSuccess,
+}: MiniatureFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>(existingRecipeIds);
 
   const {
     register,
@@ -51,6 +77,7 @@ export function MiniatureForm({ factions, miniature, onSuccess }: MiniatureFormP
           sculptor: miniature.sculptor || undefined,
           year: miniature.year || undefined,
           notes: miniature.notes || undefined,
+          storage_box_id: (miniature as any).storage_box_id || undefined,
         }
       : {
           quantity: 1,
@@ -59,16 +86,59 @@ export function MiniatureForm({ factions, miniature, onSuccess }: MiniatureFormP
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const factionId = watch("faction_id");
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const storageBoxId = watch("storage_box_id");
 
   const onSubmit = async (data: MiniatureInput) => {
     setIsLoading(true);
     setError(null);
 
     try {
+      let miniatureId: string;
+      
       if (miniature) {
-        await updateMiniature(miniature.id, data);
+        const result = await updateMiniature(miniature.id, data);
+        miniatureId = miniature.id;
       } else {
-        await createMiniature(data);
+        const result = await createMiniature(data);
+        miniatureId = result.miniature.id;
+      }
+
+      // Handle recipe linking for new miniatures or changed recipes for existing ones
+      if (miniature) {
+        // For existing miniatures, handle both adding and removing recipes
+        const newRecipeIds = selectedRecipeIds.filter((id) => !existingRecipeIds.includes(id));
+        const removedRecipeIds = existingRecipeIds.filter((id) => !selectedRecipeIds.includes(id));
+        
+        // Link new recipes
+        for (const recipeId of newRecipeIds) {
+          try {
+            await linkRecipeToMiniature(miniatureId, recipeId);
+          } catch (err) {
+            console.error("Failed to link recipe:", err);
+            toast.error(`Failed to link recipe ${recipeId}`);
+          }
+        }
+        
+        // Unlink removed recipes
+        for (const recipeId of removedRecipeIds) {
+          try {
+            await unlinkRecipeFromMiniature(miniatureId, recipeId);
+          } catch (err) {
+            console.error("Failed to unlink recipe:", err);
+            toast.error(`Failed to unlink recipe ${recipeId}`);
+          }
+        }
+      } else if (selectedRecipeIds.length > 0) {
+        // For new miniatures, only link selected recipes
+        for (const recipeId of selectedRecipeIds) {
+          try {
+            await linkRecipeToMiniature(miniatureId, recipeId);
+          } catch (err) {
+            console.error("Failed to link recipe:", err);
+            toast.error(`Failed to link recipe ${recipeId}`);
+          }
+        }
       }
 
       if (onSuccess) {
@@ -127,17 +197,42 @@ export function MiniatureForm({ factions, miniature, onSuccess }: MiniatureFormP
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="unit_type">Unit Type</Label>
-          <Input
-            id="unit_type"
-            placeholder="e.g., Troops, HQ, Elites"
-            {...register("unit_type")}
+          <Label htmlFor="storage_box_id">Storage Location</Label>
+          <Select
+            value={storageBoxId || "none"}
+            onValueChange={(value) => setValue("storage_box_id", value === "none" ? null : value)}
             disabled={isLoading}
-          />
-          {errors.unit_type && (
-            <p className="text-sm text-destructive">{errors.unit_type.message}</p>
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select storage box" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No storage box</SelectItem>
+              {storageBoxes.map((box) => (
+                <SelectItem key={box.id} value={box.id}>
+                  {box.name}
+                  {box.location && ` (${box.location})`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.storage_box_id && (
+            <p className="text-sm text-destructive">{errors.storage_box_id.message}</p>
           )}
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="unit_type">Unit Type</Label>
+        <Input
+          id="unit_type"
+          placeholder="e.g., Troops, HQ, Elites"
+          {...register("unit_type")}
+          disabled={isLoading}
+        />
+        {errors.unit_type && (
+          <p className="text-sm text-destructive">{errors.unit_type.message}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -216,6 +311,21 @@ export function MiniatureForm({ factions, miniature, onSuccess }: MiniatureFormP
         />
         {errors.notes && <p className="text-sm text-destructive">{errors.notes.message}</p>}
       </div>
+
+      {recipes.length > 0 && (
+        <div className="space-y-2">
+          <Label htmlFor="recipes">Painting Recipes</Label>
+          <RecipeSelector
+            recipes={recipes}
+            selectedRecipeIds={selectedRecipeIds}
+            onSelectionChange={setSelectedRecipeIds}
+            disabled={isLoading}
+          />
+          <p className="text-xs text-muted-foreground">
+            Select painting recipes to link to this miniature
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>

@@ -33,11 +33,25 @@ interface Collection {
   name: string;
 }
 
+interface StorageBox {
+  id: string;
+  name: string;
+  location?: string | null;
+}
+
+interface Recipe {
+  id: string;
+  name: string;
+  faction?: { name: string } | null;
+}
+
 interface CollectionClientProps {
   miniatures: MiniatureWithRelations[];
   factions: { id: string; name: string }[];
   tags: Tag[];
   collections: Collection[];
+  storageBoxes: StorageBox[];
+  recipes: Recipe[];
   games: { id: string; name: string }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
@@ -49,6 +63,8 @@ export function CollectionClient({
   factions,
   tags,
   collections,
+  storageBoxes,
+  recipes,
   games,
   editions,
   expansions,
@@ -144,6 +160,7 @@ export function CollectionClient({
       <CollectionFilters
         factions={factions}
         tags={tags}
+        storageBoxes={storageBoxes}
         games={games}
         editions={editions}
         expansions={expansions}
@@ -183,6 +200,8 @@ export function CollectionClient({
         onClearSelection={handleClearSelection}
         tags={tags}
         collections={collections}
+        storageBoxes={storageBoxes}
+        recipes={recipes}
         games={games}
         editions={editions}
         expansions={expansions}

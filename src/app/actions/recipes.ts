@@ -229,3 +229,43 @@ export async function unlinkRecipeFromMiniature(miniatureId: string, recipeId: s
   revalidatePath(`/dashboard/recipes/${recipeId}`);
   return { success: true };
 }
+
+export async function bulkLinkRecipes(miniatureIds: string[], recipeIds: string[]) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // Create all the miniature_recipe links
+  const links = [];
+  for (const miniatureId of miniatureIds) {
+    for (const recipeId of recipeIds) {
+      links.push({
+        miniature_id: miniatureId,
+        recipe_id: recipeId,
+      });
+    }
+  }
+
+  // Use upsert to avoid duplicate key errors
+  const { error } = await supabase.from("miniature_recipes").upsert(links, {
+    onConflict: "miniature_id,recipe_id",
+    ignoreDuplicates: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}

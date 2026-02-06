@@ -208,6 +208,11 @@ export function RecipeForm({ paints, factions }: RecipeFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.steps?.[index]?.paint_id && (
+                      <p className="text-sm text-destructive">
+                        {errors.steps[index]?.paint_id?.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

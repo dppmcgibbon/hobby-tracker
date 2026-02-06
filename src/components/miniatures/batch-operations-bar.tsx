@@ -2,12 +2,13 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Trash2, Tag, FolderPlus, X, Gamepad2 } from "lucide-react";
+import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen } from "lucide-react";
 import { toast } from "sonner";
-import { bulkUpdateStatus, bulkDelete } from "@/app/actions/miniatures";
+import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox } from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
 import { bulkLinkMinaturesToGame } from "@/app/actions/games";
+import { bulkLinkRecipes } from "@/app/actions/recipes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -29,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { createClient } from "@/lib/supabase/client";
+import { RecipeSelector } from "@/components/recipes/recipe-selector";
 
 interface Tag {
   id: string;
@@ -58,11 +60,25 @@ interface Expansion {
   year: number | null;
 }
 
+interface StorageBox {
+  id: string;
+  name: string;
+  location?: string | null;
+}
+
+interface Recipe {
+  id: string;
+  name: string;
+  faction?: { name: string } | null;
+}
+
 interface BatchOperationsBarProps {
   selectedIds: string[];
   onClearSelection: () => void;
   tags: Tag[];
   collections: Collection[];
+  storageBoxes?: StorageBox[];
+  recipes?: Recipe[];
   games?: Game[];
   editions?: Edition[];
   expansions?: Expansion[];
@@ -73,6 +89,8 @@ export function BatchOperationsBar({
   onClearSelection,
   tags,
   collections,
+  storageBoxes = [],
+  recipes = [],
   games = [],
   editions = [],
   expansions = [],
@@ -83,6 +101,8 @@ export function BatchOperationsBar({
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+  const [selectedStorageBoxId, setSelectedStorageBoxId] = useState<string>("");
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedEditionId, setSelectedEditionId] = useState<string>("");
   const [selectedExpansionId, setSelectedExpansionId] = useState<string>("");
@@ -194,6 +214,39 @@ export function BatchOperationsBar({
     });
   };
 
+  const handleUpdateStorageBox = () => {
+    startTransition(async () => {
+      try {
+        await bulkUpdateStorageBox(
+          selectedIds,
+          selectedStorageBoxId === "none" ? null : selectedStorageBoxId || null
+        );
+        toast.success(`Updated storage location for ${selectedIds.length} miniature(s)`);
+        onClearSelection();
+        setSelectedStorageBoxId("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update storage location");
+      }
+    });
+  };
+
+  const handleLinkRecipes = () => {
+    if (selectedRecipeIds.length === 0) return;
+
+    startTransition(async () => {
+      try {
+        await bulkLinkRecipes(selectedIds, selectedRecipeIds);
+        toast.success(`Linked ${selectedRecipeIds.length} recipe(s) to ${selectedIds.length} miniature(s)`);
+        onClearSelection();
+        setSelectedRecipeIds([]);
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to link recipes");
+      }
+    });
+  };
+
   const handleBulkDelete = () => {
     startTransition(async () => {
       try {
@@ -300,6 +353,53 @@ export function BatchOperationsBar({
             <FolderPlus className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Update Storage Box */}
+        {storageBoxes.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Select value={selectedStorageBoxId} onValueChange={setSelectedStorageBoxId}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Set storage..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No storage box</SelectItem>
+                {storageBoxes.map((box) => (
+                  <SelectItem key={box.id} value={box.id}>
+                    {box.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={handleUpdateStorageBox}
+              disabled={!selectedStorageBoxId || isPending}
+            >
+              <Archive className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Link Recipes */}
+        {recipes.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-[200px]">
+              <RecipeSelector
+                recipes={recipes}
+                selectedRecipeIds={selectedRecipeIds}
+                onSelectionChange={setSelectedRecipeIds}
+                disabled={isPending}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleLinkRecipes}
+              disabled={selectedRecipeIds.length === 0 || isPending}
+            >
+              <BookOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* Link to Game */}
         {games.length > 0 && (

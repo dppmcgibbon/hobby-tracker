@@ -27,6 +27,7 @@ import {
 interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
   tags: { id: string; name: string; color: string | null }[];
+  storageBoxes: { id: string; name: string; location?: string | null }[];
   games: { id: string; name: string }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
@@ -39,6 +40,7 @@ export interface FilterState {
   factionId: string;
   status: string;
   tagId: string;
+  storageBoxId: string;
   gameId: string;
   editionId: string;
   expansionId: string;
@@ -66,6 +68,7 @@ const SORT_OPTIONS = [
 export function CollectionFilters({
   factions,
   tags,
+  storageBoxes,
   games,
   editions,
   expansions,
@@ -82,6 +85,7 @@ export function CollectionFilters({
     factionId: searchParams.get("faction") || initialFilters?.factionId || "all",
     status: searchParams.get("status") || initialFilters?.status || "all",
     tagId: searchParams.get("tag") || initialFilters?.tagId || "all",
+    storageBoxId: searchParams.get("storage") || initialFilters?.storageBoxId || "all",
     gameId: searchParams.get("game") || initialFilters?.gameId || "all",
     editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
     expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
@@ -101,6 +105,7 @@ export function CollectionFilters({
     if (filters.factionId !== "all") params.set("faction", filters.factionId);
     if (filters.status !== "all") params.set("status", filters.status);
     if (filters.tagId !== "all") params.set("tag", filters.tagId);
+    if (filters.storageBoxId !== "all") params.set("storage", filters.storageBoxId);
     if (filters.gameId !== "all") params.set("game", filters.gameId);
     if (filters.editionId !== "all") params.set("edition", filters.editionId);
     if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
@@ -123,6 +128,7 @@ export function CollectionFilters({
     filters.factionId,
     filters.status,
     filters.tagId,
+    filters.storageBoxId,
     filters.gameId,
     filters.editionId,
     filters.expansionId,
@@ -140,6 +146,7 @@ export function CollectionFilters({
       factionId: "all",
       status: "all",
       tagId: "all",
+      storageBoxId: "all",
       gameId: "all",
       editionId: "all",
       expansionId: "all",
@@ -154,6 +161,7 @@ export function CollectionFilters({
     filters.factionId !== "all" ||
     filters.status !== "all" ||
     filters.tagId !== "all" ||
+    filters.storageBoxId !== "all" ||
     filters.gameId !== "all" ||
     filters.editionId !== "all" ||
     filters.expansionId !== "all" ||
@@ -165,6 +173,7 @@ export function CollectionFilters({
     filters.factionId !== "all",
     filters.status !== "all",
     filters.tagId !== "all",
+    filters.storageBoxId !== "all",
     filters.gameId !== "all",
     filters.editionId !== "all",
     filters.expansionId !== "all",
@@ -236,6 +245,28 @@ export function CollectionFilters({
                       )}
                       {tag.name}
                     </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Storage Box Filter */}
+          <div className="w-[220px]">
+            <Select
+              value={filters.storageBoxId}
+              onValueChange={(v) => updateFilter("storageBoxId", v)}
+            >
+              <SelectTrigger id="storage" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Storage</SelectItem>
+                <SelectItem value="none">No Storage Box</SelectItem>
+                {storageBoxes.map((box) => (
+                  <SelectItem key={box.id} value={box.id}>
+                    {box.name}
+                    {box.location && ` (${box.location})`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -556,6 +587,29 @@ export function CollectionFilters({
                   </Select>
                 </div>
 
+                {/* Storage Box */}
+                <div>
+                  <Label htmlFor="mobile-storage">Storage</Label>
+                  <Select
+                    value={filters.storageBoxId}
+                    onValueChange={(v) => updateFilter("storageBoxId", v)}
+                  >
+                    <SelectTrigger id="mobile-storage">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Storage</SelectItem>
+                      <SelectItem value="none">No Storage Box</SelectItem>
+                      {storageBoxes.map((box) => (
+                        <SelectItem key={box.id} value={box.id}>
+                          {box.name}
+                          {box.location && ` (${box.location})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Sort By */}
                 <div>
                   <Label htmlFor="mobile-sortBy">Sort By</Label>
@@ -649,6 +703,21 @@ export function CollectionFilters({
               Tag: {tags.find((t) => t.id === filters.tagId)?.name || filters.tagId}
               <button
                 onClick={() => updateFilter("tagId", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.storageBoxId !== "all" && (
+            <Badge variant="secondary">
+              Storage:{" "}
+              {filters.storageBoxId === "none"
+                ? "No Storage Box"
+                : storageBoxes.find((s) => s.id === filters.storageBoxId)?.name ||
+                  filters.storageBoxId}
+              <button
+                onClick={() => updateFilter("storageBoxId", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

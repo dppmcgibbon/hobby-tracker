@@ -16,6 +16,7 @@ export const miniatureSchema = z.object({
     .optional()
     .nullable(),
   notes: z.string().max(1000).optional().nullable(),
+  storage_box_id: z.string().uuid("Invalid storage box").optional().nullable(),
 });
 
 export const miniatureStatusSchema = z.object({

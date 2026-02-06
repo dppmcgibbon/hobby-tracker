@@ -25,6 +25,7 @@ interface MiniatureWithRelations {
     magnetised?: boolean | null;
   } | null;
   miniature_photos: { id: string; storage_path: string }[];
+  storage_box?: { id: string; name: string; location?: string | null } | null;
 }
 
 interface MiniatureTableViewProps {
@@ -72,6 +73,9 @@ export function MiniatureTableView({
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
               Status
+            </TableHead>
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
+              Storage
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
               Added
@@ -129,6 +133,18 @@ export function MiniatureTableView({
                   miniatureId={miniature.id}
                   status={miniature.miniature_status as MiniatureStatus | null}
                 />
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm">
+                {miniature.storage_box ? (
+                  <Link
+                    href={`/dashboard/storage/${miniature.storage_box.id}`}
+                    className="hover:text-primary hover:underline"
+                  >
+                    {miniature.storage_box.name}
+                  </Link>
+                ) : (
+                  "-"
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {formatDate(miniature.created_at)}

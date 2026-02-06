@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth/server";
-import { getMiniatureById, getFactions } from "@/lib/queries/miniatures";
+import { getMiniatureById, getFactions, getStorageBoxes } from "@/lib/queries/miniatures";
+import { getRecipes } from "@/lib/queries/recipes";
+import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniatureForm } from "@/components/miniatures/miniature-form";
 
@@ -19,7 +21,20 @@ export default async function EditMiniaturePage({ params }: PageProps) {
     notFound();
   }
 
-  const factions = await getFactions();
+  const [factions, storageBoxes, recipes] = await Promise.all([
+    getFactions(),
+    getStorageBoxes(user.id),
+    getRecipes(user.id),
+  ]);
+
+  // Get existing recipe links
+  const supabase = await createClient();
+  const { data: miniatureRecipes } = await supabase
+    .from("miniature_recipes")
+    .select("recipe_id")
+    .eq("miniature_id", id);
+
+  const existingRecipeIds = miniatureRecipes?.map((mr) => mr.recipe_id) || [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -34,7 +49,13 @@ export default async function EditMiniaturePage({ params }: PageProps) {
           <CardDescription>Make changes to your miniature information.</CardDescription>
         </CardHeader>
         <CardContent>
-          <MiniatureForm factions={factions} miniature={miniature} />
+          <MiniatureForm
+            factions={factions}
+            storageBoxes={storageBoxes}
+            recipes={recipes}
+            existingRecipeIds={existingRecipeIds}
+            miniature={miniature}
+          />
         </CardContent>
       </Card>
     </div>

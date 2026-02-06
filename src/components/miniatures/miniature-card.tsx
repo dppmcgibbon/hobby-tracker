@@ -26,6 +26,7 @@ interface MiniatureCardProps {
       magnetised?: boolean | null;
     } | null;
     miniature_photos: { storage_path: string }[];
+    storage_box?: { id: string; name: string; location?: string | null } | null;
   };
   selectable?: boolean;
   selected?: boolean;
@@ -132,6 +133,11 @@ export function MiniatureCard({
             miniatureId={miniature.id}
             status={miniature.miniature_status as MiniatureStatus | null}
           />
+          {miniature.storage_box && (
+            <Badge variant="outline" className="mt-2">
+              📦 {miniature.storage_box.name}
+            </Badge>
+          )}
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">

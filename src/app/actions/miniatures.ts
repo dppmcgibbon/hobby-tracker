@@ -138,6 +138,50 @@ export async function bulkUpdateStatus(miniatureIds: string[], status: string) {
   return { success: true };
 }
 
+export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId: string | null) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // If storageBoxId is provided, verify it belongs to user
+  if (storageBoxId) {
+    const { data: storageBox } = await supabase
+      .from("storage_boxes")
+      .select("id")
+      .eq("id", storageBoxId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!storageBox) {
+      throw new Error("Storage box not found or access denied");
+    }
+  }
+
+  // Update storage_box_id in miniatures table
+  const { error } = await supabase
+    .from("miniatures")
+    .update({ storage_box_id: storageBoxId })
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
 export async function bulkDelete(miniatureIds: string[]) {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -234,6 +278,12 @@ export async function duplicateMiniature(id: string) {
     .select("*")
     .eq("miniature_id", id);
 
+  // Get the original recipe links
+  const { data: originalRecipes } = await supabase
+    .from("miniature_recipes")
+    .select("recipe_id")
+    .eq("miniature_id", id);
+
   // Create duplicate with modified name
   const { id: _, user_id: __, created_at: ___, updated_at: ____, ...miniatureData } = original;
   
@@ -280,6 +330,23 @@ export async function duplicateMiniature(id: string) {
     if (gamesError) {
       console.error("Error copying game links:", gamesError);
       // Don't throw - we still want the duplicate to succeed even if game links fail
+    }
+  }
+
+  // Copy recipe links if any exist
+  if (originalRecipes && originalRecipes.length > 0) {
+    const recipeLinks = originalRecipes.map((link) => ({
+      miniature_id: duplicate.id,
+      recipe_id: link.recipe_id,
+    }));
+
+    const { error: recipesError } = await supabase
+      .from("miniature_recipes")
+      .insert(recipeLinks);
+
+    if (recipesError) {
+      console.error("Error copying recipe links:", recipesError);
+      // Don't throw - we still want the duplicate to succeed even if recipe links fail
     }
   }
 

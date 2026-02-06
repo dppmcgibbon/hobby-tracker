@@ -55,6 +55,7 @@ export async function createDatabaseBackup() {
       "user_paints",
       "tags",
       "shared_miniatures",
+      "storage_boxes",
       // Reference tables (shared data)
       "factions",
       "games",
@@ -79,6 +80,7 @@ export async function createDatabaseBackup() {
         "user_paints",
         "tags",
         "shared_miniatures",
+        "storage_boxes",
       ];
 
       if (userTables.includes(table)) {

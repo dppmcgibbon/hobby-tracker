@@ -1,11 +1,16 @@
 import { requireAuth } from "@/lib/auth/server";
-import { getFactions } from "@/lib/queries/miniatures";
+import { getFactions, getStorageBoxes } from "@/lib/queries/miniatures";
+import { getRecipes } from "@/lib/queries/recipes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniatureForm } from "@/components/miniatures/miniature-form";
 
 export default async function AddMiniaturePage() {
-  await requireAuth();
-  const factions = await getFactions();
+  const user = await requireAuth();
+  const [factions, storageBoxes, recipes] = await Promise.all([
+    getFactions(),
+    getStorageBoxes(user.id),
+    getRecipes(user.id),
+  ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -22,7 +27,7 @@ export default async function AddMiniaturePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <MiniatureForm factions={factions} />
+          <MiniatureForm factions={factions} storageBoxes={storageBoxes} recipes={recipes} />
         </CardContent>
       </Card>
     </div>

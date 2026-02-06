@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import { Home, Package, Palette, BookOpen, User, FolderOpen, Tag, Gamepad2, Archive } from "lucide-react";
+import { Home, Package, Palette, User, FolderOpen, Settings } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -64,39 +64,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Collections
             </Link>
             <Link
-              href="/dashboard/storage"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Archive className="h-4 w-4 inline-block mr-1.5" />
-              Storage
-            </Link>
-            <Link
-              href="/dashboard/tags"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Tag className="h-4 w-4 inline-block mr-1.5" />
-              Tags
-            </Link>
-            <Link
-              href="/dashboard/games"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
-              Games
-            </Link>
-            <Link
-              href="/dashboard/recipes"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <BookOpen className="h-4 w-4 inline-block mr-1.5" />
-              Recipes
-            </Link>
-            <Link
               href="/dashboard/paints"
               className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
               <Palette className="h-4 w-4 inline-block mr-1.5" />
               Paints
+            </Link>
+            <Link
+              href="/dashboard/admin"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+            >
+              <Settings className="h-4 w-4 inline-block mr-1.5" />
+              Admin
             </Link>
           </nav>
 

@@ -12,7 +12,7 @@ export const recipeSchema = z.object({
 
 export const recipeStepSchema = z.object({
   paint_id: z
-    .union([z.string().uuid(), z.literal(""), z.null()])
+    .union([z.string().uuid(), z.literal("none"), z.literal(""), z.null()])
     .transform((val) => (val === "" || val === "none" ? null : val))
     .nullable(),
   technique: z.enum([

@@ -74,6 +74,19 @@ export async function getMiniatureById(id: string, userId: string) {
     data.status = data.status[0] || null;
   }
 
+  // Fetch storage box separately if storage_box_id exists
+  if (data.storage_box_id) {
+    const { data: storageBox } = await supabase
+      .from("storage_boxes")
+      .select("*")
+      .eq("id", data.storage_box_id)
+      .single();
+    
+    if (storageBox) {
+      data.storage_box = storageBox;
+    }
+  }
+
   return data;
 }
 
@@ -90,4 +103,20 @@ export async function getFactions() {
   }
 
   return data;
+}
+
+export async function getStorageBoxes(userId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("storage_boxes")
+    .select("*")
+    .eq("user_id", userId)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
 }
