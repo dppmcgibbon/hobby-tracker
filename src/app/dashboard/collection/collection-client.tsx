@@ -99,6 +99,9 @@ export function CollectionClient({
     }
   };
 
+  // Calculate total quantity
+  const totalQuantity = miniatures.reduce((sum, m) => sum + (m.quantity || 0), 0);
+
   console.log("📦 CollectionClient render:", {
     selectionMode,
     selectedIdsCount: selectedIds.length,
@@ -110,7 +113,7 @@ export function CollectionClient({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold uppercase tracking-wider">My Miniatures</h1>
-          <p className="text-muted-foreground">{miniatures.length} miniatures</p>
+          <p className="text-muted-foreground">{totalQuantity} miniature{totalQuantity !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-1 border border-primary/20 rounded-sm overflow-hidden">
@@ -190,8 +193,8 @@ export function CollectionClient({
         <>
           <div className="flex items-center justify-end mb-4">
             <p className="text-sm text-muted-foreground">
-              Displaying <span className="font-semibold text-primary">{miniatures.length}</span> miniature
-              {miniatures.length !== 1 ? "s" : ""}
+              Displaying <span className="font-semibold text-primary">{totalQuantity}</span> miniature
+              {totalQuantity !== 1 ? "s" : ""}
             </p>
           </div>
           <MiniatureTableView

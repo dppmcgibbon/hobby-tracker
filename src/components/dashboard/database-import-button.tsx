@@ -81,12 +81,40 @@ export function DatabaseImportButton() {
 
       // Upload photo files to Supabase Storage (client-side)
       let uploadedPhotos = 0;
+      let failedPhotos = 0;
+      const photoErrors: string[] = [];
+      
       if (photoFiles.length > 0) {
+        toast.info(`Uploading ${photoFiles.length} photos...`);
+        
+        // Get current user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+        
+        // Build a map of old photo paths to new photo paths
+        const pathMapping: { [oldPath: string]: string } = {};
+        
         for (const { path, blob } of photoFiles) {
           try {
+            // Parse the old path: oldUserId/miniatureId/filename.ext
+            const pathParts = path.split("/");
+            if (pathParts.length !== 3) {
+              failedPhotos++;
+              photoErrors.push(`${path}: Invalid path format`);
+              continue;
+            }
+            
+            const [oldUserId, miniatureId, filename] = pathParts;
+            
+            // Create new path with current user ID
+            const newPath = `${user.id}/${miniatureId}/${filename}`;
+            pathMapping[path] = newPath;
+            
             const { error: uploadError } = await supabase.storage
               .from("miniature-photos")
-              .upload(path, blob, {
+              .upload(newPath, blob, {
                 upsert: true,
                 contentType: blob.type || "image/jpeg",
               });
@@ -94,20 +122,64 @@ export function DatabaseImportButton() {
             if (!uploadError) {
               uploadedPhotos++;
             } else {
-              console.warn(`Failed to upload photo: ${path}`, uploadError);
+              failedPhotos++;
+              console.error(`Failed to upload photo: ${path} -> ${newPath}`, uploadError);
+              photoErrors.push(`${path}: ${uploadError.message}`);
             }
           } catch (uploadError) {
-            console.warn(`Error uploading photo: ${path}`, uploadError);
+            failedPhotos++;
+            console.error(`Error uploading photo: ${path}`, uploadError);
+            photoErrors.push(`${path}: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`);
           }
+        }
+        
+        // Update miniature_photos storage_path in the database to reflect new paths
+        if (Object.keys(pathMapping).length > 0) {
+          try {
+            // Fetch all miniature_photos for this user
+            const { data: photos } = await supabase
+              .from("miniature_photos")
+              .select("id, storage_path")
+              .eq("user_id", user.id);
+            
+            if (photos) {
+              // Update each photo with the new path
+              for (const photo of photos) {
+                const newPath = pathMapping[photo.storage_path];
+                if (newPath) {
+                  await supabase
+                    .from("miniature_photos")
+                    .update({ storage_path: newPath })
+                    .eq("id", photo.id);
+                }
+              }
+            }
+          } catch (updateError) {
+            console.error("Error updating photo paths in database:", updateError);
+          }
+        }
+        
+        // Log detailed errors if any failed
+        if (failedPhotos > 0) {
+          console.error("Photo upload errors:", photoErrors);
         }
       }
 
-      const photoMessage = uploadedPhotos > 0 ? `, ${uploadedPhotos} photos uploaded` : "";
-      toast.success(
-        `Database imported successfully! ${result.totalRows} rows restored across ${
-          Object.keys(result.results).length
-        } tables${photoMessage}`
-      );
+      const photoMessage = uploadedPhotos > 0 
+        ? `, ${uploadedPhotos} photo${uploadedPhotos !== 1 ? "s" : ""} uploaded${failedPhotos > 0 ? `, ${failedPhotos} failed` : ""}`
+        : "";
+        
+      if (failedPhotos > 0) {
+        toast.warning(
+          `Database imported with warnings: ${uploadedPhotos}/${photoFiles.length} photos uploaded successfully. Check console for details.`
+        );
+      } else {
+        toast.success(
+          `Database imported successfully! ${result.totalRows} rows restored across ${
+            Object.keys(result.results).length
+          } tables${photoMessage}`
+        );
+      }
 
       // Refresh the page to show updated data
       router.refresh();

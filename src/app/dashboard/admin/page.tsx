@@ -1,13 +1,23 @@
 import { requireAuth } from "@/lib/auth/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Archive, Tag, Gamepad2, BookOpen, Database } from "lucide-react";
+import { Archive, Tag, Gamepad2, BookOpen, Database, Shield } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 import { DatabaseImportButton } from "@/components/dashboard/database-import-button";
+import { FactionManagement } from "@/components/admin/faction-management";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminPage() {
   await requireAuth();
+  const supabase = await createClient();
+
+  // Fetch all factions
+  const { data: factions } = await supabase
+    .from("factions")
+    .select("*")
+    .order("army_type")
+    .order("name");
 
   const adminSections = [
     {
@@ -83,6 +93,27 @@ export default async function AdminPage() {
           );
         })}
       </div>
+
+      <Card className="warhammer-card border-primary/30">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
+              <Shield className="h-6 w-6 text-blue-500" />
+            </div>
+            <div>
+              <CardTitle className="text-xl uppercase tracking-wide text-primary">
+                Faction Management
+              </CardTitle>
+              <CardDescription className="text-base">
+                Manage factions for your miniature collection
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <FactionManagement factions={factions || []} />
+        </CardContent>
+      </Card>
 
       <Card className="warhammer-card border-primary/30">
         <CardHeader>

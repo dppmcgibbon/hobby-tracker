@@ -400,6 +400,36 @@ export async function importDatabaseBackup(backupData: {
       }
     }
 
+    // Map expansions by game and name
+    if (backupData.expansions && backupData.games) {
+      const backupExpansions = parseCSV(backupData.expansions);
+      const backupGames = parseCSV(backupData.games);
+      const { data: currentExpansions } = await supabase.from("expansions").select("id, game_id, name");
+      
+      if (currentExpansions) {
+        // Create a map of old game_id -> game name
+        const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+        
+        // Create a map of (game_name, expansion_name) -> expansion_id
+        const expansionKeyMap = new Map();
+        for (const expansion of currentExpansions) {
+          const { data: game } = await supabase.from("games").select("name").eq("id", expansion.game_id).single();
+          if (game) {
+            expansionKeyMap.set(`${game.name}:${expansion.name}`, expansion.id);
+          }
+        }
+        
+        backupExpansions.forEach((oldExpansion) => {
+          const gameName = gameIdToName.get(oldExpansion.game_id);
+          if (gameName) {
+            const key = `${gameName}:${oldExpansion.name}`;
+            const newId = expansionKeyMap.get(key) || null;
+            expansionMapping[oldExpansion.id] = newId;
+          }
+        });
+      }
+    }
+
     // Delete existing user data first
     const userTables = [
       "miniatures",
@@ -440,41 +470,89 @@ export async function importDatabaseBackup(backupData: {
 
         // Map foreign keys for miniatures
         if (tableName === "miniatures") {
-          if (processedRow.faction_id && factionMapping[processedRow.faction_id] !== undefined) {
-            processedRow.faction_id = factionMapping[processedRow.faction_id];
+          if (processedRow.faction_id) {
+            if (factionMapping[processedRow.faction_id] !== undefined) {
+              processedRow.faction_id = factionMapping[processedRow.faction_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.faction_id = null;
+            }
           }
-          if (processedRow.base_id && baseMapping[processedRow.base_id] !== undefined) {
-            processedRow.base_id = baseMapping[processedRow.base_id];
+          if (processedRow.base_id) {
+            if (baseMapping[processedRow.base_id] !== undefined) {
+              processedRow.base_id = baseMapping[processedRow.base_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.base_id = null;
+            }
           }
-          if (processedRow.base_shape_id && baseShapeMapping[processedRow.base_shape_id] !== undefined) {
-            processedRow.base_shape_id = baseShapeMapping[processedRow.base_shape_id];
+          if (processedRow.base_shape_id) {
+            if (baseShapeMapping[processedRow.base_shape_id] !== undefined) {
+              processedRow.base_shape_id = baseShapeMapping[processedRow.base_shape_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.base_shape_id = null;
+            }
           }
-          if (processedRow.base_type_id && baseTypeMapping[processedRow.base_type_id] !== undefined) {
-            processedRow.base_type_id = baseTypeMapping[processedRow.base_type_id];
+          if (processedRow.base_type_id) {
+            if (baseTypeMapping[processedRow.base_type_id] !== undefined) {
+              processedRow.base_type_id = baseTypeMapping[processedRow.base_type_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.base_type_id = null;
+            }
           }
         }
 
         // Map foreign keys for recipe_steps
         if (tableName === "recipe_steps") {
-          if (processedRow.paint_id && paintMapping[processedRow.paint_id] !== undefined) {
-            processedRow.paint_id = paintMapping[processedRow.paint_id];
+          if (processedRow.paint_id) {
+            if (paintMapping[processedRow.paint_id] !== undefined) {
+              processedRow.paint_id = paintMapping[processedRow.paint_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.paint_id = null;
+            }
           }
         }
 
         // Map foreign keys for miniature_games
         if (tableName === "miniature_games") {
-          if (processedRow.game_id && gameMapping[processedRow.game_id] !== undefined) {
-            processedRow.game_id = gameMapping[processedRow.game_id];
+          if (processedRow.game_id) {
+            if (gameMapping[processedRow.game_id] !== undefined) {
+              processedRow.game_id = gameMapping[processedRow.game_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.game_id = null;
+            }
           }
-          if (processedRow.edition_id && editionMapping[processedRow.edition_id] !== undefined) {
-            processedRow.edition_id = editionMapping[processedRow.edition_id];
+          if (processedRow.edition_id) {
+            if (editionMapping[processedRow.edition_id] !== undefined) {
+              processedRow.edition_id = editionMapping[processedRow.edition_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.edition_id = null;
+            }
+          }
+          if (processedRow.expansion_id) {
+            if (expansionMapping[processedRow.expansion_id] !== undefined) {
+              processedRow.expansion_id = expansionMapping[processedRow.expansion_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.expansion_id = null;
+            }
           }
         }
 
         // Map foreign keys for user_paints
         if (tableName === "user_paints") {
-          if (processedRow.paint_id && paintMapping[processedRow.paint_id] !== undefined) {
-            processedRow.paint_id = paintMapping[processedRow.paint_id];
+          if (processedRow.paint_id) {
+            if (paintMapping[processedRow.paint_id] !== undefined) {
+              processedRow.paint_id = paintMapping[processedRow.paint_id];
+            } else {
+              // If no mapping found, set to null to avoid FK violation
+              processedRow.paint_id = null;
+            }
           }
         }
 
