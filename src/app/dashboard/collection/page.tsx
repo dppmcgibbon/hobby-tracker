@@ -108,31 +108,46 @@ export default async function CollectionPage({
   // Apply game filter (we'll do this client-side after fetching miniature_games)
   let gameFilteredMiniatureIds: Set<string> | null = null;
   if (params.game && params.game !== "all") {
-    let gameQuery = supabase
-      .from("miniature_games")
-      .select("miniature_id")
-      .eq("game_id", params.game);
+    if (params.game === "none") {
+      // Filter for miniatures with NO game links
+      const { data: allGameMiniatures } = await supabase
+        .from("miniature_games")
+        .select("miniature_id");
+      
+      if (allGameMiniatures) {
+        // Get all miniature IDs that have game links
+        const miniaturesWithGames = new Set(allGameMiniatures.map((g) => g.miniature_id));
+        
+        // Filter will be applied client-side to exclude these IDs
+        gameFilteredMiniatureIds = miniaturesWithGames;
+      }
+    } else {
+      let gameQuery = supabase
+        .from("miniature_games")
+        .select("miniature_id")
+        .eq("game_id", params.game);
 
-    // Add edition filter if specified
-    if (params.edition && params.edition !== "all") {
-      gameQuery = gameQuery.eq("edition_id", params.edition);
-    }
+      // Add edition filter if specified
+      if (params.edition && params.edition !== "all") {
+        gameQuery = gameQuery.eq("edition_id", params.edition);
+      }
 
-    // Add expansion filter if specified
-    if (params.expansion && params.expansion !== "all") {
-      gameQuery = gameQuery.eq("expansion_id", params.expansion);
-    }
+      // Add expansion filter if specified
+      if (params.expansion && params.expansion !== "all") {
+        gameQuery = gameQuery.eq("expansion_id", params.expansion);
+      }
 
-    const { data: gameMiniatures } = await gameQuery;
+      const { data: gameMiniatures } = await gameQuery;
 
-    if (gameMiniatures) {
-      gameFilteredMiniatureIds = new Set(gameMiniatures.map((g) => g.miniature_id));
+      if (gameMiniatures) {
+        gameFilteredMiniatureIds = new Set(gameMiniatures.map((g) => g.miniature_id));
+      }
     }
   }
 
-  // Fetch editions if game filter is active
+  // Fetch editions if game filter is active (but not for "none")
   let editions: { id: string; name: string; year: number | null }[] = [];
-  if (params.game && params.game !== "all") {
+  if (params.game && params.game !== "all" && params.game !== "none") {
     const { data: editionsData } = await supabase
       .from("editions")
       .select("id, name, year")
@@ -226,7 +241,13 @@ export default async function CollectionPage({
 
   // Apply game filter
   if (gameFilteredMiniatureIds) {
-    filteredMiniatures = filteredMiniatures.filter((m) => gameFilteredMiniatureIds.has(m.id));
+    if (params.game === "none") {
+      // For "none", exclude miniatures that have game links
+      filteredMiniatures = filteredMiniatures.filter((m) => !gameFilteredMiniatureIds.has(m.id));
+    } else {
+      // For specific games, include only miniatures with game links
+      filteredMiniatures = filteredMiniatures.filter((m) => gameFilteredMiniatureIds.has(m.id));
+    }
   }
 
   // Apply status filter

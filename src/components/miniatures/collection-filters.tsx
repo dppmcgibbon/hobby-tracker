@@ -320,7 +320,7 @@ export function CollectionFilters({
                 value={filters.gameId}
                 onValueChange={(v) => {
                   updateFilter("gameId", v);
-                  if (v === "all") {
+                  if (v === "all" || v === "none") {
                     updateFilter("editionId", "all");
                     updateFilter("expansionId", "all");
                   }
@@ -331,6 +331,7 @@ export function CollectionFilters({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Games</SelectItem>
+                  <SelectItem value="none">No Linked Games</SelectItem>
                   {games.map((game) => (
                     <SelectItem key={game.id} value={game.id}>
                       {game.name}
@@ -342,7 +343,7 @@ export function CollectionFilters({
           )}
 
           {/* Edition Filter - only show if game is selected */}
-          {filters.gameId !== "all" && editions.length > 0 && (
+          {filters.gameId !== "all" && filters.gameId !== "none" && editions.length > 0 && (
             <div className="w-[220px]">
               <Select
                 value={filters.editionId}
@@ -458,7 +459,7 @@ export function CollectionFilters({
                     value={filters.gameId}
                     onValueChange={(v) => {
                       updateFilter("gameId", v);
-                      if (v === "all") {
+                      if (v === "all" || v === "none") {
                         updateFilter("editionId", "all");
                         updateFilter("expansionId", "all");
                       }
@@ -469,6 +470,7 @@ export function CollectionFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Games</SelectItem>
+                      <SelectItem value="none">No Linked Games</SelectItem>
                       {games.map((game) => (
                         <SelectItem key={game.id} value={game.id}>
                           {game.name}
@@ -479,7 +481,7 @@ export function CollectionFilters({
                 </div>
 
                 {/* Edition - only show if game is selected */}
-                {filters.gameId !== "all" && editions.length > 0 && (
+                {filters.gameId !== "all" && filters.gameId !== "none" && editions.length > 0 && (
                   <div>
                     <Label htmlFor="mobile-edition">Edition</Label>
                     <Select
@@ -734,7 +736,10 @@ export function CollectionFilters({
           )}
           {filters.gameId !== "all" && (
             <Badge variant="secondary">
-              Game: {games.find((g) => g.id === filters.gameId)?.name || filters.gameId}
+              Game:{" "}
+              {filters.gameId === "none"
+                ? "No Linked Games"
+                : games.find((g) => g.id === filters.gameId)?.name || filters.gameId}
               <button
                 onClick={() => {
                   updateFilter("gameId", "all");
