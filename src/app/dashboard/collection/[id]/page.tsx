@@ -139,9 +139,30 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                   </div>
                 )}
 
+                {(miniature as any).base && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Base</p>
+                    <p className="font-medium">{(miniature as any).base.name}</p>
+                  </div>
+                )}
+
+                {(miniature as any).base_shape && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Base Shape</p>
+                    <p className="font-medium">{(miniature as any).base_shape.name}</p>
+                  </div>
+                )}
+
+                {(miniature as any).base_type && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Base Type</p>
+                    <p className="font-medium">{(miniature as any).base_type.name}</p>
+                  </div>
+                )}
+
                 {miniature.base_size && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Base Size</p>
+                    <p className="text-sm text-muted-foreground">Base Size (Legacy)</p>
                     <p className="font-medium">{miniature.base_size}</p>
                   </div>
                 )}

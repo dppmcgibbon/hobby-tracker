@@ -182,6 +182,45 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
   return { success: true };
 }
 
+export async function bulkUpdateBases(
+  miniatureIds: string[],
+  baseId: string | null,
+  baseShapeId: string | null,
+  baseTypeId: string | null
+) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // Update base fields in miniatures table
+  const { error } = await supabase
+    .from("miniatures")
+    .update({
+      base_id: baseId,
+      base_shape_id: baseShapeId,
+      base_type_id: baseTypeId,
+    })
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
 export async function bulkDelete(miniatureIds: string[]) {
   const user = await requireAuth();
   const supabase = await createClient();

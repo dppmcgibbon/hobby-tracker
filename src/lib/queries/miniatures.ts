@@ -43,6 +43,9 @@ export async function getMiniatureById(id: string, userId: string) {
       faction:factions(*),
       status:miniature_status!miniature_id(*),
       photos:miniature_photos(*),
+      base:bases(id, name),
+      base_shape:base_shapes(id, name),
+      base_type:base_types(id, name),
       recipes:miniature_recipes(
         recipe:painting_recipes(
           *,

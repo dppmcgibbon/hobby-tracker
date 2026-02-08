@@ -56,6 +56,9 @@ interface CollectionClientProps {
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
   unitTypes: string[];
+  bases: { id: string; name: string }[];
+  baseShapes: { id: string; name: string }[];
+  baseTypes: { id: string; name: string }[];
   initialFilters: FilterState;
 }
 
@@ -70,6 +73,9 @@ export function CollectionClient({
   editions,
   expansions,
   unitTypes,
+  bases,
+  baseShapes,
+  baseTypes,
   initialFilters,
 }: CollectionClientProps) {
   const [showTagManager, setShowTagManager] = useState(false);
@@ -90,6 +96,11 @@ export function CollectionClient({
   const handleClearSelection = () => {
     setSelectedIds([]);
     setSelectionMode(false);
+  };
+
+  const handleSelectAll = () => {
+    const allIds = miniatures.map((m) => m.id);
+    setSelectedIds(allIds);
   };
 
   const handleToggleSelectionMode = () => {
@@ -143,6 +154,11 @@ export function CollectionClient({
           >
             {selectionMode ? "Cancel Selection" : "Select Multiple"}
           </Button>
+          {selectionMode && (
+            <Button variant="outline" onClick={handleSelectAll}>
+              Select All
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setShowTagManager(!showTagManager)}>
             <Tag className="mr-2 h-4 w-4" />
             Manage Tags
@@ -170,6 +186,7 @@ export function CollectionClient({
         editions={editions}
         expansions={expansions}
         unitTypes={unitTypes}
+        bases={bases}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />
@@ -219,6 +236,9 @@ export function CollectionClient({
         games={games}
         editions={editions}
         expansions={expansions}
+        bases={bases}
+        baseShapes={baseShapes}
+        baseTypes={baseTypes}
       />
     </div>
   );

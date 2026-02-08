@@ -152,7 +152,40 @@ export async function createDatabaseBackup() {
 
         if (userMiniatures && userMiniatures.length > 0) {
           const miniatureIds = userMiniatures.map((m) => m.id);
-          query = query.in("miniature_id", miniatureIds);
+          
+          // Fetch in batches to avoid "URI too long" error
+          const batchSize = 100;
+          const allData: any[] = [];
+          
+          for (let i = 0; i < miniatureIds.length; i += batchSize) {
+            const batch = miniatureIds.slice(i, i + batchSize);
+            const { data: batchData, error: batchError } = await supabase
+              .from(table)
+              .select("*")
+              .in("miniature_id", batch);
+            
+            if (batchError) {
+              console.error(`Error fetching ${table} batch:`, batchError);
+              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
+            }
+            
+            if (batchData) {
+              allData.push(...batchData);
+            }
+          }
+          
+          // Process the combined data
+          if (allData.length > 0) {
+            const csv = convertToCSV(allData, table);
+            backups.push({
+              tableName: table,
+              csv,
+              rowCount: allData.length,
+            });
+          }
+          
+          // Skip the normal query execution
+          continue;
         } else {
           // No miniatures, skip this table
           continue;
@@ -168,7 +201,40 @@ export async function createDatabaseBackup() {
 
         if (userCollections && userCollections.length > 0) {
           const collectionIds = userCollections.map((c) => c.id);
-          query = query.in("collection_id", collectionIds);
+          
+          // Fetch in batches to avoid "URI too long" error
+          const batchSize = 100;
+          const allData: any[] = [];
+          
+          for (let i = 0; i < collectionIds.length; i += batchSize) {
+            const batch = collectionIds.slice(i, i + batchSize);
+            const { data: batchData, error: batchError } = await supabase
+              .from(table)
+              .select("*")
+              .in("collection_id", batch);
+            
+            if (batchError) {
+              console.error(`Error fetching ${table} batch:`, batchError);
+              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
+            }
+            
+            if (batchData) {
+              allData.push(...batchData);
+            }
+          }
+          
+          // Process the combined data
+          if (allData.length > 0) {
+            const csv = convertToCSV(allData, table);
+            backups.push({
+              tableName: table,
+              csv,
+              rowCount: allData.length,
+            });
+          }
+          
+          // Skip the normal query execution
+          continue;
         } else {
           // No collections, skip this table
           continue;
@@ -184,7 +250,40 @@ export async function createDatabaseBackup() {
 
         if (userRecipes && userRecipes.length > 0) {
           const recipeIds = userRecipes.map((r) => r.id);
-          query = query.in("recipe_id", recipeIds);
+          
+          // Fetch in batches to avoid "URI too long" error
+          const batchSize = 100;
+          const allData: any[] = [];
+          
+          for (let i = 0; i < recipeIds.length; i += batchSize) {
+            const batch = recipeIds.slice(i, i + batchSize);
+            const { data: batchData, error: batchError } = await supabase
+              .from(table)
+              .select("*")
+              .in("recipe_id", batch);
+            
+            if (batchError) {
+              console.error(`Error fetching ${table} batch:`, batchError);
+              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
+            }
+            
+            if (batchData) {
+              allData.push(...batchData);
+            }
+          }
+          
+          // Process the combined data
+          if (allData.length > 0) {
+            const csv = convertToCSV(allData, table);
+            backups.push({
+              tableName: table,
+              csv,
+              rowCount: allData.length,
+            });
+          }
+          
+          // Skip the normal query execution
+          continue;
         } else {
           // No recipes, skip this table
           continue;

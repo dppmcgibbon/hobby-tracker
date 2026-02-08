@@ -32,6 +32,7 @@ interface CollectionFiltersProps {
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
   unitTypes: string[];
+  bases: { id: string; name: string }[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
 }
@@ -46,6 +47,7 @@ export interface FilterState {
   editionId: string;
   expansionId: string;
   unitType: string;
+  baseSize: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -85,6 +87,7 @@ export function CollectionFilters({
   editions,
   expansions,
   unitTypes,
+  bases,
   onFiltersChange,
   initialFilters,
 }: CollectionFiltersProps) {
@@ -103,6 +106,7 @@ export function CollectionFilters({
     editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
     expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
     unitType: searchParams.get("unit") || initialFilters?.unitType || "all",
+    baseSize: searchParams.get("base_size") || initialFilters?.baseSize || "all",
     sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "faction-unit-name",
     sortOrder:
       (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "asc",
@@ -124,6 +128,7 @@ export function CollectionFilters({
     if (filters.editionId !== "all") params.set("edition", filters.editionId);
     if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
     if (filters.unitType !== "all") params.set("unit", filters.unitType);
+    if (filters.baseSize !== "all") params.set("base_size", filters.baseSize);
     if (filters.sortBy !== "faction-unit-name") params.set("sortBy", filters.sortBy);
     if (filters.sortOrder !== "asc") params.set("sortOrder", filters.sortOrder);
 
@@ -152,6 +157,7 @@ export function CollectionFilters({
     filters.editionId,
     filters.expansionId,
     filters.unitType,
+    filters.baseSize,
     filters.sortBy,
     filters.sortOrder,
   ]);
@@ -171,6 +177,7 @@ export function CollectionFilters({
       editionId: "all",
       expansionId: "all",
       unitType: "all",
+      baseSize: "all",
       sortBy: "faction-unit-name",
       sortOrder: "asc",
     };
@@ -187,6 +194,7 @@ export function CollectionFilters({
     filters.editionId !== "all" ||
     filters.expansionId !== "all" ||
     filters.unitType !== "all" ||
+    filters.baseSize !== "all" ||
     filters.sortBy !== "faction-unit-name" ||
     filters.sortOrder !== "asc";
 
@@ -200,6 +208,7 @@ export function CollectionFilters({
     filters.editionId !== "all",
     filters.expansionId !== "all",
     filters.unitType !== "all",
+    filters.baseSize !== "all",
     filters.sortBy !== "faction-unit-name" || filters.sortOrder !== "asc",
   ].filter(Boolean).length;
 
@@ -245,6 +254,26 @@ export function CollectionFilters({
                   {unitTypes.map((unitType) => (
                     <SelectItem key={unitType} value={unitType}>
                       {unitType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Base Size Filter */}
+          {bases.length > 0 && (
+            <div className="w-[220px]">
+              <Select value={filters.baseSize} onValueChange={(v) => updateFilter("baseSize", v)}>
+                <SelectTrigger id="baseSize" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Base Sizes</SelectItem>
+                  <SelectItem value="none">No Base Defined</SelectItem>
+                  {bases.map((base) => (
+                    <SelectItem key={base.id} value={base.id}>
+                      {base.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -608,6 +637,27 @@ export function CollectionFilters({
                   </div>
                 )}
 
+                {/* Base Size */}
+                {bases.length > 0 && (
+                  <div>
+                    <Label htmlFor="mobile-baseSize">Base Size</Label>
+                    <Select value={filters.baseSize} onValueChange={(v) => updateFilter("baseSize", v)}>
+                      <SelectTrigger id="mobile-baseSize">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Base Sizes</SelectItem>
+                        <SelectItem value="none">No Base Defined</SelectItem>
+                        {bases.map((base) => (
+                          <SelectItem key={base.id} value={base.id}>
+                            {base.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Status */}
                 <div>
                   <Label htmlFor="mobile-status">Status</Label>
@@ -756,6 +806,20 @@ export function CollectionFilters({
               Unit: {filters.unitType}
               <button
                 onClick={() => updateFilter("unitType", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.baseSize !== "all" && (
+            <Badge variant="secondary">
+              Base Size:{" "}
+              {filters.baseSize === "none"
+                ? "No Base Defined"
+                : bases.find((b) => b.id === filters.baseSize)?.name || filters.baseSize}
+              <button
+                onClick={() => updateFilter("baseSize", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

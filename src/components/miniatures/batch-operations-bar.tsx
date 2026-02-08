@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen } from "lucide-react";
 import { toast } from "sonner";
-import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox } from "@/app/actions/miniatures";
+import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases } from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
 import { bulkLinkMinaturesToGame } from "@/app/actions/games";
@@ -72,6 +72,21 @@ interface Recipe {
   faction?: { name: string } | null;
 }
 
+interface Base {
+  id: string;
+  name: string;
+}
+
+interface BaseShape {
+  id: string;
+  name: string;
+}
+
+interface BaseType {
+  id: string;
+  name: string;
+}
+
 interface BatchOperationsBarProps {
   selectedIds: string[];
   onClearSelection: () => void;
@@ -82,6 +97,9 @@ interface BatchOperationsBarProps {
   games?: Game[];
   editions?: Edition[];
   expansions?: Expansion[];
+  bases?: Base[];
+  baseShapes?: BaseShape[];
+  baseTypes?: BaseType[];
 }
 
 export function BatchOperationsBar({
@@ -94,6 +112,9 @@ export function BatchOperationsBar({
   games = [],
   editions = [],
   expansions = [],
+  bases = [],
+  baseShapes = [],
+  baseTypes = [],
 }: BatchOperationsBarProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -106,6 +127,9 @@ export function BatchOperationsBar({
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedEditionId, setSelectedEditionId] = useState<string>("");
   const [selectedExpansionId, setSelectedExpansionId] = useState<string>("");
+  const [selectedBaseId, setSelectedBaseId] = useState<string>("");
+  const [selectedBaseShapeId, setSelectedBaseShapeId] = useState<string>("");
+  const [selectedBaseTypeId, setSelectedBaseTypeId] = useState<string>("");
   const [availableEditions, setAvailableEditions] = useState<Edition[]>([]);
   const [availableExpansions, setAvailableExpansions] = useState<Expansion[]>([]);
 
@@ -279,6 +303,27 @@ export function BatchOperationsBar({
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to link game");
+      }
+    });
+  };
+
+  const handleUpdateBases = () => {
+    startTransition(async () => {
+      try {
+        await bulkUpdateBases(
+          selectedIds,
+          selectedBaseId && selectedBaseId !== "none" ? selectedBaseId : null,
+          selectedBaseShapeId && selectedBaseShapeId !== "none" ? selectedBaseShapeId : null,
+          selectedBaseTypeId && selectedBaseTypeId !== "none" ? selectedBaseTypeId : null
+        );
+        toast.success(`Updated base information for ${selectedIds.length} miniature(s)`);
+        onClearSelection();
+        setSelectedBaseId("");
+        setSelectedBaseShapeId("");
+        setSelectedBaseTypeId("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update bases");
       }
     });
   };
@@ -515,6 +560,76 @@ export function BatchOperationsBar({
               )}
 
               <Button size="sm" onClick={handleLinkGame} disabled={!selectedGameId || isPending}>
+                Apply
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Third Row - Base/Shape/Type */}
+        {(bases.length > 0 || baseShapes.length > 0 || baseTypes.length > 0) && (
+          <div className="flex items-center gap-4 pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">Update Base:</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Base Size */}
+              {bases.length > 0 && (
+                <Select value={selectedBaseId} onValueChange={setSelectedBaseId}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Base size..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No base</SelectItem>
+                    {bases.map((base) => (
+                      <SelectItem key={base.id} value={base.id}>
+                        {base.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Base Shape */}
+              {baseShapes.length > 0 && (
+                <Select value={selectedBaseShapeId} onValueChange={setSelectedBaseShapeId}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Shape..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No shape</SelectItem>
+                    {baseShapes.map((shape) => (
+                      <SelectItem key={shape.id} value={shape.id}>
+                        {shape.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Base Type */}
+              {baseTypes.length > 0 && (
+                <Select value={selectedBaseTypeId} onValueChange={setSelectedBaseTypeId}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No type</SelectItem>
+                    {baseTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Button
+                size="sm"
+                onClick={handleUpdateBases}
+                disabled={(!selectedBaseId && !selectedBaseShapeId && !selectedBaseTypeId) || isPending}
+              >
                 Apply
               </Button>
             </div>

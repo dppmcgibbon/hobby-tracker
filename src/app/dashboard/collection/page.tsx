@@ -24,6 +24,9 @@ export default async function CollectionPage({
     { data: storageBoxes },
     { data: recipesData },
     { data: unitTypesData },
+    { data: basesData },
+    { data: baseShapesData },
+    { data: baseTypesData },
   ] = await Promise.all([
     supabase.from("factions").select("id, name").order("name"),
     supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
@@ -40,6 +43,18 @@ export default async function CollectionPage({
       .select("unit_type")
       .eq("user_id", user.id)
       .not("unit_type", "is", null),
+    supabase
+      .from("bases")
+      .select("id, name")
+      .order("name"),
+    supabase
+      .from("base_shapes")
+      .select("id, name")
+      .order("name"),
+    supabase
+      .from("base_types")
+      .select("id, name")
+      .order("name"),
   ]);
 
   // Normalize recipes data
@@ -57,6 +72,11 @@ export default async function CollectionPage({
         .filter((ut): ut is string => ut !== null && ut !== "")
     )
   ).sort();
+
+  // Get all bases for the filter
+  const bases = basesData || [];
+  const baseShapes = baseShapesData || [];
+  const baseTypes = baseTypesData || [];
 
   // Build query with filters
   let query = supabase
@@ -95,6 +115,15 @@ export default async function CollectionPage({
   // Apply faction filter
   if (params.faction && params.faction !== "all") {
     query = query.eq("faction_id", params.faction);
+  }
+
+  // Apply base filter
+  if (params.base_size && params.base_size !== "all") {
+    if (params.base_size === "none") {
+      query = query.is("base_id", null);
+    } else {
+      query = query.eq("base_id", params.base_size);
+    }
   }
 
   // Apply status filter
@@ -333,6 +362,9 @@ export default async function CollectionPage({
       editions={editions}
       expansions={expansions}
       unitTypes={unitTypes}
+      bases={bases}
+      baseShapes={baseShapes}
+      baseTypes={baseTypes}
       initialFilters={{
         search: params.search || "",
         factionId: params.faction || "all",
@@ -343,6 +375,7 @@ export default async function CollectionPage({
         editionId: params.edition || "all",
         expansionId: params.expansion || "all",
         unitType: params.unit || "all",
+        baseSize: params.base_size || "all",
         sortBy: params.sortBy || "faction-unit-name",
         sortOrder: (params.sortOrder as "asc" | "desc") || "asc",
       }}

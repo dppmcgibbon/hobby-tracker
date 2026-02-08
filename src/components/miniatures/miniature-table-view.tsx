@@ -248,11 +248,13 @@ export function MiniatureTableView({
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
               </TableCell>
-              <TableCell className="text-center">
-                <StatusBadge
-                  miniatureId={miniature.id}
-                  status={miniature.miniature_status as MiniatureStatus | null}
-                />
+              <TableCell>
+                <div className="flex justify-center">
+                  <StatusBadge
+                    miniatureId={miniature.id}
+                    status={miniature.miniature_status as MiniatureStatus | null}
+                  />
+                </div>
               </TableCell>
               <TableCell className="text-center">
                 <Switch
