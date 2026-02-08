@@ -31,6 +31,7 @@ interface CollectionFiltersProps {
   games: { id: string; name: string }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
+  unitTypes: string[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
 }
@@ -44,6 +45,7 @@ export interface FilterState {
   gameId: string;
   editionId: string;
   expansionId: string;
+  unitType: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -66,11 +68,13 @@ const STATUS_OPTIONS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: "created_at", label: "Date Added" },
+  { value: "faction-unit-name", label: "Faction > Unit > Name" },
   { value: "name", label: "Name" },
   { value: "faction", label: "Faction" },
+  { value: "unit", label: "Unit" },
   { value: "status", label: "Status" },
   { value: "quantity", label: "Quantity" },
+  { value: "created_at", label: "Date Added" },
 ];
 
 export function CollectionFilters({
@@ -80,6 +84,7 @@ export function CollectionFilters({
   games,
   editions,
   expansions,
+  unitTypes,
   onFiltersChange,
   initialFilters,
 }: CollectionFiltersProps) {
@@ -97,9 +102,10 @@ export function CollectionFilters({
     gameId: searchParams.get("game") || initialFilters?.gameId || "all",
     editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
     expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
-    sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "created_at",
+    unitType: searchParams.get("unit") || initialFilters?.unitType || "all",
+    sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "faction-unit-name",
     sortOrder:
-      (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "desc",
+      (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "asc",
   });
 
   // Debounce search input
@@ -117,8 +123,9 @@ export function CollectionFilters({
     if (filters.gameId !== "all") params.set("game", filters.gameId);
     if (filters.editionId !== "all") params.set("edition", filters.editionId);
     if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
-    if (filters.sortBy !== "created_at") params.set("sortBy", filters.sortBy);
-    if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
+    if (filters.unitType !== "all") params.set("unit", filters.unitType);
+    if (filters.sortBy !== "faction-unit-name") params.set("sortBy", filters.sortBy);
+    if (filters.sortOrder !== "asc") params.set("sortOrder", filters.sortOrder);
 
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
@@ -144,6 +151,7 @@ export function CollectionFilters({
     filters.gameId,
     filters.editionId,
     filters.expansionId,
+    filters.unitType,
     filters.sortBy,
     filters.sortOrder,
   ]);
@@ -162,8 +170,9 @@ export function CollectionFilters({
       gameId: "all",
       editionId: "all",
       expansionId: "all",
-      sortBy: "created_at",
-      sortOrder: "desc",
+      unitType: "all",
+      sortBy: "faction-unit-name",
+      sortOrder: "asc",
     };
     setFilters(defaultFilters);
   };
@@ -177,8 +186,9 @@ export function CollectionFilters({
     filters.gameId !== "all" ||
     filters.editionId !== "all" ||
     filters.expansionId !== "all" ||
-    filters.sortBy !== "created_at" ||
-    filters.sortOrder !== "desc";
+    filters.unitType !== "all" ||
+    filters.sortBy !== "faction-unit-name" ||
+    filters.sortOrder !== "asc";
 
   const activeFilterCount = [
     filters.search,
@@ -189,7 +199,8 @@ export function CollectionFilters({
     filters.gameId !== "all",
     filters.editionId !== "all",
     filters.expansionId !== "all",
-    filters.sortBy !== "created_at" || filters.sortOrder !== "desc",
+    filters.unitType !== "all",
+    filters.sortBy !== "faction-unit-name" || filters.sortOrder !== "asc",
   ].filter(Boolean).length;
 
   console.log("CollectionFilters rendering:", {
@@ -221,6 +232,25 @@ export function CollectionFilters({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Unit Type Filter */}
+          {unitTypes.length > 0 && (
+            <div className="w-[220px]">
+              <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
+                <SelectTrigger id="unitType" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {unitTypes.map((unitType) => (
+                    <SelectItem key={unitType} value={unitType}>
+                      {unitType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Status Filter */}
           <div className="w-[220px]">
@@ -558,6 +588,26 @@ export function CollectionFilters({
                   </Select>
                 </div>
 
+                {/* Unit Type */}
+                {unitTypes.length > 0 && (
+                  <div>
+                    <Label htmlFor="mobile-unit">Unit</Label>
+                    <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
+                      <SelectTrigger id="mobile-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Units</SelectItem>
+                        {unitTypes.map((unitType) => (
+                          <SelectItem key={unitType} value={unitType}>
+                            {unitType}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Status */}
                 <div>
                   <Label htmlFor="mobile-status">Status</Label>
@@ -695,6 +745,17 @@ export function CollectionFilters({
               Faction: {factions.find((f) => f.id === filters.factionId)?.name || filters.factionId}
               <button
                 onClick={() => updateFilter("factionId", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.unitType !== "all" && (
+            <Badge variant="secondary">
+              Unit: {filters.unitType}
+              <button
+                onClick={() => updateFilter("unitType", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

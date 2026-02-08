@@ -55,6 +55,7 @@ interface CollectionClientProps {
   games: { id: string; name: string }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
+  unitTypes: string[];
   initialFilters: FilterState;
 }
 
@@ -68,6 +69,7 @@ export function CollectionClient({
   games,
   editions,
   expansions,
+  unitTypes,
   initialFilters,
 }: CollectionClientProps) {
   const [showTagManager, setShowTagManager] = useState(false);
@@ -167,6 +169,7 @@ export function CollectionClient({
         games={games}
         editions={editions}
         expansions={expansions}
+        unitTypes={unitTypes}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />

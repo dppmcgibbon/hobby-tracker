@@ -212,10 +212,30 @@ export function MiniatureTableView({
                 </TableCell>
               )}
               <TableCell className="text-muted-foreground">
-                {miniature.factions?.name || "-"}
+                {miniature.factions?.name ? (
+                  <Link
+                    href={`/dashboard/collection?faction=${miniature.factions.id}`}
+                    className="hover:text-primary transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {miniature.factions.name}
+                  </Link>
+                ) : (
+                  "-"
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {miniature.unit_type || "-"}
+                {miniature.unit_type ? (
+                  <Link
+                    href={`/dashboard/collection?unit=${encodeURIComponent(miniature.unit_type)}`}
+                    className="hover:text-primary transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {miniature.unit_type}
+                  </Link>
+                ) : (
+                  "-"
+                )}
               </TableCell>
               <TableCell>
                 <Link

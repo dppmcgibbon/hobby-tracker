@@ -23,6 +23,7 @@ export default async function CollectionPage({
     { data: games },
     { data: storageBoxes },
     { data: recipesData },
+    { data: unitTypesData },
   ] = await Promise.all([
     supabase.from("factions").select("id, name").order("name"),
     supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
@@ -34,6 +35,11 @@ export default async function CollectionPage({
       .select("id, name, faction:factions(name)")
       .eq("user_id", user.id)
       .order("name"),
+    supabase
+      .from("miniatures")
+      .select("unit_type")
+      .eq("user_id", user.id)
+      .not("unit_type", "is", null),
   ]);
 
   // Normalize recipes data
@@ -42,6 +48,15 @@ export default async function CollectionPage({
     name: r.name,
     faction: Array.isArray(r.faction) ? r.faction[0] : r.faction,
   }));
+
+  // Get unique unit types
+  const unitTypes = Array.from(
+    new Set(
+      (unitTypesData || [])
+        .map((m) => m.unit_type)
+        .filter((ut): ut is string => ut !== null && ut !== "")
+    )
+  ).sort();
 
   // Build query with filters
   let query = supabase
@@ -70,6 +85,11 @@ export default async function CollectionPage({
   // Apply search filter
   if (params.search) {
     query = query.ilike("name", `%${params.search}%`);
+  }
+
+  // Apply unit type filter
+  if (params.unit) {
+    query = query.eq("unit_type", params.unit);
   }
 
   // Apply faction filter
@@ -167,17 +187,9 @@ export default async function CollectionPage({
     expansions = expansionsData || [];
   }
 
-  // Apply sorting
-  const sortBy = params.sortBy || "created_at";
-  const sortOrder = (params.sortOrder || "desc") as "asc" | "desc";
-
-  if (sortBy === "name") {
-    query = query.order("name", { ascending: sortOrder === "asc" });
-  } else if (sortBy === "created_at") {
-    query = query.order("created_at", { ascending: sortOrder === "asc" });
-  } else if (sortBy === "quantity") {
-    query = query.order("quantity", { ascending: sortOrder === "asc" });
-  }
+  // Apply sorting - for now just get data, we'll sort client-side
+  // Only apply basic ordering to ensure consistent results
+  query = query.order("created_at", { ascending: false });
 
   const { data: miniatures, error } = await query;
 
@@ -258,6 +270,57 @@ export default async function CollectionPage({
     });
   }
 
+  // Apply sorting - default is faction, unit, name
+  const sortBy = params.sortBy || "faction-unit-name";
+  const sortOrder = (params.sortOrder || "asc") as "asc" | "desc";
+
+  filteredMiniatures.sort((a, b) => {
+    let comparison = 0;
+
+    switch (sortBy) {
+      case "faction-unit-name":
+        // Sort by faction, then unit, then name
+        const factionA = a.factions?.name || "";
+        const factionB = b.factions?.name || "";
+        comparison = factionA.localeCompare(factionB);
+        if (comparison === 0) {
+          const unitA = a.unit_type || "";
+          const unitB = b.unit_type || "";
+          comparison = unitA.localeCompare(unitB);
+          if (comparison === 0) {
+            comparison = a.name.localeCompare(b.name);
+          }
+        }
+        break;
+      case "name":
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case "faction":
+        const facA = a.factions?.name || "";
+        const facB = b.factions?.name || "";
+        comparison = facA.localeCompare(facB);
+        break;
+      case "unit":
+        const uA = a.unit_type || "";
+        const uB = b.unit_type || "";
+        comparison = uA.localeCompare(uB);
+        break;
+      case "status":
+        const statusA = a.miniature_status?.status || "backlog";
+        const statusB = b.miniature_status?.status || "backlog";
+        comparison = statusA.localeCompare(statusB);
+        break;
+      case "quantity":
+        comparison = (a.quantity || 0) - (b.quantity || 0);
+        break;
+      case "created_at":
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        break;
+    }
+
+    return sortOrder === "desc" ? -comparison : comparison;
+  });
+
   return (
     <CollectionClient
       miniatures={filteredMiniatures}
@@ -269,6 +332,7 @@ export default async function CollectionPage({
       games={games || []}
       editions={editions}
       expansions={expansions}
+      unitTypes={unitTypes}
       initialFilters={{
         search: params.search || "",
         factionId: params.faction || "all",
@@ -278,8 +342,9 @@ export default async function CollectionPage({
         gameId: params.game || "all",
         editionId: params.edition || "all",
         expansionId: params.expansion || "all",
-        sortBy: params.sortBy || "created_at",
-        sortOrder: (params.sortOrder as "asc" | "desc") || "desc",
+        unitType: params.unit || "all",
+        sortBy: params.sortBy || "faction-unit-name",
+        sortOrder: (params.sortOrder as "asc" | "desc") || "asc",
       }}
     />
   );

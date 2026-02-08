@@ -19,6 +19,7 @@ import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
 import { unlinkRecipeFromMiniature } from "@/app/actions/recipes";
 import { BookOpen, X } from "lucide-react";
 import { GameLinkManager } from "@/components/games/game-link-manager";
+import { BackToMiniaturesButton } from "@/components/miniatures/back-to-miniatures-button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -72,12 +73,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" asChild>
-          <Link href="/dashboard/collection">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Miniatures
-          </Link>
-        </Button>
+        <BackToMiniaturesButton />
         <div className="flex gap-2">
           <DuplicateMiniatureButton miniatureId={id} />
           <Button variant="outline" asChild>
