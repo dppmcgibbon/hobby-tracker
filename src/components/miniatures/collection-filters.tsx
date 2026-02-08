@@ -123,7 +123,11 @@ export function CollectionFilters({
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
 
-    router.replace(newUrl, { scroll: false });
+    // Only update if URL actually changed
+    const currentUrl = queryString ? `${pathname}?${searchParams.toString()}` : pathname;
+    if (newUrl !== currentUrl) {
+      router.replace(newUrl, { scroll: false });
+    }
 
     // Notify parent component
     onFiltersChange({

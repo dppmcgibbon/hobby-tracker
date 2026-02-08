@@ -58,8 +58,10 @@ export function MiniatureTableView({
   const router = useRouter();
   const supabase = createClient();
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
-  const [selectedMiniature, setSelectedMiniature] = useState<MiniatureWithRelations | null>(null);
+  const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+
+  const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
 
   const getBaseTooltip = (miniature: MiniatureWithRelations) => {
     const baseParts: string[] = [];
@@ -99,24 +101,53 @@ export function MiniatureTableView({
   };
 
   const openGallery = (miniature: MiniatureWithRelations) => {
-    setSelectedMiniature(miniature);
+    const index = miniatures.findIndex((m) => m.id === miniature.id);
+    setSelectedMiniatureIndex(index);
     setSelectedPhotoIndex(0);
   };
 
   const closeGallery = () => {
-    setSelectedMiniature(null);
+    setSelectedMiniatureIndex(null);
     setSelectedPhotoIndex(0);
   };
 
   const goToPrevious = () => {
+    if (!selectedMiniature) return;
+    
     if (selectedPhotoIndex > 0) {
+      // Go to previous photo of same miniature
       setSelectedPhotoIndex(selectedPhotoIndex - 1);
+    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex > 0) {
+      // Go to previous miniature (only if it has photos)
+      let prevIndex = selectedMiniatureIndex - 1;
+      while (prevIndex >= 0) {
+        if (miniatures[prevIndex].miniature_photos.length > 0) {
+          setSelectedMiniatureIndex(prevIndex);
+          setSelectedPhotoIndex(miniatures[prevIndex].miniature_photos.length - 1); // Start at last photo
+          return;
+        }
+        prevIndex--;
+      }
     }
   };
 
   const goToNext = () => {
-    if (selectedMiniature && selectedPhotoIndex < selectedMiniature.miniature_photos.length - 1) {
+    if (!selectedMiniature) return;
+    
+    if (selectedPhotoIndex < selectedMiniature.miniature_photos.length - 1) {
+      // Go to next photo of same miniature
       setSelectedPhotoIndex(selectedPhotoIndex + 1);
+    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex < miniatures.length - 1) {
+      // Go to next miniature (only if it has photos)
+      let nextIndex = selectedMiniatureIndex + 1;
+      while (nextIndex < miniatures.length) {
+        if (miniatures[nextIndex].miniature_photos.length > 0) {
+          setSelectedMiniatureIndex(nextIndex);
+          setSelectedPhotoIndex(0); // Start at first photo
+          return;
+        }
+        nextIndex++;
+      }
     }
   };
 
@@ -296,6 +327,11 @@ export function MiniatureTableView({
                 <X className="h-4 w-4" />
               </Button>
 
+              {/* Miniature Name */}
+              <div className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur px-3 py-1 rounded-sm">
+                <p className="text-sm font-semibold">{selectedMiniature.name}</p>
+              </div>
+
               {selectedMiniature.miniature_photos.length > 0 ? (
                 <>
                   <div className="relative w-full h-[70vh]">
@@ -316,29 +352,32 @@ export function MiniatureTableView({
                     />
                   </div>
 
-                  {/* Navigation */}
-                  {selectedMiniature.miniature_photos.length > 1 && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute left-2 top-1/2 -translate-y-1/2"
-                        onClick={goToPrevious}
-                        disabled={selectedPhotoIndex === 0}
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                        onClick={goToNext}
-                        disabled={selectedPhotoIndex === selectedMiniature.miniature_photos.length - 1}
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
-                    </>
-                  )}
+                  {/* Navigation - Always show if we can navigate */}
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur hover:bg-background/90"
+                      onClick={goToPrevious}
+                      disabled={selectedMiniatureIndex === 0 && selectedPhotoIndex === 0}
+                      title="Previous photo or miniature"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur hover:bg-background/90"
+                      onClick={goToNext}
+                      disabled={
+                        selectedMiniatureIndex === miniatures.length - 1 &&
+                        selectedPhotoIndex === selectedMiniature.miniature_photos.length - 1
+                      }
+                      title="Next photo or miniature"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  </>
 
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur px-3 py-1 rounded-full text-sm">
                     {selectedPhotoIndex + 1} / {selectedMiniature.miniature_photos.length}

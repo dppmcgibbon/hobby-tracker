@@ -106,6 +106,7 @@ export function MiniatureForm({
       : {
           quantity: 1,
           sculptor: "Unknown",
+          year: 2020,
         },
   });
 
