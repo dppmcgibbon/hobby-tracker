@@ -20,7 +20,15 @@ const nextConfig: NextConfig = {
         port: "54321",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "http",
+        hostname: "192.168.1.65",
+        port: "54321",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
+    dangerouslyAllowSVG: true,
+    unoptimized: process.env.NODE_ENV === "development", // Allow private IPs in development
     formats: ["image/webp", "image/avif"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],

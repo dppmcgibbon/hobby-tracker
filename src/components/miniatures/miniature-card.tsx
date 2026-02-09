@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import Image from "next/image";
-import { StatusBadge } from "./status-badge";
+import { StatusIcon } from "./status-icon";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { createClient } from "@/lib/supabase/client";
 import type { MiniatureStatus } from "@/types";
@@ -18,6 +18,7 @@ interface MiniatureCardProps {
     name: string;
     quantity: number;
     created_at: string;
+    unit_type?: string | null;
     factions: { name: string } | null;
     miniature_status: {
       status: string;
@@ -65,7 +66,7 @@ export function MiniatureCard({
   }
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow relative group">
+    <Card className="warhammer-card border-primary/30 hover:border-primary/50 transition-all hover:shadow-gold overflow-hidden relative group">
       {selectable && (
         <div
           className="absolute top-2 left-2 z-50 bg-white dark:bg-gray-800 rounded-md p-2 shadow-lg border-2 border-primary"
@@ -106,44 +107,64 @@ export function MiniatureCard({
         />
       </div>
       <Link href={`/dashboard/collection/${miniature.id}`}>
-        <div className="relative aspect-square bg-muted">
-          <Image
-            src={imageUrl}
-            alt={miniature.name}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover"
-            loading="lazy"
-            unoptimized={isLocalSupabase || imageUrl === "/placeholder-miniature.png"}
-          />
+        <div className="relative aspect-square p-4">
+          <div className="relative w-full h-full">
+            <Image
+              src={imageUrl}
+              alt={miniature.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-contain"
+              loading="lazy"
+              unoptimized={isLocalSupabase || imageUrl === "/placeholder-miniature.png"}
+            />
+          </div>
           {photos.length > 1 && (
-            <Badge className="absolute top-2 right-2" variant="secondary">
+            <Badge className="absolute top-6 right-6" variant="secondary">
               +{photos.length - 1}
             </Badge>
           )}
         </div>
-        <CardHeader>
-          <CardTitle className="line-clamp-2">{miniature.name}</CardTitle>
+        <div className="p-4 pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="line-clamp-2 text-lg font-semibold flex-1 leading-tight" style={{ marginBottom: '2px' }}>{miniature.name}</h3>
+            {miniature.quantity > 1 && (
+              <Badge variant="outline" className="text-xs shrink-0">
+                x{miniature.quantity}
+              </Badge>
+            )}
+          </div>
           {miniature.factions && (
-            <p className="text-sm text-muted-foreground">{miniature.factions.name}</p>
+            <p className="text-xs text-muted-foreground" style={{ marginTop: '2px' }}>
+              {miniature.factions.name}
+              {miniature.unit_type && `: ${miniature.unit_type}`}
+            </p>
           )}
-        </CardHeader>
-        <CardContent>
-          <StatusBadge
-            miniatureId={miniature.id}
-            status={miniature.miniature_status as MiniatureStatus | null}
-          />
-          {miniature.storage_box && (
-            <Badge variant="outline" className="mt-2">
-              📦 {miniature.storage_box.name}
-            </Badge>
-          )}
+        </div>
+        <CardContent className="pt-3 pb-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <StatusIcon status={miniature.miniature_status as MiniatureStatus | null} />
+              {miniature.miniature_status?.magnetised && (
+                <Badge variant="outline" className="text-xs">
+                  🧲
+                </Badge>
+              )}
+              {miniature.miniature_status?.based && (
+                <Badge variant="outline" className="text-xs">
+                  ✓
+                </Badge>
+              )}
+            </div>
+            {miniature.storage_box && (
+              <div className="flex items-center">
+                <Badge variant="outline" className="text-xs">
+                  📦 {miniature.storage_box.name}
+                </Badge>
+              </div>
+            )}
+          </div>
         </CardContent>
-        <CardFooter>
-          <p className="text-xs text-muted-foreground">
-            Quantity: {miniature.quantity} • Added {formattedDate}
-          </p>
-        </CardFooter>
       </Link>
     </Card>
   );
