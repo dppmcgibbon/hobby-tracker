@@ -2,7 +2,8 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Archive } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Archive, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 export default async function StoragePage() {
@@ -66,9 +67,20 @@ export default async function StoragePage() {
                   <div className="flex items-center gap-3">
                     <Archive className="h-8 w-8 text-primary" />
                     <div>
-                      <CardTitle className="text-xl uppercase tracking-wide">
-                        {box.name}
-                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl uppercase tracking-wide">
+                          {box.name}
+                        </CardTitle>
+                        {box.completed && (
+                          <Badge
+                            variant="default"
+                            className="bg-green-600 text-white border-green-600"
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Complete
+                          </Badge>
+                        )}
+                      </div>
                       {box.location && (
                         <p className="text-sm text-muted-foreground mt-1">{box.location}</p>
                       )}

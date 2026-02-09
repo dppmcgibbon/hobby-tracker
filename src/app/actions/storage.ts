@@ -80,3 +80,22 @@ export async function deleteStorageBox(id: string) {
   revalidatePath("/dashboard/storage");
   return { success: true };
 }
+
+export async function toggleStorageBoxComplete(id: string, completed: boolean) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("storage_boxes")
+    .update({ completed })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/storage");
+  revalidatePath(`/dashboard/storage/${id}`);
+  return { success: true };
+}

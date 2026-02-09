@@ -48,6 +48,7 @@ export interface FilterState {
   expansionId: string;
   unitType: string;
   baseSize: string;
+  hasPhotos: string; // "all" | "yes" | "no"
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -107,6 +108,7 @@ export function CollectionFilters({
     expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
     unitType: searchParams.get("unit") || initialFilters?.unitType || "all",
     baseSize: searchParams.get("base_size") || initialFilters?.baseSize || "all",
+    hasPhotos: searchParams.get("photos") || initialFilters?.hasPhotos || "all",
     sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "faction-unit-name",
     sortOrder:
       (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "asc",
@@ -129,6 +131,7 @@ export function CollectionFilters({
     if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
     if (filters.unitType !== "all") params.set("unit", filters.unitType);
     if (filters.baseSize !== "all") params.set("base_size", filters.baseSize);
+    if (filters.hasPhotos !== "all") params.set("photos", filters.hasPhotos);
     if (filters.sortBy !== "faction-unit-name") params.set("sortBy", filters.sortBy);
     if (filters.sortOrder !== "asc") params.set("sortOrder", filters.sortOrder);
 
@@ -158,6 +161,7 @@ export function CollectionFilters({
     filters.expansionId,
     filters.unitType,
     filters.baseSize,
+    filters.hasPhotos,
     filters.sortBy,
     filters.sortOrder,
   ]);
@@ -178,6 +182,7 @@ export function CollectionFilters({
       expansionId: "all",
       unitType: "all",
       baseSize: "all",
+      hasPhotos: "all",
       sortBy: "faction-unit-name",
       sortOrder: "asc",
     };
@@ -195,6 +200,7 @@ export function CollectionFilters({
     filters.expansionId !== "all" ||
     filters.unitType !== "all" ||
     filters.baseSize !== "all" ||
+    filters.hasPhotos !== "all" ||
     filters.sortBy !== "faction-unit-name" ||
     filters.sortOrder !== "asc";
 
@@ -209,6 +215,7 @@ export function CollectionFilters({
     filters.expansionId !== "all",
     filters.unitType !== "all",
     filters.baseSize !== "all",
+    filters.hasPhotos !== "all",
     filters.sortBy !== "faction-unit-name" || filters.sortOrder !== "asc",
   ].filter(Boolean).length;
 
@@ -280,6 +287,15 @@ export function CollectionFilters({
               </Select>
             </div>
           )}
+
+          {/* Photo Filter */}
+          <Button
+            variant={filters.hasPhotos === "no" ? "default" : "outline"}
+            onClick={() => updateFilter("hasPhotos", filters.hasPhotos === "no" ? "all" : "no")}
+            className="whitespace-nowrap"
+          >
+            No Photos
+          </Button>
 
           {/* Status Filter */}
           <div className="w-[220px]">
@@ -658,6 +674,21 @@ export function CollectionFilters({
                   </div>
                 )}
 
+                {/* Photos */}
+                <div>
+                  <Label htmlFor="mobile-photos">Photos</Label>
+                  <Select value={filters.hasPhotos} onValueChange={(v) => updateFilter("hasPhotos", v)}>
+                    <SelectTrigger id="mobile-photos">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Miniatures</SelectItem>
+                      <SelectItem value="no">No Photos</SelectItem>
+                      <SelectItem value="yes">Has Photos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Status */}
                 <div>
                   <Label htmlFor="mobile-status">Status</Label>
@@ -820,6 +851,17 @@ export function CollectionFilters({
                 : bases.find((b) => b.id === filters.baseSize)?.name || filters.baseSize}
               <button
                 onClick={() => updateFilter("baseSize", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.hasPhotos !== "all" && (
+            <Badge variant="secondary">
+              Photos: {filters.hasPhotos === "no" ? "No Photos" : "Has Photos"}
+              <button
+                onClick={() => updateFilter("hasPhotos", "all")}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

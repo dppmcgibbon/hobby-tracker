@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Archive, Edit, ArrowLeft, Package } from "lucide-react";
 import Link from "next/link";
+import { StorageBoxCompleteToggle } from "@/components/storage/storage-box-complete-toggle";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -69,9 +70,16 @@ export default async function StorageBoxDetailPage({ params }: PageProps) {
                 <Archive className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-3xl uppercase tracking-wider text-primary">
-                  {storageBox.name}
-                </CardTitle>
+                <div className="flex items-center gap-3">
+                  <CardTitle className="text-3xl uppercase tracking-wider text-primary">
+                    {storageBox.name}
+                  </CardTitle>
+                  <StorageBoxCompleteToggle
+                    storageBoxId={id}
+                    completed={storageBox.completed || false}
+                    variant="badge"
+                  />
+                </div>
                 {storageBox.location && (
                   <p className="text-muted-foreground mt-1">
                     Location: {storageBox.location}

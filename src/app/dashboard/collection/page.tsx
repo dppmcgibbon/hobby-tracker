@@ -268,7 +268,7 @@ export default async function CollectionPage({
     miniature_status: Array.isArray(m.miniature_status)
       ? m.miniature_status[0]
       : m.miniature_status,
-    miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
+    miniature_photos: m.miniature_photos || [],
     storage_box: Array.isArray(m.storage_boxes) ? m.storage_boxes[0] : m.storage_boxes,
     bases: Array.isArray(m.bases) ? m.bases[0] : m.bases,
     base_shapes: Array.isArray(m.base_shapes) ? m.base_shapes[0] : m.base_shapes,
@@ -297,6 +297,20 @@ export default async function CollectionPage({
       const status = m.miniature_status?.status || "backlog";
       return status === params.status;
     });
+  }
+
+  // Apply photo filter
+  if (params.photos && params.photos !== "all") {
+    if (params.photos === "no") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        const hasPhotos = m.miniature_photos && m.miniature_photos.length > 0;
+        return !hasPhotos;
+      });
+    } else if (params.photos === "yes") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        return m.miniature_photos && m.miniature_photos.length > 0;
+      });
+    }
   }
 
   // Apply sorting - default is faction, unit, name
@@ -376,6 +390,7 @@ export default async function CollectionPage({
         expansionId: params.expansion || "all",
         unitType: params.unit || "all",
         baseSize: params.base_size || "all",
+        hasPhotos: params.photos || "all",
         sortBy: params.sortBy || "faction-unit-name",
         sortOrder: (params.sortOrder as "asc" | "desc") || "asc",
       }}
