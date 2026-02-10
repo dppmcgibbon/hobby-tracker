@@ -45,17 +45,21 @@ export function GameCard({ game, editionCount = 0, onUpdate }: GameCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <CardHeader className="bg-gradient-to-br from-primary/10 to-primary/5">
+    <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold">
+      <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <Link href={`/dashboard/games/${game.id}`}>
-              <CardTitle className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer">
-                <Gamepad2 className="h-5 w-5" />
-                {game.name}
-              </CardTitle>
-            </Link>
-            {game.publisher && <CardDescription className="mt-1">{game.publisher}</CardDescription>}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
+                <Gamepad2 className="h-6 w-6 text-blue-500" />
+              </div>
+              <Link href={`/dashboard/games/${game.id}`}>
+                <CardTitle className="text-xl uppercase tracking-wide hover:text-primary transition-colors cursor-pointer">
+                  {game.name}
+                </CardTitle>
+              </Link>
+            </div>
+            {game.publisher && <CardDescription className="text-base">{game.publisher}</CardDescription>}
           </div>
           <div className="flex gap-1">
             <GameFormDialog
