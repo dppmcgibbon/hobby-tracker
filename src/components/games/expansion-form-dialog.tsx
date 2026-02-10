@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ export function ExpansionFormDialog({
   trigger,
   onSuccess,
 }: ExpansionFormDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -55,6 +57,19 @@ export function ExpansionFormDialog({
     },
   });
 
+  // When the dialog opens, reset form with latest expansion/edition data
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        edition_id: editionId,
+        name: expansion?.name || "",
+        sequence: expansion?.sequence ?? 1,
+        year: expansion?.year ?? undefined,
+        description: expansion?.description || "",
+      });
+    }
+  }, [open, editionId, expansion?.id, expansion?.name, expansion?.sequence, expansion?.year, expansion?.description]);
+
   const onSubmit = async (data: ExpansionInput) => {
     setIsLoading(true);
     try {
@@ -67,6 +82,7 @@ export function ExpansionFormDialog({
       }
       setOpen(false);
       form.reset();
+      router.refresh();
       onSuccess?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save expansion");

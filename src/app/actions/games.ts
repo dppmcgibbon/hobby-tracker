@@ -159,14 +159,24 @@ export async function updateExpansion(id: string, data: ExpansionInput) {
     .from("expansions")
     .update(validated)
     .eq("id", id)
-    .select()
+    .select(`
+      *,
+      edition:editions!inner(
+        id,
+        game_id
+      )
+    `)
     .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
+  // Revalidate both the games list and the specific game detail page
   revalidatePath("/dashboard/games");
+  if (expansion?.edition?.game_id) {
+    revalidatePath(`/dashboard/games/${expansion.edition.game_id}`);
+  }
   return { success: true, expansion };
 }
 
