@@ -34,11 +34,23 @@ export async function getCollectionStatistics(userId: string) {
     {} as Record<string, number>
   );
 
-  const completed = statusBreakdown.completed || 0;
-  const painting = statusBreakdown.painting || 0;
+  const completed = statusBreakdown.complete || 0;
+  const painting = 
+    (statusBreakdown.painting_started || 0) +
+    (statusBreakdown.primed || 0) +
+    (statusBreakdown.built || 0) +
+    (statusBreakdown.sub_assembled || 0);
   const primed = statusBreakdown.primed || 0;
-  const assembled = statusBreakdown.assembled || 0;
-  const backlog = statusBreakdown.backlog || 0;
+  const assembled = statusBreakdown.built || 0;
+  const backlog = 
+    (statusBreakdown.backlog || 0) +
+    (statusBreakdown.unknown || 0) +
+    (statusBreakdown.missing || 0) +
+    (statusBreakdown.needs_stripped || 0) +
+    (statusBreakdown.needs_repair || 0) +
+    (statusBreakdown.missing_arm || 0) +
+    (statusBreakdown.missing_leg || 0) +
+    (statusBreakdown.missing_head || 0);
 
   const completionPercentage = totalMiniatures > 0 ? (completed / totalMiniatures) * 100 : 0;
 

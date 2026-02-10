@@ -243,7 +243,6 @@ export function MiniatureForm({
               {storageBoxes.map((box) => (
                 <SelectItem key={box.id} value={box.id}>
                   {box.name}
-                  {box.location && ` (${box.location})`}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -3,22 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
-import { DatabaseImportButton } from "@/components/dashboard/database-import-button";
-import { FactionManagement } from "@/components/admin/faction-management";
-import { MiniatureCSVImport } from "@/components/admin/miniature-csv-import";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminPage() {
   await requireAuth();
-  const supabase = await createClient();
-
-  // Fetch all factions
-  const { data: factions } = await supabase
-    .from("factions")
-    .select("*")
-    .order("army_type")
-    .order("name");
 
   const adminSections = [
     {
@@ -48,6 +35,34 @@ export default async function AdminPage() {
       icon: Archive,
       href: "/dashboard/storage",
       color: "text-purple-500",
+    },
+    {
+      title: "Faction Management",
+      description: "Manage factions for your miniature collection",
+      icon: Shield,
+      href: "/dashboard/admin/factions",
+      color: "text-blue-500",
+    },
+    {
+      title: "Army Types",
+      description: "Manage army types for faction categorization",
+      icon: Shield,
+      href: "/dashboard/admin/army-types",
+      color: "text-cyan-500",
+    },
+    {
+      title: "Miniature Import",
+      description: "Bulk import miniatures from CSV file",
+      icon: Upload,
+      href: "/dashboard/admin/miniature-import",
+      color: "text-indigo-500",
+    },
+    {
+      title: "Database Management",
+      description: "Backup and restore your database",
+      icon: Database,
+      href: "/dashboard/admin/database",
+      color: "text-red-500",
     },
   ];
 
@@ -94,94 +109,6 @@ export default async function AdminPage() {
           );
         })}
       </div>
-
-      <Card className="warhammer-card border-primary/30">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
-              <Shield className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <CardTitle className="text-xl uppercase tracking-wide text-primary">
-                Faction Management
-              </CardTitle>
-              <CardDescription className="text-base">
-                Manage factions for your miniature collection
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <FactionManagement factions={factions || []} />
-        </CardContent>
-      </Card>
-
-      <Card className="warhammer-card border-primary/30">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
-              <Upload className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <CardTitle className="text-xl uppercase tracking-wide text-primary">
-                Miniature Import
-              </CardTitle>
-              <CardDescription className="text-base">
-                Bulk import miniatures from CSV file
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <MiniatureCSVImport />
-        </CardContent>
-      </Card>
-
-      <Card className="warhammer-card border-primary/30">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
-              <Database className="h-6 w-6 text-red-500" />
-            </div>
-            <div>
-              <CardTitle className="text-xl uppercase tracking-wide text-primary">
-                Database Management
-              </CardTitle>
-              <CardDescription className="text-base">
-                Backup and manage your database
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-sm border border-primary/20">
-              <Database className="h-5 w-5 mt-0.5 text-red-500" />
-              <div className="flex-1">
-                <p className="font-semibold text-sm uppercase tracking-wide mb-1">Backup Database</p>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Download a complete backup of your collection data including miniatures, recipes, and all metadata
-                </p>
-                <DatabaseBackupButton />
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-sm border border-destructive/20">
-              <Database className="h-5 w-5 mt-0.5 text-destructive" />
-              <div className="flex-1">
-                <p className="font-semibold text-sm uppercase tracking-wide mb-1 text-destructive">
-                  Import Database
-                </p>
-                <p className="text-sm text-muted-foreground mb-3">
-                  <span className="font-semibold text-destructive">Warning:</span> This will permanently replace all
-                  your current data with the backup file. Make sure you have a current backup before importing.
-                </p>
-                <DatabaseImportButton />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

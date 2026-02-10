@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Gamepad2 } from "lucide-react";
+import Link from "next/link";
 
 interface GameBreakdown {
   id: string;
@@ -36,9 +37,10 @@ export function GameStatisticsCard({ gameBreakdown, totalGames, totalLinkedMinia
       <CardContent>
         <div className="space-y-3">
           {gameBreakdown.map((game) => (
-            <div
+            <Link
               key={game.id}
-              className="flex items-center justify-between p-3 rounded border border-primary/20 hover:bg-muted/30 transition-colors hover:border-primary/40"
+              href={`/dashboard/collection?game=${game.id}`}
+              className="flex items-center justify-between p-3 rounded border border-primary/20 hover:bg-muted/30 transition-colors hover:border-primary/40 cursor-pointer block"
             >
               <div className="flex-1">
                 <p className="text-sm font-bold uppercase tracking-wide">{game.name}</p>
@@ -54,7 +56,7 @@ export function GameStatisticsCard({ gameBreakdown, totalGames, totalLinkedMinia
               >
                 {game.count} {game.count === 1 ? "mini" : "minis"}
               </Badge>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

@@ -97,7 +97,15 @@ export default async function CollectionPage({
       miniature_photos (id, storage_path),
       bases (id, name),
       base_shapes (id, name),
-      base_types (id, name)
+      base_types (id, name),
+      miniature_games (
+        game_id,
+        edition_id,
+        expansion_id,
+        game:games (id, name),
+        edition:editions (id, name),
+        expansion:expansions (id, name)
+      )
     `
     )
     .eq("user_id", user.id);

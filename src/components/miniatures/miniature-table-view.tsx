@@ -40,6 +40,14 @@ interface MiniatureWithRelations {
   bases?: { id: string; name: string } | null;
   base_shapes?: { id: string; name: string } | null;
   base_types?: { id: string; name: string } | null;
+  miniature_games?: Array<{
+    game_id: string;
+    edition_id?: string | null;
+    expansion_id?: string | null;
+    game?: { id: string; name: string } | null;
+    edition?: { id: string; name: string } | null;
+    expansion?: { id: string; name: string } | null;
+  }>;
 }
 
 interface MiniatureTableViewProps {
@@ -214,7 +222,19 @@ export function MiniatureTableView({
               <TableCell className="text-muted-foreground">
                 {miniature.factions?.name ? (
                   <Link
-                    href={`/dashboard/collection?faction=${miniature.factions.id}`}
+                    href={(() => {
+                      const params = new URLSearchParams();
+                      params.set('faction', miniature.factions.id);
+                      // Use the first game/edition if available
+                      const primaryGame = miniature.miniature_games?.[0];
+                      if (primaryGame?.game_id) {
+                        params.set('game', primaryGame.game_id);
+                      }
+                      if (primaryGame?.edition_id) {
+                        params.set('edition', primaryGame.edition_id);
+                      }
+                      return `/dashboard/collection?${params.toString()}`;
+                    })()}
                     className="hover:text-primary transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -227,7 +247,14 @@ export function MiniatureTableView({
               <TableCell className="text-muted-foreground">
                 {miniature.unit_type ? (
                   <Link
-                    href={`/dashboard/collection?unit=${encodeURIComponent(miniature.unit_type)}`}
+                    href={(() => {
+                      const params = new URLSearchParams();
+                      params.set('unit', miniature.unit_type);
+                      if (miniature.factions?.id) {
+                        params.set('faction', miniature.factions.id);
+                      }
+                      return `/dashboard/collection?${params.toString()}`;
+                    })()}
                     className="hover:text-primary transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >

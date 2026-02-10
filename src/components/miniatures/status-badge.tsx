@@ -67,7 +67,7 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
   return (
     <div className="space-y-2">
       <Select value={currentStatus} onValueChange={handleStatusChange} disabled={updating}>
-        <SelectTrigger id="status">
+        <SelectTrigger id="status" className="w-[160px] [&>span]:mx-auto [&>span]:text-center">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

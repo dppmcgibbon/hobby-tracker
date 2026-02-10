@@ -51,19 +51,17 @@ interface Faction {
   color_hex?: string | null;
 }
 
-interface FactionManagementProps {
-  factions: Faction[];
+interface ArmyType {
+  id: string;
+  name: string;
 }
 
-const ARMY_TYPES = [
-  { value: "imperium", label: "Imperium" },
-  { value: "loyalist", label: "Loyalist" },
-  { value: "chaos", label: "Chaos" },
-  { value: "traitor", label: "Traitor" },
-  { value: "xenos", label: "Xenos" },
-];
+interface FactionManagementProps {
+  factions: Faction[];
+  armyTypes: ArmyType[];
+}
 
-export function FactionManagement({ factions }: FactionManagementProps) {
+export function FactionManagement({ factions, armyTypes }: FactionManagementProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingFaction, setEditingFaction] = useState<Faction | null>(null);
   const [deletingFaction, setDeletingFaction] = useState<Faction | null>(null);
@@ -74,16 +72,14 @@ export function FactionManagement({ factions }: FactionManagementProps) {
     name: "",
     army_type: "imperium",
     description: "",
-    color_hex: "#0066CC",
   });
 
   const openAddDialog = () => {
     setEditingFaction(null);
     setFormData({
       name: "",
-      army_type: "imperium",
+      army_type: armyTypes.length > 0 ? armyTypes[0].name : "imperium",
       description: "",
-      color_hex: "#0066CC",
     });
     setShowDialog(true);
   };
@@ -94,7 +90,6 @@ export function FactionManagement({ factions }: FactionManagementProps) {
       name: faction.name,
       army_type: faction.army_type,
       description: faction.description || "",
-      color_hex: faction.color_hex || "#0066CC",
     });
     setShowDialog(true);
   };
@@ -159,14 +154,13 @@ export function FactionManagement({ factions }: FactionManagementProps) {
               <TableHead>Name</TableHead>
               <TableHead>Army Type</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead>Color</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {factions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                   No factions yet. Add your first faction to get started.
                 </TableCell>
               </TableRow>
@@ -181,15 +175,6 @@ export function FactionManagement({ factions }: FactionManagementProps) {
                   </TableCell>
                   <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                     {faction.description || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded border border-primary/30"
-                        style={{ backgroundColor: faction.color_hex || "#888" }}
-                      />
-                      <span className="text-xs text-muted-foreground">{faction.color_hex || "-"}</span>
-                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -252,9 +237,9 @@ export function FactionManagement({ factions }: FactionManagementProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ARMY_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
+                    {armyTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.name}>
+                        {type.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -270,26 +255,6 @@ export function FactionManagement({ factions }: FactionManagementProps) {
                   placeholder="Brief description of the faction"
                   rows={3}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="color_hex">Color (Hex)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="color_hex"
-                    type="color"
-                    value={formData.color_hex}
-                    onChange={(e) => setFormData({ ...formData, color_hex: e.target.value })}
-                    className="w-20 h-10"
-                  />
-                  <Input
-                    type="text"
-                    value={formData.color_hex}
-                    onChange={(e) => setFormData({ ...formData, color_hex: e.target.value })}
-                    placeholder="#0066CC"
-                    className="flex-1"
-                  />
-                </div>
               </div>
             </div>
             <DialogFooter>

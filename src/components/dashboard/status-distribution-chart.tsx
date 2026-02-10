@@ -100,6 +100,13 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
                 borderRadius: "0.25rem",
                 color: "hsl(40, 10%, 85%)",
               }}
+              labelStyle={{
+                color: "hsl(40, 10%, 85%)",
+                fontWeight: "bold",
+              }}
+              itemStyle={{
+                color: "hsl(40, 10%, 85%)",
+              }}
             />
           </PieChart>
         </ResponsiveContainer>
