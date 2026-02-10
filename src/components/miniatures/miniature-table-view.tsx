@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,7 @@ interface MiniatureTableViewProps {
   selectable?: boolean;
   selectedIds?: string[];
   onSelectChange?: (id: string, selected: boolean) => void;
+  onMiniaturesUpdate?: (miniatures: MiniatureWithRelations[]) => void;
 }
 
 export function MiniatureTableView({
@@ -62,29 +63,39 @@ export function MiniatureTableView({
   selectable,
   selectedIds = [],
   onSelectChange,
+  onMiniaturesUpdate,
 }: MiniatureTableViewProps) {
   const router = useRouter();
   const supabase = createClient();
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
   const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [localMiniatures, setLocalMiniatures] = useState(miniatures);
 
-  const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
+  // Sync local state with incoming props when miniatures change (e.g., filtering)
+  useEffect(() => {
+    setLocalMiniatures(miniatures);
+  }, [miniatures]);
+
+  const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
 
   const getBaseTooltip = (miniature: MiniatureWithRelations) => {
     const baseParts: string[] = [];
     
     if (miniature.bases?.name) {
-      baseParts.push(`Base: ${miniature.bases.name}`);
+      baseParts.push(miniature.bases.name);
     }
     if (miniature.base_shapes?.name) {
-      baseParts.push(`Shape: ${miniature.base_shapes.name}`);
+      baseParts.push(miniature.base_shapes.name);
     }
     if (miniature.base_types?.name) {
-      baseParts.push(`Type: ${miniature.base_types.name}`);
+      baseParts.push(miniature.base_types.name);
     }
     
-    return baseParts.length > 0 ? baseParts.join(", ") : null;
+    return {
+      baseInfo: baseParts.length > 0 ? baseParts.join(" ") : null,
+      storageBox: miniature.storage_box?.name || null,
+    };
   };
 
   const handleToggle = async (
@@ -94,22 +105,40 @@ export function MiniatureTableView({
     currentStatus: MiniatureStatus | null
   ) => {
     setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: true }));
+    
+    // Optimistically update local state
+    setLocalMiniatures((prev) => 
+      prev.map((m) => 
+        m.id === miniatureId
+          ? {
+              ...m,
+              miniature_status: {
+                ...m.miniature_status,
+                status: (currentStatus?.status as any) || "backlog",
+                [field]: value,
+              } as any,
+            }
+          : m
+      )
+    );
+    
     try {
       await updateMiniatureStatus(miniatureId, {
         status: (currentStatus?.status as any) || "backlog",
         magnetised: field === "magnetised" ? value : currentStatus?.magnetised ?? false,
         based: field === "based" ? value : currentStatus?.based ?? false,
       });
-      router.refresh();
     } catch (error) {
       console.error(`Failed to update ${field}:`, error);
+      // Revert optimistic update on error
+      setLocalMiniatures(miniatures);
     } finally {
       setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: false }));
     }
   };
 
   const openGallery = (miniature: MiniatureWithRelations) => {
-    const index = miniatures.findIndex((m) => m.id === miniature.id);
+    const index = localMiniatures.findIndex((m) => m.id === miniature.id);
     setSelectedMiniatureIndex(index);
     setSelectedPhotoIndex(0);
   };
@@ -129,9 +158,9 @@ export function MiniatureTableView({
       // Go to previous miniature (only if it has photos)
       let prevIndex = selectedMiniatureIndex - 1;
       while (prevIndex >= 0) {
-        if (miniatures[prevIndex].miniature_photos.length > 0) {
+        if (localMiniatures[prevIndex].miniature_photos.length > 0) {
           setSelectedMiniatureIndex(prevIndex);
-          setSelectedPhotoIndex(miniatures[prevIndex].miniature_photos.length - 1); // Start at last photo
+          setSelectedPhotoIndex(localMiniatures[prevIndex].miniature_photos.length - 1); // Start at last photo
           return;
         }
         prevIndex--;
@@ -145,11 +174,11 @@ export function MiniatureTableView({
     if (selectedPhotoIndex < selectedMiniature.miniature_photos.length - 1) {
       // Go to next photo of same miniature
       setSelectedPhotoIndex(selectedPhotoIndex + 1);
-    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex < miniatures.length - 1) {
+    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex < localMiniatures.length - 1) {
       // Go to next miniature (only if it has photos)
       let nextIndex = selectedMiniatureIndex + 1;
-      while (nextIndex < miniatures.length) {
-        if (miniatures[nextIndex].miniature_photos.length > 0) {
+      while (nextIndex < localMiniatures.length) {
+        if (localMiniatures[nextIndex].miniature_photos.length > 0) {
           setSelectedMiniatureIndex(nextIndex);
           setSelectedPhotoIndex(0); // Start at first photo
           return;
@@ -202,7 +231,7 @@ export function MiniatureTableView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {miniatures.map((miniature) => {
+          {localMiniatures.map((miniature) => {
             const baseTooltip = getBaseTooltip(miniature);
             const RowContent = (
               <TableRow
@@ -340,13 +369,16 @@ export function MiniatureTableView({
             </TableRow>
             );
 
-            return baseTooltip ? (
+            return baseTooltip.baseInfo || baseTooltip.storageBox ? (
               <Tooltip key={miniature.id}>
                 <TooltipTrigger asChild>
                   {RowContent}
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-sm font-medium">{baseTooltip}</p>
+                  <div className="text-sm font-medium">
+                    {baseTooltip.baseInfo && <p>{baseTooltip.baseInfo}</p>}
+                    {baseTooltip.storageBox && <p>{baseTooltip.storageBox}</p>}
+                  </div>
                 </TooltipContent>
               </Tooltip>
             ) : (
@@ -419,7 +451,7 @@ export function MiniatureTableView({
                       className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur hover:bg-background/90"
                       onClick={goToNext}
                       disabled={
-                        selectedMiniatureIndex === miniatures.length - 1 &&
+                        selectedMiniatureIndex === localMiniatures.length - 1 &&
                         selectedPhotoIndex === selectedMiniature.miniature_photos.length - 1
                       }
                       title="Next photo or miniature"

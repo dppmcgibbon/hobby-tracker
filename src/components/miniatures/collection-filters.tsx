@@ -109,9 +109,9 @@ export function CollectionFilters({
     unitType: searchParams.get("unit") || initialFilters?.unitType || "all",
     baseSize: searchParams.get("base_size") || initialFilters?.baseSize || "all",
     hasPhotos: searchParams.get("photos") || initialFilters?.hasPhotos || "all",
-    sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "faction-unit-name",
+    sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "created_at",
     sortOrder:
-      (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "asc",
+      (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "desc",
   });
 
   // Debounce search input
@@ -132,8 +132,8 @@ export function CollectionFilters({
     if (filters.unitType !== "all") params.set("unit", filters.unitType);
     if (filters.baseSize !== "all") params.set("base_size", filters.baseSize);
     if (filters.hasPhotos !== "all") params.set("photos", filters.hasPhotos);
-    if (filters.sortBy !== "faction-unit-name") params.set("sortBy", filters.sortBy);
-    if (filters.sortOrder !== "asc") params.set("sortOrder", filters.sortOrder);
+    if (filters.sortBy !== "created_at") params.set("sortBy", filters.sortBy);
+    if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
 
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
@@ -183,10 +183,12 @@ export function CollectionFilters({
       unitType: "all",
       baseSize: "all",
       hasPhotos: "all",
-      sortBy: "faction-unit-name",
-      sortOrder: "asc",
+      sortBy: "created_at",
+      sortOrder: "desc",
     };
     setFilters(defaultFilters);
+    // Navigate to clean URL immediately
+    router.replace(pathname, { scroll: false });
   };
 
   const hasActiveFilters =
@@ -201,8 +203,8 @@ export function CollectionFilters({
     filters.unitType !== "all" ||
     filters.baseSize !== "all" ||
     filters.hasPhotos !== "all" ||
-    filters.sortBy !== "faction-unit-name" ||
-    filters.sortOrder !== "asc";
+    filters.sortBy !== "created_at" ||
+    filters.sortOrder !== "desc";
 
   const activeFilterCount = [
     filters.search,

@@ -106,7 +106,7 @@ export function MiniatureForm({
       : {
           quantity: 1,
           sculptor: "Unknown",
-          year: 2020,
+          year: 1900,
         },
   });
 
@@ -382,7 +382,7 @@ export function MiniatureForm({
           <Input
             id="year"
             type="number"
-            min="1987"
+            min="1900"
             max={new Date().getFullYear()}
             placeholder={new Date().getFullYear().toString()}
             {...register("year")}

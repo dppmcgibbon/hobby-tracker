@@ -321,9 +321,9 @@ export default async function CollectionPage({
     }
   }
 
-  // Apply sorting - default is faction, unit, name
-  const sortBy = params.sortBy || "faction-unit-name";
-  const sortOrder = (params.sortOrder || "asc") as "asc" | "desc";
+  // Apply sorting - default is created_at descending
+  const sortBy = params.sortBy || "created_at";
+  const sortOrder = (params.sortOrder || "desc") as "asc" | "desc";
 
   filteredMiniatures.sort((a, b) => {
     let comparison = 0;
@@ -399,8 +399,8 @@ export default async function CollectionPage({
         unitType: params.unit || "all",
         baseSize: params.base_size || "all",
         hasPhotos: params.photos || "all",
-        sortBy: params.sortBy || "faction-unit-name",
-        sortOrder: (params.sortOrder as "asc" | "desc") || "asc",
+        sortBy: params.sortBy || "created_at",
+        sortOrder: (params.sortOrder as "asc" | "desc") || "desc",
       }}
     />
   );
