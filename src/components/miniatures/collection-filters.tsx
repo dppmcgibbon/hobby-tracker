@@ -232,171 +232,11 @@ export function CollectionFilters({
     <div className="space-y-4">
       {/* Filters - Visible on all screen sizes */}
       <div className="space-y-3">
-        {/* Bottom Row - Other Filters */}
+        {/* Top Row - Game Filters */}
         <div className="flex gap-4 flex-wrap items-end">
-          {/* Faction Filter */}
-          <div className="w-[220px]">
-            <Select value={filters.factionId} onValueChange={(v) => updateFilter("factionId", v)}>
-              <SelectTrigger id="faction" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Factions</SelectItem>
-                {factions.map((faction) => (
-                  <SelectItem key={faction.id} value={faction.id}>
-                    {faction.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Unit Type Filter */}
-          {unitTypes.length > 0 && (
-            <div className="w-[220px]">
-              <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
-                <SelectTrigger id="unitType" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Units</SelectItem>
-                  {unitTypes.map((unitType) => (
-                    <SelectItem key={unitType} value={unitType}>
-                      {unitType}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Base Size Filter */}
-          {bases.length > 0 && (
-            <div className="w-[220px]">
-              <Select value={filters.baseSize} onValueChange={(v) => updateFilter("baseSize", v)}>
-                <SelectTrigger id="baseSize" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Base Sizes</SelectItem>
-                  <SelectItem value="none">No Base Defined</SelectItem>
-                  {bases.map((base) => (
-                    <SelectItem key={base.id} value={base.id}>
-                      {base.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Photo Filter */}
-          <Button
-            variant={filters.hasPhotos === "no" ? "default" : "outline"}
-            onClick={() => updateFilter("hasPhotos", filters.hasPhotos === "no" ? "all" : "no")}
-            className="whitespace-nowrap"
-          >
-            No Photos
-          </Button>
-
-          {/* Status Filter */}
-          <div className="w-[220px]">
-            <Select value={filters.status} onValueChange={(v) => updateFilter("status", v)}>
-              <SelectTrigger id="status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tag Filter */}
-          <div className="w-[220px]">
-            <Select value={filters.tagId} onValueChange={(v) => updateFilter("tagId", v)}>
-              <SelectTrigger id="tag" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Tags</SelectItem>
-                {tags.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    <div className="flex items-center gap-2">
-                      {tag.color && (
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                      )}
-                      {tag.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Storage Box Filter */}
-          <div className="w-[220px]">
-            <Select
-              value={filters.storageBoxId}
-              onValueChange={(v) => updateFilter("storageBoxId", v)}
-            >
-              <SelectTrigger id="storage" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Storage</SelectItem>
-                <SelectItem value="none">No Storage Box</SelectItem>
-                {storageBoxes.map((box) => (
-                  <SelectItem key={box.id} value={box.id}>
-                    {box.name}
-                    {box.location && ` (${box.location})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort By */}
-          <div className="w-[220px]">
-            <Select value={filters.sortBy} onValueChange={(v) => updateFilter("sortBy", v)}>
-              <SelectTrigger id="sortBy" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SORT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort Order */}
-          <div className="w-[220px]">
-            <Select
-              value={filters.sortOrder}
-              onValueChange={(v) => updateFilter("sortOrder", v as "asc" | "desc")}
-            >
-              <SelectTrigger id="sortOrder" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Game Filter - moved from top row */}
+          {/* Game Filter */}
           {games.length > 0 && (
-            <div className="w-[220px]">
+            <div className="w-[456px]">
               <Select
                 value={filters.gameId}
                 onValueChange={(v) => {
@@ -473,8 +313,162 @@ export function CollectionFilters({
               </Select>
             </div>
           )}
+        </div>
 
-          {/* Search - moved to end */}
+        {/* Bottom Row - Other Filters */}
+        <div className="flex gap-4 flex-wrap items-end">
+          {/* Faction Filter */}
+          <div className="w-[220px]">
+            <Select value={filters.factionId} onValueChange={(v) => updateFilter("factionId", v)}>
+              <SelectTrigger id="faction" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Factions</SelectItem>
+                {factions.map((faction) => (
+                  <SelectItem key={faction.id} value={faction.id}>
+                    {faction.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Unit Type Filter */}
+          {unitTypes.length > 0 && (
+            <div className="w-[220px]">
+              <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
+                <SelectTrigger id="unitType" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {unitTypes.map((unitType) => (
+                    <SelectItem key={unitType} value={unitType}>
+                      {unitType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Base Size Filter */}
+          {bases.length > 0 && (
+            <div className="w-[220px]">
+              <Select value={filters.baseSize} onValueChange={(v) => updateFilter("baseSize", v)}>
+                <SelectTrigger id="baseSize" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Base Sizes</SelectItem>
+                  <SelectItem value="none">No Base Defined</SelectItem>
+                  {bases.map((base) => (
+                    <SelectItem key={base.id} value={base.id}>
+                      {base.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Status Filter */}
+          <div className="w-[220px]">
+            <Select value={filters.status} onValueChange={(v) => updateFilter("status", v)}>
+              <SelectTrigger id="status" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Storage Box Filter */}
+          <div className="w-[220px]">
+            <Select
+              value={filters.storageBoxId}
+              onValueChange={(v) => updateFilter("storageBoxId", v)}
+            >
+              <SelectTrigger id="storage" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Storage</SelectItem>
+                <SelectItem value="none">No Storage Box</SelectItem>
+                {storageBoxes.map((box) => (
+                  <SelectItem key={box.id} value={box.id}>
+                    {box.name}
+                    {box.location && ` (${box.location})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tag Filter */}
+          <div className="w-[220px]">
+            <Select value={filters.tagId} onValueChange={(v) => updateFilter("tagId", v)}>
+              <SelectTrigger id="tag" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                {tags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      {tag.color && (
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                      )}
+                      {tag.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sort By */}
+          <div className="w-[220px]">
+            <Select value={filters.sortBy} onValueChange={(v) => updateFilter("sortBy", v)}>
+              <SelectTrigger id="sortBy" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sort Order */}
+          <div className="w-[220px]">
+            <Select
+              value={filters.sortOrder}
+              onValueChange={(v) => updateFilter("sortOrder", v as "asc" | "desc")}
+            >
+              <SelectTrigger id="sortOrder" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Search */}
           <div className="w-full sm:w-[300px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -488,6 +482,15 @@ export function CollectionFilters({
               />
             </div>
           </div>
+
+          {/* Photo Filter */}
+          <Button
+            variant={filters.hasPhotos === "no" ? "default" : "outline"}
+            onClick={() => updateFilter("hasPhotos", filters.hasPhotos === "no" ? "all" : "no")}
+            className="whitespace-nowrap"
+          >
+            No Photos
+          </Button>
 
           {/* Clear Filters */}
           {hasActiveFilters && (

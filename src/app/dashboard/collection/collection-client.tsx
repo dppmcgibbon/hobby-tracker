@@ -163,10 +163,9 @@ export function CollectionClient({
             <Tag className="mr-2 h-4 w-4" />
             Manage Tags
           </Button>
-          <Button asChild className="btn-warhammer-primary">
+          <Button asChild className="btn-warhammer-primary" size="icon">
             <Link href="/dashboard/collection/add">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Miniature
+              <Plus className="h-4 w-4" />
             </Link>
           </Button>
         </div>
