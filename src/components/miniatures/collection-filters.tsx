@@ -49,8 +49,8 @@ export interface FilterState {
   unitType: string;
   baseSize: string;
   hasPhotos: string; // "all" | "yes" | "no"
-  sortBy: string;
-  sortOrder: "asc" | "desc";
+  magnetised: string; // "all" | "yes" | "no"
+  based: string; // "all" | "yes" | "no"
 }
 
 const STATUS_OPTIONS = [
@@ -68,16 +68,6 @@ const STATUS_OPTIONS = [
   { value: "missing_leg", label: "Missing Leg" },
   { value: "missing_head", label: "Missing Head" },
   { value: "complete", label: "Complete" },
-];
-
-const SORT_OPTIONS = [
-  { value: "faction-unit-name", label: "Faction > Unit > Name" },
-  { value: "name", label: "Name" },
-  { value: "faction", label: "Faction" },
-  { value: "unit", label: "Unit" },
-  { value: "status", label: "Status" },
-  { value: "quantity", label: "Quantity" },
-  { value: "created_at", label: "Date Added" },
 ];
 
 export function CollectionFilters({
@@ -109,9 +99,8 @@ export function CollectionFilters({
     unitType: searchParams.get("unit") || initialFilters?.unitType || "all",
     baseSize: searchParams.get("base_size") || initialFilters?.baseSize || "all",
     hasPhotos: searchParams.get("photos") || initialFilters?.hasPhotos || "all",
-    sortBy: searchParams.get("sortBy") || initialFilters?.sortBy || "created_at",
-    sortOrder:
-      (searchParams.get("sortOrder") as "asc" | "desc") || initialFilters?.sortOrder || "desc",
+    magnetised: searchParams.get("magnetised") || initialFilters?.magnetised || "all",
+    based: searchParams.get("based") || initialFilters?.based || "all",
   });
 
   // Debounce search input
@@ -132,8 +121,8 @@ export function CollectionFilters({
     if (filters.unitType !== "all") params.set("unit", filters.unitType);
     if (filters.baseSize !== "all") params.set("base_size", filters.baseSize);
     if (filters.hasPhotos !== "all") params.set("photos", filters.hasPhotos);
-    if (filters.sortBy !== "created_at") params.set("sortBy", filters.sortBy);
-    if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
+    if (filters.magnetised !== "all") params.set("magnetised", filters.magnetised);
+    if (filters.based !== "all") params.set("based", filters.based);
 
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
@@ -162,8 +151,8 @@ export function CollectionFilters({
     filters.unitType,
     filters.baseSize,
     filters.hasPhotos,
-    filters.sortBy,
-    filters.sortOrder,
+    filters.magnetised,
+    filters.based,
   ]);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
@@ -183,8 +172,8 @@ export function CollectionFilters({
       unitType: "all",
       baseSize: "all",
       hasPhotos: "all",
-      sortBy: "created_at",
-      sortOrder: "desc",
+      magnetised: "all",
+      based: "all",
     };
     setFilters(defaultFilters);
     // Navigate to clean URL immediately
@@ -203,8 +192,8 @@ export function CollectionFilters({
     filters.unitType !== "all" ||
     filters.baseSize !== "all" ||
     filters.hasPhotos !== "all" ||
-    filters.sortBy !== "created_at" ||
-    filters.sortOrder !== "desc";
+    filters.magnetised !== "all" ||
+    filters.based !== "all";
 
   const activeFilterCount = [
     filters.search,
@@ -218,7 +207,8 @@ export function CollectionFilters({
     filters.unitType !== "all",
     filters.baseSize !== "all",
     filters.hasPhotos !== "all",
-    filters.sortBy !== "faction-unit-name" || filters.sortOrder !== "asc",
+    filters.magnetised !== "all",
+    filters.based !== "all",
   ].filter(Boolean).length;
 
   console.log("CollectionFilters rendering:", {
@@ -436,38 +426,6 @@ export function CollectionFilters({
             </Select>
           </div>
 
-          {/* Sort By */}
-          <div className="w-[220px]">
-            <Select value={filters.sortBy} onValueChange={(v) => updateFilter("sortBy", v)}>
-              <SelectTrigger id="sortBy" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SORT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort Order */}
-          <div className="w-[220px]">
-            <Select
-              value={filters.sortOrder}
-              onValueChange={(v) => updateFilter("sortOrder", v as "asc" | "desc")}
-            >
-              <SelectTrigger id="sortOrder" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Search */}
           <div className="w-full sm:w-[300px]">
             <div className="relative">
@@ -490,6 +448,24 @@ export function CollectionFilters({
             className="whitespace-nowrap"
           >
             No Photos
+          </Button>
+
+          {/* Magnetised Filter */}
+          <Button
+            variant={filters.magnetised === "no" ? "default" : "outline"}
+            onClick={() => updateFilter("magnetised", filters.magnetised === "no" ? "all" : "no")}
+            className="whitespace-nowrap"
+          >
+            Not Magnetised
+          </Button>
+
+          {/* Based Filter */}
+          <Button
+            variant={filters.based === "no" ? "default" : "outline"}
+            onClick={() => updateFilter("based", filters.based === "no" ? "all" : "no")}
+            className="whitespace-nowrap"
+          >
+            Not Based
           </Button>
 
           {/* Clear Filters */}
@@ -756,40 +732,6 @@ export function CollectionFilters({
                           {box.location && ` (${box.location})`}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Sort By */}
-                <div>
-                  <Label htmlFor="mobile-sortBy">Sort By</Label>
-                  <Select value={filters.sortBy} onValueChange={(v) => updateFilter("sortBy", v)}>
-                    <SelectTrigger id="mobile-sortBy">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SORT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Sort Order */}
-                <div>
-                  <Label htmlFor="mobile-sortOrder">Order</Label>
-                  <Select
-                    value={filters.sortOrder}
-                    onValueChange={(v) => updateFilter("sortOrder", v as "asc" | "desc")}
-                  >
-                    <SelectTrigger id="mobile-sortOrder">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="asc">Ascending</SelectItem>
-                      <SelectItem value="desc">Descending</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

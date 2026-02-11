@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info } from "lucide-react";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import type { MiniatureStatus } from "@/types";
 
@@ -80,12 +81,86 @@ export function MiniatureTableView({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  
   // Calculate pagination
   const totalItems = localMiniatures.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentMiniatures = localMiniatures.slice(startIndex, endIndex);
+  
+  // Apply sorting
+  const sortedMiniatures = [...localMiniatures].sort((a, b) => {
+    if (!sortColumn) return 0;
+    
+    let comparison = 0;
+    
+    switch (sortColumn) {
+      case "faction":
+        const factionA = a.factions?.name || "";
+        const factionB = b.factions?.name || "";
+        comparison = factionA.localeCompare(factionB);
+        // If factions are the same, sort by unit
+        if (comparison === 0) {
+          const unitA = a.unit_type || "";
+          const unitB = b.unit_type || "";
+          comparison = unitA.localeCompare(unitB);
+          // If units are the same, sort by name
+          if (comparison === 0) {
+            comparison = a.name.localeCompare(b.name);
+          }
+        }
+        break;
+      case "unit":
+        const unitA = a.unit_type || "";
+        const unitB = b.unit_type || "";
+        comparison = unitA.localeCompare(unitB);
+        // If units are the same, sort by name
+        if (comparison === 0) {
+          comparison = a.name.localeCompare(b.name);
+        }
+        break;
+      case "name":
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case "quantity":
+        comparison = (a.quantity || 0) - (b.quantity || 0);
+        // If quantities are the same, sort by name
+        if (comparison === 0) {
+          comparison = a.name.localeCompare(b.name);
+        }
+        break;
+      case "status":
+        const statusA = a.miniature_status?.status || "backlog";
+        const statusB = b.miniature_status?.status || "backlog";
+        comparison = statusA.localeCompare(statusB);
+        // If statuses are the same, sort by name
+        if (comparison === 0) {
+          comparison = a.name.localeCompare(b.name);
+        }
+        break;
+    }
+    
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+  
+  const currentMiniatures = sortedMiniatures.slice(startIndex, endIndex);
+  
+  // Handle column header click
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column with ascending direction
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
+  };
 
   // Sync local state with incoming props when miniatures change (e.g., filtering)
   useEffect(() => {
@@ -95,25 +170,6 @@ export function MiniatureTableView({
   }, [miniatures]);
 
   const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
-
-  const getBaseTooltip = (miniature: MiniatureWithRelations) => {
-    const baseParts: string[] = [];
-    
-    if (miniature.bases?.name) {
-      baseParts.push(miniature.bases.name);
-    }
-    if (miniature.base_shapes?.name) {
-      baseParts.push(miniature.base_shapes.name);
-    }
-    if (miniature.base_types?.name) {
-      baseParts.push(miniature.base_types.name);
-    }
-    
-    return {
-      baseInfo: baseParts.length > 0 ? baseParts.join(" ") : null,
-      storageBox: miniature.storage_box?.name || null,
-    };
-  };
 
   const handleToggle = async (
     miniatureId: string,
@@ -181,7 +237,6 @@ export function MiniatureTableView({
   return (
     <>
       <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
-        <TooltipProvider>
         <Table>
           <TableHeader>
             <TableRow className="border-primary/20 hover:bg-muted/30">
@@ -190,21 +245,54 @@ export function MiniatureTableView({
                 Select
               </TableHead>
             )}
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Faction
+            <TableHead 
+              className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
+              onClick={() => handleSort("faction")}
+            >
+              <div className="flex items-center gap-1">
+                Faction
+                <ArrowUpDown className="h-3 w-3" />
+              </div>
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Unit
+            <TableHead 
+              className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
+              onClick={() => handleSort("unit")}
+            >
+              <div className="flex items-center gap-1">
+                Unit
+                <ArrowUpDown className="h-3 w-3" />
+              </div>
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary">
-              Name
+            <TableHead 
+              className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
+              onClick={() => handleSort("name")}
+            >
+              <div className="flex items-center gap-1">
+                Name
+                <ArrowUpDown className="h-3 w-3" />
+              </div>
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Quantity">
-              <Hash className="h-4 w-4 mx-auto" />
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Info">
+              <Info className="h-4 w-4 mx-auto" />
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary" title="Status">
-              <div className="flex justify-center">
+            <TableHead 
+              className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20" 
+              title="Quantity"
+              onClick={() => handleSort("quantity")}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <Hash className="h-4 w-4" />
+                <ArrowUpDown className="h-3 w-3" />
+              </div>
+            </TableHead>
+            <TableHead 
+              className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20" 
+              title="Status"
+              onClick={() => handleSort("status")}
+            >
+              <div className="flex justify-center items-center gap-1">
                 <Activity className="h-4 w-4" />
+                <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Magnetised">
@@ -222,13 +310,11 @@ export function MiniatureTableView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {currentMiniatures.map((miniature) => {
-            const baseTooltip = getBaseTooltip(miniature);
-            const RowContent = (
-              <TableRow
-                key={miniature.id}
-                className="border-primary/10 hover:bg-muted/20 transition-colors"
-              >
+          {currentMiniatures.map((miniature) => (
+            <TableRow
+              key={miniature.id}
+              className="border-primary/10 hover:bg-muted/20 transition-colors"
+            >
               {selectable && (
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
@@ -291,6 +377,73 @@ export function MiniatureTableView({
                 >
                   {miniature.name}
                 </Link>
+              </TableCell>
+              <TableCell className="text-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="View details"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96" align="start" side="right">
+                    <div className="space-y-3">
+                      <h3 className="font-bold text-lg">{miniature.name}</h3>
+                      
+                      {/* Base Details - Single Line */}
+                      {(miniature.bases || miniature.base_shapes || miniature.base_types) && (
+                        <div className="text-sm">
+                          <span className="font-medium">Base:</span>{" "}
+                          {[
+                            miniature.bases?.name,
+                            miniature.base_shapes?.name,
+                            miniature.base_types?.name,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        </div>
+                      )}
+
+                      {/* Storage Box - Single Line */}
+                      {miniature.storage_box && (
+                        <div className="text-sm">
+                          <span className="font-medium">Box:</span>{" "}
+                          <Link
+                            href={`/dashboard/storage/${miniature.storage_box.id}`}
+                            className="hover:text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {miniature.storage_box.name}
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {(miniature as any).notes && (
+                        <div className="text-sm">
+                          <span className="font-medium">Notes:</span>{" "}
+                          <span className="text-muted-foreground whitespace-pre-wrap">
+                            {(miniature as any).notes}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Show message if no info */}
+                      {!miniature.bases && 
+                       !miniature.base_shapes && 
+                       !miniature.base_types && 
+                       !miniature.storage_box && 
+                       !(miniature as any).notes && (
+                        <p className="text-center text-muted-foreground py-4 text-sm">
+                          No additional information available
+                        </p>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </TableCell>
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
@@ -358,27 +511,9 @@ export function MiniatureTableView({
                 </Button>
               </TableCell>
             </TableRow>
-            );
-
-            return baseTooltip.baseInfo || baseTooltip.storageBox ? (
-              <Tooltip key={miniature.id}>
-                <TooltipTrigger asChild>
-                  {RowContent}
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm font-medium">
-                    {baseTooltip.baseInfo && <p>{baseTooltip.baseInfo}</p>}
-                    {baseTooltip.storageBox && <p>{baseTooltip.storageBox}</p>}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              RowContent
-            );
-          })}
+          ))}
         </TableBody>
       </Table>
-      </TooltipProvider>
       
       {/* Pagination Controls - Bottom */}
       {totalPages > 1 && (

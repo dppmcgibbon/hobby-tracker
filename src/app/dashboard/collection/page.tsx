@@ -92,6 +92,7 @@ export default async function CollectionPage({
       base_id,
       base_shape_id,
       base_type_id,
+      notes,
       factions (id, name),
       miniature_status (status, completed_at, magnetised, based),
       miniature_photos (id, storage_path),
@@ -321,56 +322,31 @@ export default async function CollectionPage({
     }
   }
 
-  // Apply sorting - default is created_at descending
-  const sortBy = params.sortBy || "created_at";
-  const sortOrder = (params.sortOrder || "desc") as "asc" | "desc";
-
-  filteredMiniatures.sort((a, b) => {
-    let comparison = 0;
-
-    switch (sortBy) {
-      case "faction-unit-name":
-        // Sort by faction, then unit, then name
-        const factionA = a.factions?.name || "";
-        const factionB = b.factions?.name || "";
-        comparison = factionA.localeCompare(factionB);
-        if (comparison === 0) {
-          const unitA = a.unit_type || "";
-          const unitB = b.unit_type || "";
-          comparison = unitA.localeCompare(unitB);
-          if (comparison === 0) {
-            comparison = a.name.localeCompare(b.name);
-          }
-        }
-        break;
-      case "name":
-        comparison = a.name.localeCompare(b.name);
-        break;
-      case "faction":
-        const facA = a.factions?.name || "";
-        const facB = b.factions?.name || "";
-        comparison = facA.localeCompare(facB);
-        break;
-      case "unit":
-        const uA = a.unit_type || "";
-        const uB = b.unit_type || "";
-        comparison = uA.localeCompare(uB);
-        break;
-      case "status":
-        const statusA = a.miniature_status?.status || "backlog";
-        const statusB = b.miniature_status?.status || "backlog";
-        comparison = statusA.localeCompare(statusB);
-        break;
-      case "quantity":
-        comparison = (a.quantity || 0) - (b.quantity || 0);
-        break;
-      case "created_at":
-        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        break;
+  // Apply magnetised filter
+  if (params.magnetised && params.magnetised !== "all") {
+    if (params.magnetised === "no") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        return !m.miniature_status?.magnetised;
+      });
+    } else if (params.magnetised === "yes") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        return m.miniature_status?.magnetised === true;
+      });
     }
+  }
 
-    return sortOrder === "desc" ? -comparison : comparison;
-  });
+  // Apply based filter
+  if (params.based && params.based !== "all") {
+    if (params.based === "no") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        return !m.miniature_status?.based;
+      });
+    } else if (params.based === "yes") {
+      filteredMiniatures = filteredMiniatures.filter((m) => {
+        return m.miniature_status?.based === true;
+      });
+    }
+  }
 
   return (
     <CollectionClient
@@ -399,8 +375,8 @@ export default async function CollectionPage({
         unitType: params.unit || "all",
         baseSize: params.base_size || "all",
         hasPhotos: params.photos || "all",
-        sortBy: params.sortBy || "created_at",
-        sortOrder: (params.sortOrder as "asc" | "desc") || "desc",
+        magnetised: params.magnetised || "all",
+        based: params.based || "all",
       }}
     />
   );
