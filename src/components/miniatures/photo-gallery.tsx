@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { deleteMiniaturePhoto } from "@/app/actions/photos";
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Photo {
   id: string;
@@ -36,6 +37,11 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<Photo | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [lightboxZoomed, setLightboxZoomed] = useState(false);
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const supabase = createClient();
   const router = useRouter();
 
@@ -45,18 +51,62 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
 
   const closeLightbox = () => {
     setSelectedIndex(null);
+    setLightboxZoomed(false);
+    setImageZoom(1);
+    setImagePosition({ x: 0, y: 0 });
   };
 
   const goToPrevious = () => {
     if (selectedIndex !== null && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
+      setImageZoom(1);
+      setImagePosition({ x: 0, y: 0 });
     }
   };
 
   const goToNext = () => {
     if (selectedIndex !== null && selectedIndex < photos.length - 1) {
       setSelectedIndex(selectedIndex + 1);
+      setImageZoom(1);
+      setImagePosition({ x: 0, y: 0 });
     }
+  };
+
+  const handleZoomIn = () => {
+    setImageZoom((prev) => Math.min(prev + 0.5, 4));
+  };
+
+  const handleZoomOut = () => {
+    setImageZoom((prev) => {
+      const newZoom = Math.max(prev - 0.5, 1);
+      if (newZoom === 1) {
+        setImagePosition({ x: 0, y: 0 });
+      }
+      return newZoom;
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (imageZoom > 1) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - imagePosition.x,
+        y: e.clientY - imagePosition.y,
+      });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && imageZoom > 1) {
+      setImagePosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const handleDelete = async () => {
@@ -119,12 +169,67 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
       {/* Lightbox Dialog */}
       {selectedIndex !== null && (
         <Dialog open={selectedIndex !== null} onOpenChange={closeLightbox}>
-          <DialogContent className="max-w-4xl p-0">
+          <DialogContent
+            className="p-0"
+            style={
+              lightboxZoomed
+                ? { width: "95vw", maxWidth: "95vw" }
+                : { width: "min(896px, calc(100vw - 2rem))", maxWidth: "896px" }
+            }
+          >
             <DialogTitle className="sr-only">
               {photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`}
             </DialogTitle>
-            <div className="relative">
-              <div className="absolute top-2 right-2 z-10 flex gap-2">
+            <TooltipProvider>
+              <div className="relative">
+                <div className="absolute top-2 right-2 z-10 flex gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur"
+                        onClick={handleZoomIn}
+                        disabled={imageZoom >= 4}
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Zoom in</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur"
+                        onClick={handleZoomOut}
+                        disabled={imageZoom <= 1}
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Zoom out</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur"
+                        onClick={() => setLightboxZoomed((z) => !z)}
+                      >
+                        {lightboxZoomed ? (
+                          <Minimize2 className="h-4 w-4" />
+                        ) : (
+                          <Maximize2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {lightboxZoomed ? "Reduce size" : "Increase size"}
+                    </TooltipContent>
+                  </Tooltip>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -143,22 +248,40 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
                 </Button>
               </div>
 
-              <div className="relative w-full h-[70vh]">
-                <Image
-                  src={
-                    supabase.storage
-                      .from("miniature-photos")
-                      .getPublicUrl(photos[selectedIndex].storage_path).data.publicUrl
-                  }
-                  alt={
-                    photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`
-                  }
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 896px"
-                  className="object-contain"
-                  priority
-                  unoptimized
-                />
+              <div 
+                className={`relative w-full ${lightboxZoomed ? "h-[90vh]" : "h-[70vh]"} overflow-hidden`}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                style={{ cursor: imageZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+              >
+                <div
+                  style={{
+                    transform: `scale(${imageZoom}) translate(${imagePosition.x / imageZoom}px, ${imagePosition.y / imageZoom}px)`,
+                    transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  <Image
+                    src={
+                      supabase.storage
+                        .from("miniature-photos")
+                        .getPublicUrl(photos[selectedIndex].storage_path).data.publicUrl
+                    }
+                    alt={
+                      photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`
+                    }
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 896px"
+                    className="object-contain"
+                    priority
+                    unoptimized
+                    draggable={false}
+                  />
+                </div>
               </div>
 
               {photos[selectedIndex].caption && (
@@ -194,7 +317,8 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur px-3 py-1 rounded-full text-sm">
                 {selectedIndex + 1} / {photos.length}
               </div>
-            </div>
+              </div>
+            </TooltipProvider>
           </DialogContent>
         </Dialog>
       )}

@@ -1,22 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
-import Image from "next/image";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Trash2, Image as ImageIcon, ChevronLeft, ChevronRight, X, Magnet, Sprout, Activity, Hash } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash } from "lucide-react";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
-import { createClient } from "@/lib/supabase/client";
 import type { MiniatureStatus } from "@/types";
+
+// Lazy load the photo dialog to reduce initial bundle size
+const MiniaturePhotoDialog = lazy(() => 
+  import("./miniature-photo-dialog").then(module => ({ default: module.MiniaturePhotoDialog }))
+);
 
 interface MiniatureWithRelations {
   id: string;
@@ -66,15 +68,30 @@ export function MiniatureTableView({
   onMiniaturesUpdate,
 }: MiniatureTableViewProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
   const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [localMiniatures, setLocalMiniatures] = useState(miniatures);
+  
+  // Separate state to prevent table re-renders
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  
+  // Calculate pagination
+  const totalItems = localMiniatures.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentMiniatures = localMiniatures.slice(startIndex, endIndex);
 
   // Sync local state with incoming props when miniatures change (e.g., filtering)
   useEffect(() => {
     setLocalMiniatures(miniatures);
+    // Reset to first page when miniatures change
+    setCurrentPage(1);
   }, [miniatures]);
 
   const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
@@ -137,60 +154,34 @@ export function MiniatureTableView({
     }
   };
 
-  const openGallery = (miniature: MiniatureWithRelations) => {
+  const openGallery = useCallback((miniature: MiniatureWithRelations) => {
     const index = localMiniatures.findIndex((m) => m.id === miniature.id);
-    setSelectedMiniatureIndex(index);
-    setSelectedPhotoIndex(0);
-  };
+    // Use a single state update to batch the changes
+    requestAnimationFrame(() => {
+      setSelectedMiniatureIndex(index);
+      setSelectedPhotoIndex(0);
+      setDialogOpen(true);
+    });
+  }, [localMiniatures]);
 
-  const closeGallery = () => {
-    setSelectedMiniatureIndex(null);
-    setSelectedPhotoIndex(0);
-  };
+  const closeGallery = useCallback(() => {
+    setDialogOpen(false);
+    // Delay clearing the selected indices until after animation
+    setTimeout(() => {
+      setSelectedMiniatureIndex(null);
+      setSelectedPhotoIndex(0);
+    }, 200);
+  }, []);
 
-  const goToPrevious = () => {
-    if (!selectedMiniature) return;
-    
-    if (selectedPhotoIndex > 0) {
-      // Go to previous photo of same miniature
-      setSelectedPhotoIndex(selectedPhotoIndex - 1);
-    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex > 0) {
-      // Go to previous miniature (only if it has photos)
-      let prevIndex = selectedMiniatureIndex - 1;
-      while (prevIndex >= 0) {
-        if (localMiniatures[prevIndex].miniature_photos.length > 0) {
-          setSelectedMiniatureIndex(prevIndex);
-          setSelectedPhotoIndex(localMiniatures[prevIndex].miniature_photos.length - 1); // Start at last photo
-          return;
-        }
-        prevIndex--;
-      }
-    }
-  };
-
-  const goToNext = () => {
-    if (!selectedMiniature) return;
-    
-    if (selectedPhotoIndex < selectedMiniature.miniature_photos.length - 1) {
-      // Go to next photo of same miniature
-      setSelectedPhotoIndex(selectedPhotoIndex + 1);
-    } else if (selectedMiniatureIndex !== null && selectedMiniatureIndex < localMiniatures.length - 1) {
-      // Go to next miniature (only if it has photos)
-      let nextIndex = selectedMiniatureIndex + 1;
-      while (nextIndex < localMiniatures.length) {
-        if (localMiniatures[nextIndex].miniature_photos.length > 0) {
-          setSelectedMiniatureIndex(nextIndex);
-          setSelectedPhotoIndex(0); // Start at first photo
-          return;
-        }
-        nextIndex++;
-      }
-    }
-  };
+  const handleNavigate = useCallback((miniatureIndex: number, photoIndex: number) => {
+    setSelectedMiniatureIndex(miniatureIndex);
+    setSelectedPhotoIndex(photoIndex);
+  }, []);
 
   return (
-    <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
-      <TooltipProvider>
+    <>
+      <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
+        <TooltipProvider>
         <Table>
           <TableHeader>
             <TableRow className="border-primary/20 hover:bg-muted/30">
@@ -231,7 +222,7 @@ export function MiniatureTableView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {localMiniatures.map((miniature) => {
+          {currentMiniatures.map((miniature) => {
             const baseTooltip = getBaseTooltip(miniature);
             const RowContent = (
               <TableRow
@@ -388,91 +379,81 @@ export function MiniatureTableView({
         </TableBody>
       </Table>
       </TooltipProvider>
-
-      {/* Photo Gallery Dialog */}
-      {selectedMiniature && (
-        <Dialog open={!!selectedMiniature} onOpenChange={closeGallery}>
-          <DialogContent className="max-w-4xl p-0">
-            <DialogTitle className="sr-only">
-              {selectedMiniature.miniature_photos[selectedPhotoIndex]
-                ? `${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`
-                : selectedMiniature.name}
-            </DialogTitle>
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 z-10"
-                onClick={closeGallery}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-
-              {/* Miniature Name */}
-              <div className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur px-3 py-1 rounded-sm">
-                <p className="text-sm font-semibold">{selectedMiniature.name}</p>
-              </div>
-
-              {selectedMiniature.miniature_photos.length > 0 ? (
-                <>
-                  <div className="relative w-full h-[70vh]">
-                    <Image
-                      src={
-                        supabase.storage
-                          .from("miniature-photos")
-                          .getPublicUrl(
-                            selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
-                          ).data.publicUrl
-                      }
-                      alt={`${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 896px"
-                      className="object-contain"
-                      priority
-                      unoptimized
-                    />
-                  </div>
-
-                  {/* Navigation - Always show if we can navigate */}
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur hover:bg-background/90"
-                      onClick={goToPrevious}
-                      disabled={selectedMiniatureIndex === 0 && selectedPhotoIndex === 0}
-                      title="Previous photo or miniature"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur hover:bg-background/90"
-                      onClick={goToNext}
-                      disabled={
-                        selectedMiniatureIndex === localMiniatures.length - 1 &&
-                        selectedPhotoIndex === selectedMiniature.miniature_photos.length - 1
-                      }
-                      title="Next photo or miniature"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </Button>
-                  </>
-
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur px-3 py-1 rounded-full text-sm">
-                    {selectedPhotoIndex + 1} / {selectedMiniature.miniature_photos.length}
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
-                  No photos available
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+      
+      {/* Pagination Controls - Bottom */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-primary/20">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
+            </span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="text-sm border border-primary/20 rounded px-2 py-1 bg-background"
+            >
+              <option value={25}>25 per page</option>
+              <option value={50}>50 per page</option>
+              <option value={100}>100 per page</option>
+              <option value={200}>200 per page</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
       )}
-    </div>
+      </div>
+
+      {/* Photo Gallery Dialog - Lazy loaded and rendered outside the table */}
+      {dialogOpen && selectedMiniatureIndex !== null && (
+        <Suspense fallback={null}>
+          <MiniaturePhotoDialog
+            miniatures={localMiniatures}
+            selectedMiniatureIndex={selectedMiniatureIndex}
+            selectedPhotoIndex={selectedPhotoIndex}
+            onClose={closeGallery}
+            onNavigate={handleNavigate}
+          />
+        </Suspense>
+      )}
+    </>
   );
 }
