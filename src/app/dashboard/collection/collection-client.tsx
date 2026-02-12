@@ -7,8 +7,9 @@ import { TagManager } from "@/components/miniatures/tag-manager";
 import { BatchOperationsBar } from "@/components/miniatures/batch-operations-bar";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Tag, Grid3x3, List } from "lucide-react";
-import { useState } from "react";
+import { Plus, Package, Tag, Grid3x3, List, Save, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 interface MiniatureWithRelations {
   id: string;
@@ -78,10 +79,38 @@ export function CollectionClient({
   baseTypes,
   initialFilters,
 }: CollectionClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showTagManager, setShowTagManager] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
+  const [savedFilter, setSavedFilter] = useState<string | null>(null);
+  const [hasSavedFilter, setHasSavedFilter] = useState(false);
+
+  // Load saved filter from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('savedFilter');
+    if (saved) {
+      setSavedFilter(saved);
+      setHasSavedFilter(true);
+    }
+  }, []);
+
+  const handleSaveFilter = () => {
+    const currentParams = searchParams.toString();
+    setSavedFilter(currentParams);
+    setHasSavedFilter(true);
+    // Optionally save to localStorage for persistence
+    localStorage.setItem('savedFilter', currentParams);
+  };
+
+  const handleLoadFilter = () => {
+    const filterToLoad = savedFilter || localStorage.getItem('savedFilter');
+    if (filterToLoad) {
+      router.push(`/dashboard/collection?${filterToLoad}`);
+    }
+  };
 
   const handleSelectChange = (id: string, selected: boolean) => {
     setSelectedIds((prev) => {
@@ -163,10 +192,20 @@ export function CollectionClient({
             <Tag className="mr-2 h-4 w-4" />
             Manage Tags
           </Button>
-          <Button asChild className="btn-warhammer-primary" size="icon">
-            <Link href="/dashboard/collection/add">
-              <Plus className="h-4 w-4" />
-            </Link>
+          <Button 
+            variant="outline" 
+            onClick={handleSaveFilter}
+            title="Save current filter"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleLoadFilter}
+            disabled={!hasSavedFilter}
+            title="Load saved filter"
+          >
+            <Zap className="h-4 w-4" />
           </Button>
         </div>
       </div>

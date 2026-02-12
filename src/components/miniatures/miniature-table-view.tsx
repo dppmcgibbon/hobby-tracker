@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info, Plus } from "lucide-react";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import type { MiniatureStatus } from "@/types";
 import { createClient } from "@/lib/supabase/client";
@@ -308,6 +308,17 @@ export function MiniatureTableView({
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
+              <Button
+                asChild
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                title="Add Miniature"
+              >
+                <Link href="/dashboard/collection/add">
+                  <Plus className="h-4 w-4" />
+                </Link>
+              </Button>
             </TableHead>
           </TableRow>
         </TableHeader>

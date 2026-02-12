@@ -106,6 +106,25 @@ export function CollectionFilters({
   // Debounce search input
   const [debouncedSearch] = useDebounce(filters.search, 300);
 
+  // Sync filters with URL when searchParams change externally
+  useEffect(() => {
+    setFilters({
+      search: searchParams.get("search") || "",
+      factionId: searchParams.get("faction") || "all",
+      status: searchParams.get("status") || "all",
+      tagId: searchParams.get("tag") || "all",
+      storageBoxId: searchParams.get("storage") || "all",
+      gameId: searchParams.get("game") || "all",
+      editionId: searchParams.get("edition") || "all",
+      expansionId: searchParams.get("expansion") || "all",
+      unitType: searchParams.get("unit") || "all",
+      baseSize: searchParams.get("base_size") || "all",
+      hasPhotos: searchParams.get("photos") || "all",
+      magnetised: searchParams.get("magnetised") || "all",
+      based: searchParams.get("based") || "all",
+    });
+  }, [searchParams]);
+
   // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
