@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info } from "lucide-react";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import type { MiniatureStatus } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 
 // Lazy load the photo dialog to reduce initial bundle size
 const MiniaturePhotoDialog = lazy(() => 
@@ -69,6 +70,7 @@ export function MiniatureTableView({
   onMiniaturesUpdate,
 }: MiniatureTableViewProps) {
   const router = useRouter();
+  const supabase = createClient();
   const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
   const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -76,6 +78,9 @@ export function MiniatureTableView({
   
   // Separate state to prevent table re-renders
   const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // State for expanded info rows
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -272,9 +277,6 @@ export function MiniatureTableView({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Info">
-              <Info className="h-4 w-4 mx-auto" />
-            </TableHead>
             <TableHead 
               className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20" 
               title="Quantity"
@@ -301,7 +303,7 @@ export function MiniatureTableView({
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Based">
               <Sprout className="h-4 w-4 mx-auto" />
             </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Photos & Info">
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
             </TableHead>
@@ -311,8 +313,8 @@ export function MiniatureTableView({
         </TableHeader>
         <TableBody>
           {currentMiniatures.map((miniature) => (
+            <Fragment key={miniature.id}>
             <TableRow
-              key={miniature.id}
               className="border-primary/10 hover:bg-muted/20 transition-colors"
             >
               {selectable && (
@@ -378,73 +380,6 @@ export function MiniatureTableView({
                   {miniature.name}
                 </Link>
               </TableCell>
-              <TableCell className="text-center">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="View details"
-                    >
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-96" align="start" side="right">
-                    <div className="space-y-3">
-                      <h3 className="font-bold text-lg">{miniature.name}</h3>
-                      
-                      {/* Base Details - Single Line */}
-                      {(miniature.bases || miniature.base_shapes || miniature.base_types) && (
-                        <div className="text-sm">
-                          <span className="font-medium">Base:</span>{" "}
-                          {[
-                            miniature.bases?.name,
-                            miniature.base_shapes?.name,
-                            miniature.base_types?.name,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                        </div>
-                      )}
-
-                      {/* Storage Box - Single Line */}
-                      {miniature.storage_box && (
-                        <div className="text-sm">
-                          <span className="font-medium">Box:</span>{" "}
-                          <Link
-                            href={`/dashboard/storage/${miniature.storage_box.id}`}
-                            className="hover:text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {miniature.storage_box.name}
-                          </Link>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      {(miniature as any).notes && (
-                        <div className="text-sm">
-                          <span className="font-medium">Notes:</span>{" "}
-                          <span className="text-muted-foreground whitespace-pre-wrap">
-                            {(miniature as any).notes}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Show message if no info */}
-                      {!miniature.bases && 
-                       !miniature.base_shapes && 
-                       !miniature.base_types && 
-                       !miniature.storage_box && 
-                       !(miniature as any).notes && (
-                        <p className="text-center text-muted-foreground py-4 text-sm">
-                          No additional information available
-                        </p>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </TableCell>
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
               </TableCell>
@@ -480,15 +415,21 @@ export function MiniatureTableView({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => openGallery(miniature)}
-                  disabled={miniature.miniature_photos.length === 0}
-                  title={
-                    miniature.miniature_photos.length === 0
-                      ? "No photos"
-                      : `View ${miniature.miniature_photos.length} photo(s)`
+                  title="View details and photos"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedRowId(expandedRowId === miniature.id ? null : miniature.id);
+                  }}
+                  disabled={
+                    !miniature.miniature_photos?.length &&
+                    !miniature.bases &&
+                    !miniature.base_shapes &&
+                    !miniature.base_types &&
+                    !miniature.storage_box &&
+                    !(miniature as any).notes
                   }
                 >
-                  <ImageIcon className="h-4 w-4" />
+                  <Info className={`h-3 w-3 ${miniature.miniature_photos?.length ? 'text-primary' : ''}`} />
                 </Button>
               </TableCell>
               <TableCell className="text-center">
@@ -511,6 +452,97 @@ export function MiniatureTableView({
                 </Button>
               </TableCell>
             </TableRow>
+            {/* Accordion row for additional info */}
+            {expandedRowId === miniature.id && (
+              <TableRow className="border-primary/10 bg-stone-900 hover:bg-stone-900">
+                <TableCell colSpan={selectable ? 12 : 11} className="py-2">
+                  <div className="flex gap-3 px-1 items-stretch">
+                    {/* Left side - Details */}
+                    <div className="flex-1 border border-primary/20 rounded p-3 pl-6 my-1 flex flex-col justify-center">
+                      {/* Base Details */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Base:</div>
+                        <div className="text-sm">
+                          {miniature.bases || miniature.base_shapes || miniature.base_types
+                            ? [
+                                miniature.bases?.name,
+                                miniature.base_shapes?.name,
+                                miniature.base_types?.name,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")
+                            : "-"}
+                        </div>
+                      </div>
+
+                      {/* Storage Box */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Storage Box:</div>
+                        <div className="text-sm">
+                          {miniature.storage_box ? (
+                            <Link
+                              href={`/dashboard/storage/${miniature.storage_box.id}`}
+                              className="hover:text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {miniature.storage_box.name}
+                            </Link>
+                          ) : (
+                            "-"
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Photos Count */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Photos:</div>
+                        <div className="text-sm">
+                          {miniature.miniature_photos?.length || 0}
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Notes:</div>
+                        <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {(miniature as any).notes || "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right side - Photo Gallery */}
+                    {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
+                      <div className="flex-1 border border-primary/20 rounded px-3 my-1 flex items-center justify-center">
+                        <div className="grid grid-cols-4 gap-5 w-full">
+                          {miniature.miniature_photos.slice(0, 4).map((photo) => {
+                            const { data } = supabase.storage
+                              .from("miniature-photos")
+                              .getPublicUrl(photo.storage_path);
+                            
+                            return (
+                              <div
+                                key={photo.id}
+                                className="relative aspect-square rounded overflow-hidden border-2 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors min-h-[120px]"
+                                onClick={() => openGallery(miniature)}
+                              >
+                                <Image
+                                  src={data.publicUrl}
+                                  alt={miniature.name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="150px"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+            </Fragment>
           ))}
         </TableBody>
       </Table>
