@@ -20,10 +20,10 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     throw new Error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
   }
 
-  // Validate file size (max 5MB)
-  const maxSize = 5 * 1024 * 1024;
+  // Validate file size (max 12MB)
+  const maxSize = 12 * 1024 * 1024;
   if (file.size > maxSize) {
-    throw new Error("File too large. Maximum size is 5MB.");
+    throw new Error("File too large. Maximum size is 12MB.");
   }
 
   // Generate unique filename

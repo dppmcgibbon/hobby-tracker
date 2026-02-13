@@ -47,15 +47,33 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
     }
   }, []);
 
+  const onDropRejected = useCallback((fileRejections: any[]) => {
+    if (fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      const errors = rejection.errors;
+      
+      if (errors.some((e: any) => e.code === 'file-too-large')) {
+        setError('File is too large. Maximum size is 12MB.');
+      } else if (errors.some((e: any) => e.code === 'file-invalid-type')) {
+        setError('Invalid file type. Please upload a JPEG, PNG, or WebP image.');
+      } else if (errors.some((e: any) => e.code === 'too-many-files')) {
+        setError('Too many files. Please upload only one image at a time.');
+      } else {
+        setError('File upload failed. Please try again.');
+      }
+    }
+  }, []);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       "image/jpeg": [".jpg", ".jpeg"],
       "image/png": [".png"],
       "image/webp": [".webp"],
     },
     maxFiles: 1,
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 12 * 1024 * 1024, // 12MB
   });
 
   const handleUpload = async () => {
@@ -117,7 +135,7 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
           <p className="mt-2 text-sm text-muted-foreground">
             {isDragActive ? "Drop the image here" : "Drag & drop an image here, or click to select"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 5MB)</p>
+          <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 12MB)</p>
         </div>
       ) : (
         <div className="space-y-4">
