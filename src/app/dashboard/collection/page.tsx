@@ -93,12 +93,17 @@ export default async function CollectionPage({
       base_shape_id,
       base_type_id,
       notes,
+      material,
       factions (id, name),
       miniature_status (status, completed_at, magnetised, based),
       miniature_photos (id, storage_path),
       bases (id, name),
       base_shapes (id, name),
       base_types (id, name),
+      miniature_tags (
+        tag_id,
+        tags (id, name, color)
+      ),
       miniature_games (
         game_id,
         edition_id,

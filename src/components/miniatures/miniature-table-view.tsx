@@ -32,6 +32,7 @@ interface MiniatureWithRelations {
   base_id?: string | null;
   base_shape_id?: string | null;
   base_type_id?: string | null;
+  material?: string | null;
   factions: { id: string; name: string } | null;
   miniature_status: {
     status: string;
@@ -44,6 +45,10 @@ interface MiniatureWithRelations {
   bases?: { id: string; name: string } | null;
   base_shapes?: { id: string; name: string } | null;
   base_types?: { id: string; name: string } | null;
+  miniature_tags?: Array<{
+    tag_id: string;
+    tags: { id: string; name: string; color: string | null } | null;
+  }>;
   miniature_games?: Array<{
     game_id: string;
     edition_id?: string | null;
@@ -326,7 +331,8 @@ export function MiniatureTableView({
           {currentMiniatures.map((miniature) => (
             <Fragment key={miniature.id}>
             <TableRow
-              className="border-primary/10 hover:bg-muted/20 transition-colors"
+              className="border-primary/10 hover:bg-muted/20 transition-colors cursor-pointer"
+              onClick={() => setExpandedRowId(expandedRowId === miniature.id ? null : miniature.id)}
             >
               {selectable && (
                 <TableCell onClick={(e) => e.stopPropagation()}>
@@ -440,7 +446,7 @@ export function MiniatureTableView({
                     !(miniature as any).notes
                   }
                 >
-                  <Info className={`h-3 w-3 ${miniature.miniature_photos?.length ? 'text-primary' : ''}`} />
+                  <ImageIcon className={`h-4 w-4 ${miniature.miniature_photos?.length ? 'text-primary' : ''}`} />
                 </Button>
               </TableCell>
               <TableCell className="text-center">
@@ -467,9 +473,9 @@ export function MiniatureTableView({
             {expandedRowId === miniature.id && (
               <TableRow className="border-primary/10 bg-stone-900 hover:bg-stone-900">
                 <TableCell colSpan={selectable ? 12 : 11} className="py-2">
-                  <div className="flex gap-3 px-1 items-stretch">
+                  <div className="flex gap-4 px-4 py-3 items-stretch">
                     {/* Left side - Details */}
-                    <div className="flex-1 border border-primary/20 rounded p-3 pl-6 my-1 flex flex-col justify-center">
+                    <div className="flex-1 border border-primary/20 rounded p-3 pl-6 flex flex-col justify-center">
                       {/* Base Details */}
                       <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
                         <div className="text-sm font-bold text-primary">Base:</div>
@@ -483,6 +489,14 @@ export function MiniatureTableView({
                                 .filter(Boolean)
                                 .join(" ")
                             : "-"}
+                        </div>
+                      </div>
+
+                      {/* Material */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Material:</div>
+                        <div className="text-sm">
+                          {miniature.material || "-"}
                         </div>
                       </div>
 
@@ -512,6 +526,30 @@ export function MiniatureTableView({
                         </div>
                       </div>
 
+                      {/* Tags */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Tags:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {miniature.miniature_tags && miniature.miniature_tags.length > 0 ? (
+                            miniature.miniature_tags.map((mt) => 
+                              mt.tags ? (
+                                <Badge
+                                  key={mt.tag_id}
+                                  style={{
+                                    backgroundColor: mt.tags.color || undefined,
+                                  }}
+                                  className="text-xs"
+                                >
+                                  {mt.tags.name}
+                                </Badge>
+                              ) : null
+                            )
+                          ) : (
+                            <span className="text-sm">-</span>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Notes */}
                       <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
                         <div className="text-sm font-bold text-primary">Notes:</div>
@@ -523,9 +561,9 @@ export function MiniatureTableView({
 
                     {/* Right side - Photo Gallery */}
                     {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
-                      <div className="flex-1 border border-primary/20 rounded px-3 my-1 flex items-center justify-center">
-                        <div className="grid grid-cols-4 gap-5 w-full">
-                          {miniature.miniature_photos.slice(0, 4).map((photo) => {
+                      <div className="flex-1 border border-primary/20 rounded pl-3 pr-5 flex items-center justify-center">
+                        <div className="grid grid-cols-3 gap-5 w-full">
+                          {miniature.miniature_photos.slice(0, 3).map((photo) => {
                             const { data } = supabase.storage
                               .from("miniature-photos")
                               .getPublicUrl(photo.storage_path);
@@ -533,7 +571,7 @@ export function MiniatureTableView({
                             return (
                               <div
                                 key={photo.id}
-                                className="relative aspect-square rounded overflow-hidden border-2 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors min-h-[120px]"
+                                className="relative aspect-square rounded overflow-hidden border-2 border-primary/70 cursor-pointer hover:border-primary transition-colors min-h-[160px]"
                                 onClick={() => openGallery(miniature)}
                               >
                                 <Image
@@ -541,7 +579,7 @@ export function MiniatureTableView({
                                   alt={miniature.name}
                                   fill
                                   className="object-cover"
-                                  sizes="150px"
+                                  sizes="200px"
                                 />
                               </div>
                             );
