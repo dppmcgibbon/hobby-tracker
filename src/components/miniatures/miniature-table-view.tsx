@@ -33,6 +33,7 @@ interface MiniatureWithRelations {
   base_shape_id?: string | null;
   base_type_id?: string | null;
   material?: string | null;
+  year?: number | null;
   factions: { id: string; name: string } | null;
   miniature_status: {
     status: string;
@@ -536,6 +537,14 @@ export function MiniatureTableView({
                         <div className="text-sm font-bold text-primary">Material:</div>
                         <div className="text-sm">
                           {miniature.material || "-"}
+                        </div>
+                      </div>
+
+                      {/* Year */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Year:</div>
+                        <div className="text-sm">
+                          {miniature.year || "-"}
                         </div>
                       </div>
 

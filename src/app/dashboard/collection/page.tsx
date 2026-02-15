@@ -94,6 +94,7 @@ export default async function CollectionPage({
       base_type_id,
       notes,
       material,
+      year,
       factions (id, name),
       miniature_status (status, completed_at, magnetised, based),
       miniature_photos (id, storage_path),
