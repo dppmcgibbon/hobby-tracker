@@ -476,6 +476,45 @@ export function MiniatureTableView({
                   <div className="flex gap-4 px-4 py-3 items-stretch">
                     {/* Left side - Details */}
                     <div className="flex-1 border border-primary/20 rounded p-3 pl-6 flex flex-col justify-center">
+                      {/* Game */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Game:</div>
+                        <div className="text-sm">
+                          {miniature.miniature_games && miniature.miniature_games.length > 0
+                            ? miniature.miniature_games
+                                .map((mg) => mg.game?.name)
+                                .filter(Boolean)
+                                .join(", ")
+                            : "-"}
+                        </div>
+                      </div>
+
+                      {/* Edition */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Edition:</div>
+                        <div className="text-sm">
+                          {miniature.miniature_games && miniature.miniature_games.length > 0
+                            ? miniature.miniature_games
+                                .map((mg) => mg.edition?.name)
+                                .filter(Boolean)
+                                .join(", ")
+                            : "-"}
+                        </div>
+                      </div>
+
+                      {/* Expansion */}
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                        <div className="text-sm font-bold text-primary">Expansion:</div>
+                        <div className="text-sm">
+                          {miniature.miniature_games && miniature.miniature_games.length > 0
+                            ? miniature.miniature_games
+                                .map((mg) => mg.expansion?.name)
+                                .filter(Boolean)
+                                .join(", ")
+                            : "-"}
+                        </div>
+                      </div>
+
                       {/* Base Details */}
                       <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
                         <div className="text-sm font-bold text-primary">Base:</div>
@@ -562,7 +601,7 @@ export function MiniatureTableView({
                     {/* Right side - Photo Gallery */}
                     {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
                       <div className="flex-1 border border-primary/20 rounded pl-3 pr-5 flex items-center justify-center">
-                        <div className="grid grid-cols-3 gap-5 w-full">
+                        <div className="flex gap-5 justify-center items-center flex-wrap">
                           {miniature.miniature_photos.slice(0, 3).map((photo) => {
                             const { data } = supabase.storage
                               .from("miniature-photos")
