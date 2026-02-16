@@ -272,7 +272,7 @@ export function MiniatureForm({
           <Input
             id="quantity"
             type="number"
-            min="1"
+            min="0"
             {...register("quantity")}
             disabled={isLoading}
           />

@@ -260,47 +260,34 @@ export function MiniatureTableView({
               className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
               onClick={() => handleSort("faction")}
             >
-              <div className="flex items-center gap-1">
-                Faction
-                <ArrowUpDown className="h-3 w-3" />
-              </div>
+              Faction
             </TableHead>
             <TableHead 
               className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
               onClick={() => handleSort("unit")}
             >
-              <div className="flex items-center gap-1">
-                Unit
-                <ArrowUpDown className="h-3 w-3" />
-              </div>
+              Unit
             </TableHead>
             <TableHead 
               className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20"
               onClick={() => handleSort("name")}
             >
-              <div className="flex items-center gap-1">
-                Name
-                <ArrowUpDown className="h-3 w-3" />
-              </div>
+              Name
             </TableHead>
             <TableHead 
               className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20" 
               title="Quantity"
               onClick={() => handleSort("quantity")}
             >
-              <div className="flex items-center justify-center gap-1">
-                <Hash className="h-4 w-4" />
-                <ArrowUpDown className="h-3 w-3" />
-              </div>
+              <Hash className="h-4 w-4 mx-auto" />
             </TableHead>
             <TableHead 
               className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20" 
               title="Status"
               onClick={() => handleSort("status")}
             >
-              <div className="flex justify-center items-center gap-1">
+              <div className="flex justify-center items-center">
                 <Activity className="h-4 w-4" />
-                <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Magnetised">

@@ -1,3 +1,3 @@
 update miniatures
-set unit_type = 'Genestealer Hybrids'
-where unit_type = 'Hybrid Genestealers'
+set unit_type = 'Headquarters'
+where unit_type = 'Command'

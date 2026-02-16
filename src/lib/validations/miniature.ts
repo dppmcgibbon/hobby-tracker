@@ -4,7 +4,7 @@ export const miniatureSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name too long"),
   faction_id: z.string().uuid("Invalid faction").optional().nullable(),
   unit_type: z.string().max(50).optional().nullable(),
-  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1").default(1),
+  quantity: z.coerce.number().int().min(0, "Quantity cannot be negative").default(1),
   material: z.string().max(50).optional().nullable(),
   base_size: z.string().max(50).optional().nullable(),
   base_id: z.string().uuid("Invalid base").optional().nullable(),
