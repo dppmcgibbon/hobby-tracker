@@ -304,13 +304,10 @@ export function CollectionFilters({
       .filter((status: any) => status != null)
   );
 
-  // Get available storage boxes from relevant miniatures
-  const availableStorageBoxIds = new Set(
-    relevantMiniatures
-      .map((m: any) => m.storage_box_id)
-      .filter((id: any) => id != null)
-  );
-  const filteredStorageBoxes = storageBoxes.filter(sb => availableStorageBoxIds.has(sb.id));
+  // Always show all storage boxes regardless of filters
+  // This ensures users can always select any storage box even if it's empty
+  // or contains miniatures that don't match current filters
+  const filteredStorageBoxes = storageBoxes;
 
   return (
     <div className="space-y-4">
