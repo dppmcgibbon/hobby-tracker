@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUniverses } from "@/lib/queries/miniatures";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,16 @@ import { DeleteExpansionButton } from "@/components/games/delete-expansion-butto
 import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-async function GameDetailsContent({ id }: { id: string }) {
+async function GameDetailsContent({ id, universes }: { id: string; universes: { id: string; name: string }[] }) {
   const supabase = await createClient();
 
-  // Fetch game with editions and expansions
+  // Fetch game with editions, expansions, and universe
   const { data: game } = await supabase
     .from("games")
     .select(
       `
       *,
+      universe:universes(id, name),
       editions (
         *,
         expansions (*)
@@ -55,12 +57,20 @@ async function GameDetailsContent({ id }: { id: string }) {
                 <Gamepad2 className="h-6 w-6" />
                 {game.name}
               </CardTitle>
+              {(game as any).universe && (
+                <div className="mt-2">
+                  <Badge variant="outline">
+                    {(game as any).universe.name}
+                  </Badge>
+                </div>
+              )}
               {game.publisher && (
                 <CardDescription className="mt-2 text-base">{game.publisher}</CardDescription>
               )}
             </div>
             <GameFormDialog
               game={game}
+              universes={universes}
               trigger={
                 <Button variant="outline" size="sm">
                   <Edit className="h-4 w-4 mr-2" />
@@ -256,11 +266,12 @@ function LoadingSkeleton() {
 export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth();
   const { id } = await params;
+  const universes = await getUniverses();
 
   return (
     <div className="container mx-auto py-8">
       <Suspense fallback={<LoadingSkeleton />}>
-        <GameDetailsContent id={id} />
+        <GameDetailsContent id={id} universes={universes} />
       </Suspense>
     </div>
   );

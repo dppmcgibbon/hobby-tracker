@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUniverses } from "@/lib/queries/miniatures";
 import { GameCard } from "@/components/games/game-card";
 import { GameFormDialog } from "@/components/games/game-form-dialog";
 import { GamesSearch } from "@/components/games/games-search";
@@ -8,22 +9,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Gamepad2 } from "lucide-react";
 
-async function GamesContent({ searchQuery }: { searchQuery?: string }) {
+async function GamesContent({ searchQuery, universeId, universes }: { searchQuery?: string; universeId?: string; universes: { id: string; name: string }[] }) {
   const supabase = await createClient();
 
-  // Fetch games with edition counts
+  // Fetch games with edition counts and universe
   let query = supabase
     .from("games")
     .select(
       `
       *,
-      editions(count)
+      editions(count),
+      universe:universes(id, name)
     `
     )
     .order("name");
 
   if (searchQuery) {
     query = query.ilike("name", `%${searchQuery}%`);
+  }
+
+  if (universeId && universeId !== "all") {
+    query = query.eq("universe_id", universeId);
   }
 
   const { data: games } = await query;
@@ -46,6 +52,7 @@ async function GamesContent({ searchQuery }: { searchQuery?: string }) {
         <GameCard
           key={game.id}
           game={game}
+          universes={universes}
           editionCount={
             Array.isArray(game.editions) ? game.editions.length : game.editions?.[0]?.count || 0
           }
@@ -74,10 +81,11 @@ function LoadingSkeleton() {
 export default async function GamesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{ search?: string; universe?: string }>;
 }) {
   await requireAuth();
-  const { search } = await searchParams;
+  const { search, universe } = await searchParams;
+  const universes = await getUniverses();
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -92,15 +100,15 @@ export default async function GamesPage({
             Manage your game systems, editions, and expansions
           </p>
         </div>
-        <GameFormDialog />
+        <GameFormDialog universes={universes} />
       </div>
 
       {/* Search */}
-      <GamesSearch />
+      <GamesSearch universes={universes} />
 
       {/* Games Grid */}
       <Suspense fallback={<LoadingSkeleton />}>
-        <GamesContent searchQuery={search} />
+        <GamesContent searchQuery={search} universeId={universe} universes={universes} />
       </Suspense>
     </div>
   );

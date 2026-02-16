@@ -25,10 +25,11 @@ import {
 interface GameCardProps {
   game: Game;
   editionCount?: number;
+  universes?: { id: string; name: string }[];
   onUpdate?: () => void;
 }
 
-export function GameCard({ game, editionCount = 0, onUpdate }: GameCardProps) {
+export function GameCard({ game, editionCount = 0, universes = [], onUpdate }: GameCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -59,11 +60,19 @@ export function GameCard({ game, editionCount = 0, onUpdate }: GameCardProps) {
                 </CardTitle>
               </Link>
             </div>
+            {(game as any).universe && (
+              <div className="mb-2">
+                <Badge variant="outline" className="text-xs">
+                  {(game as any).universe.name}
+                </Badge>
+              </div>
+            )}
             {game.publisher && <CardDescription className="text-base">{game.publisher}</CardDescription>}
           </div>
           <div className="flex gap-1">
             <GameFormDialog
               game={game}
+              universes={universes}
               trigger={
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <Edit className="h-4 w-4" />

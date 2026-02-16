@@ -183,3 +183,18 @@ export async function getMiniatureStatuses() {
 
   return data || [];
 }
+
+export async function getUniverses() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("universes")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}

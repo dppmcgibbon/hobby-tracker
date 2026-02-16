@@ -20,7 +20,8 @@ export default async function CollectionPage({
     { data: factions },
     { data: tags },
     { data: collections },
-    { data: games },
+    { data: universes },
+    { data: allGames },
     { data: storageBoxes },
     { data: recipesData },
     { data: unitTypesData },
@@ -31,7 +32,8 @@ export default async function CollectionPage({
     supabase.from("factions").select("id, name").order("name"),
     supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
     supabase.from("collections").select("id, name").eq("user_id", user.id).order("name"),
-    supabase.from("games").select("id, name").order("name"),
+    supabase.from("universes").select("id, name").order("name"),
+    supabase.from("games").select("id, name, universe_id").order("name"),
     supabase.from("storage_boxes").select("id, name, location").eq("user_id", user.id).order("name"),
     supabase
       .from("painting_recipes")
@@ -56,6 +58,16 @@ export default async function CollectionPage({
       .select("id, name")
       .order("name"),
   ]);
+
+  // Don't filter games on the server - pass all games with universe_id to the client
+  // The client will filter them based on the selected universe
+  const allGamesList = allGames || [];
+  const gamesWithUniverse = allGamesList.map((game: any) => ({ 
+    id: game.id, 
+    name: game.name,
+    universe_id: game.universe_id 
+  }));
+
 
   // Normalize recipes data
   const recipes = (recipesData || []).map((r) => ({
@@ -166,6 +178,33 @@ export default async function CollectionPage({
       query = query.is("storage_box_id", null);
     } else {
       query = query.eq("storage_box_id", params.storage);
+    }
+  }
+
+  // Apply universe filter (we need to filter by games that belong to this universe)
+  let universeFilteredMiniatureIds: Set<string> | null = null;
+  if (params.universe && params.universe !== "all") {
+    // First, get all games that belong to this universe
+    const { data: universeGames } = await supabase
+      .from("games")
+      .select("id")
+      .eq("universe_id", params.universe);
+
+    if (universeGames && universeGames.length > 0) {
+      const gameIds = universeGames.map((g) => g.id);
+      
+      // Then get all miniatures linked to these games
+      const { data: universeMiniatures } = await supabase
+        .from("miniature_games")
+        .select("miniature_id")
+        .in("game_id", gameIds);
+
+      if (universeMiniatures) {
+        universeFilteredMiniatureIds = new Set(universeMiniatures.map((m) => m.miniature_id));
+      }
+    } else {
+      // If no games match the universe, return empty set
+      universeFilteredMiniatureIds = new Set();
     }
   }
 
@@ -295,6 +334,11 @@ export default async function CollectionPage({
     filteredMiniatures = filteredMiniatures.filter((m) => tagFilteredMiniatureIds.has(m.id));
   }
 
+  // Apply universe filter
+  if (universeFilteredMiniatureIds) {
+    filteredMiniatures = filteredMiniatures.filter((m) => universeFilteredMiniatureIds.has(m.id));
+  }
+
   // Apply game filter
   if (gameFilteredMiniatureIds) {
     if (params.game === "none") {
@@ -360,9 +404,10 @@ export default async function CollectionPage({
       factions={factions || []}
       tags={tags || []}
       collections={collections || []}
+      universes={universes || []}
       storageBoxes={storageBoxes || []}
       recipes={recipes || []}
-      games={games || []}
+      games={gamesWithUniverse || []}
       editions={editions}
       expansions={expansions}
       unitTypes={unitTypes}
@@ -375,6 +420,7 @@ export default async function CollectionPage({
         status: params.status || "all",
         tagId: params.tag || "all",
         storageBoxId: params.storage || "all",
+        universeId: params.universe || "all",
         gameId: params.game || "all",
         editionId: params.edition || "all",
         expansionId: params.expansion || "all",

@@ -4,6 +4,7 @@ export const gameSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name too long"),
   description: z.string().max(1000).optional().nullable(),
   publisher: z.string().max(100).optional().nullable(),
+  universe_id: z.string().uuid("Invalid universe").optional().nullable(),
 });
 
 export const editionSchema = z.object({

@@ -28,11 +28,13 @@ interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
   tags: { id: string; name: string; color: string | null }[];
   storageBoxes: { id: string; name: string; location?: string | null }[];
-  games: { id: string; name: string }[];
+  universes: { id: string; name: string }[];
+  games: { id: string; name: string; universe_id?: string | null }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
   unitTypes: string[];
   bases: { id: string; name: string }[];
+  miniatures: any[]; // The miniatures to determine available options
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
 }
@@ -43,6 +45,7 @@ export interface FilterState {
   status: string;
   tagId: string;
   storageBoxId: string;
+  universeId: string;
   gameId: string;
   editionId: string;
   expansionId: string;
@@ -74,11 +77,13 @@ export function CollectionFilters({
   factions,
   tags,
   storageBoxes,
+  universes,
   games,
   editions,
   expansions,
   unitTypes,
   bases,
+  miniatures,
   onFiltersChange,
   initialFilters,
 }: CollectionFiltersProps) {
@@ -93,6 +98,7 @@ export function CollectionFilters({
     status: searchParams.get("status") || initialFilters?.status || "all",
     tagId: searchParams.get("tag") || initialFilters?.tagId || "all",
     storageBoxId: searchParams.get("storage") || initialFilters?.storageBoxId || "all",
+    universeId: searchParams.get("universe") || initialFilters?.universeId || "all",
     gameId: searchParams.get("game") || initialFilters?.gameId || "all",
     editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
     expansionId: searchParams.get("expansion") || initialFilters?.expansionId || "all",
@@ -114,6 +120,7 @@ export function CollectionFilters({
       status: searchParams.get("status") || "all",
       tagId: searchParams.get("tag") || "all",
       storageBoxId: searchParams.get("storage") || "all",
+      universeId: searchParams.get("universe") || "all",
       gameId: searchParams.get("game") || "all",
       editionId: searchParams.get("edition") || "all",
       expansionId: searchParams.get("expansion") || "all",
@@ -134,6 +141,7 @@ export function CollectionFilters({
     if (filters.status !== "all") params.set("status", filters.status);
     if (filters.tagId !== "all") params.set("tag", filters.tagId);
     if (filters.storageBoxId !== "all") params.set("storage", filters.storageBoxId);
+    if (filters.universeId !== "all") params.set("universe", filters.universeId);
     if (filters.gameId !== "all") params.set("game", filters.gameId);
     if (filters.editionId !== "all") params.set("edition", filters.editionId);
     if (filters.expansionId !== "all") params.set("expansion", filters.expansionId);
@@ -145,11 +153,13 @@ export function CollectionFilters({
 
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
+    const currentUrl = `${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
 
     // Only update if URL actually changed
-    const currentUrl = queryString ? `${pathname}?${searchParams.toString()}` : pathname;
     if (newUrl !== currentUrl) {
-      router.replace(newUrl, { scroll: false });
+      router.push(newUrl, { scroll: false });
+      // Force a refresh to ensure server component re-renders with new data
+      router.refresh();
     }
 
     // Notify parent component
@@ -164,6 +174,7 @@ export function CollectionFilters({
     filters.status,
     filters.tagId,
     filters.storageBoxId,
+    filters.universeId,
     filters.gameId,
     filters.editionId,
     filters.expansionId,
@@ -185,6 +196,7 @@ export function CollectionFilters({
       status: "all",
       tagId: "all",
       storageBoxId: "all",
+      universeId: "all",
       gameId: "all",
       editionId: "all",
       expansionId: "all",
@@ -205,6 +217,7 @@ export function CollectionFilters({
     filters.status !== "all" ||
     filters.tagId !== "all" ||
     filters.storageBoxId !== "all" ||
+    filters.universeId !== "all" ||
     filters.gameId !== "all" ||
     filters.editionId !== "all" ||
     filters.expansionId !== "all" ||
@@ -220,6 +233,7 @@ export function CollectionFilters({
     filters.status !== "all",
     filters.tagId !== "all",
     filters.storageBoxId !== "all",
+    filters.universeId !== "all",
     filters.gameId !== "all",
     filters.editionId !== "all",
     filters.expansionId !== "all",
@@ -237,20 +251,110 @@ export function CollectionFilters({
     filters,
   });
 
+  // Filter games based on selected universe (client-side)
+  const filteredGames = filters.universeId === "all" 
+    ? games 
+    : games.filter(game => game.universe_id === filters.universeId);
+
+  // Filter miniatures based on universe and game to determine available factions/units
+  let relevantMiniatures = miniatures;
+  
+  // First filter by universe (via games)
+  if (filters.universeId !== "all") {
+    const universeGameIds = new Set(filteredGames.map(g => g.id));
+    relevantMiniatures = relevantMiniatures.filter((m: any) => {
+      // Check if miniature has any game links to games in this universe
+      return m.miniature_games?.some((mg: any) => universeGameIds.has(mg.game_id));
+    });
+  }
+  
+  // Then filter by specific game
+  if (filters.gameId !== "all" && filters.gameId !== "none") {
+    relevantMiniatures = relevantMiniatures.filter((m: any) => {
+      return m.miniature_games?.some((mg: any) => mg.game_id === filters.gameId);
+    });
+  } else if (filters.gameId === "none") {
+    // Show miniatures with no game links
+    relevantMiniatures = relevantMiniatures.filter((m: any) => {
+      return !m.miniature_games || m.miniature_games.length === 0;
+    });
+  }
+
+  // Get available factions from relevant miniatures
+  const availableFactionIds = new Set(
+    relevantMiniatures
+      .map((m: any) => m.faction_id || m.factions?.id)
+      .filter((id: any) => id != null)
+  );
+  const filteredFactions = factions.filter(f => availableFactionIds.has(f.id));
+
+  // Get available unit types from relevant miniatures
+  const availableUnitTypes = Array.from(
+    new Set(
+      relevantMiniatures
+        .map((m: any) => m.unit_type)
+        .filter((ut: any) => ut != null && ut !== "")
+    )
+  ).sort();
+
+  // Get available statuses from relevant miniatures
+  const availableStatuses = new Set(
+    relevantMiniatures
+      .map((m: any) => m.miniature_status?.status)
+      .filter((status: any) => status != null)
+  );
+
+  // Get available storage boxes from relevant miniatures
+  const availableStorageBoxIds = new Set(
+    relevantMiniatures
+      .map((m: any) => m.storage_box_id)
+      .filter((id: any) => id != null)
+  );
+  const filteredStorageBoxes = storageBoxes.filter(sb => availableStorageBoxIds.has(sb.id));
+
   return (
     <div className="space-y-4">
       {/* Filters - Visible on all screen sizes */}
       <div className="space-y-3">
         {/* Top Row - Game Filters */}
         <div className="flex gap-4 flex-wrap items-end">
+          {/* Universe Filter */}
+          {universes.length > 0 && (
+            <div className="w-[220px]">
+              <Select
+                value={filters.universeId}
+                onValueChange={(v) => {
+                  updateFilter("universeId", v);
+                  if (v === "all") {
+                    updateFilter("gameId", "all");
+                    updateFilter("editionId", "all");
+                    updateFilter("expansionId", "all");
+                  }
+                }}
+              >
+                <SelectTrigger id="universe" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Universes</SelectItem>
+                  {universes.map((universe) => (
+                    <SelectItem key={universe.id} value={universe.id}>
+                      {universe.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Game Filter */}
-          {games.length > 0 && (
+          {filteredGames.length > 0 && (
             <div className="w-[456px]">
               <Select
                 value={filters.gameId}
                 onValueChange={(v) => {
                   updateFilter("gameId", v);
-                  if (v === "all" || v === "none") {
+                  if (v === "all") {
                     updateFilter("editionId", "all");
                     updateFilter("expansionId", "all");
                   }
@@ -261,8 +365,7 @@ export function CollectionFilters({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Games</SelectItem>
-                  <SelectItem value="none">No Linked Games</SelectItem>
-                  {games.map((game) => (
+                  {filteredGames.map((game) => (
                     <SelectItem key={game.id} value={game.id}>
                       {game.name}
                     </SelectItem>
@@ -334,7 +437,7 @@ export function CollectionFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Factions</SelectItem>
-                {factions.map((faction) => (
+                {filteredFactions.map((faction) => (
                   <SelectItem key={faction.id} value={faction.id}>
                     {faction.name}
                   </SelectItem>
@@ -344,7 +447,7 @@ export function CollectionFilters({
           </div>
 
           {/* Unit Type Filter */}
-          {unitTypes.length > 0 && (
+          {availableUnitTypes.length > 0 && (
             <div className="w-[220px]">
               <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
                 <SelectTrigger id="unitType" className="w-full">
@@ -352,7 +455,7 @@ export function CollectionFilters({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Units</SelectItem>
-                  {unitTypes.map((unitType) => (
+                  {availableUnitTypes.map((unitType) => (
                     <SelectItem key={unitType} value={unitType}>
                       {unitType}
                     </SelectItem>
@@ -389,7 +492,9 @@ export function CollectionFilters({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
+                {STATUS_OPTIONS.filter(option => 
+                  option.value === "all" || availableStatuses.has(option.value)
+                ).map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -410,7 +515,7 @@ export function CollectionFilters({
               <SelectContent>
                 <SelectItem value="all">All Storage</SelectItem>
                 <SelectItem value="none">No Storage Box</SelectItem>
-                {storageBoxes.map((box) => (
+                {filteredStorageBoxes.map((box) => (
                   <SelectItem key={box.id} value={box.id}>
                     {box.name}
                     {box.location && ` (${box.location})`}
@@ -459,6 +564,25 @@ export function CollectionFilters({
               />
             </div>
           </div>
+
+          {/* No Linked Games Filter */}
+          <Button
+            variant={filters.gameId === "none" ? "default" : "outline"}
+            onClick={() => {
+              if (filters.gameId === "none") {
+                updateFilter("gameId", "all");
+                updateFilter("editionId", "all");
+                updateFilter("expansionId", "all");
+              } else {
+                updateFilter("gameId", "none");
+                updateFilter("editionId", "all");
+                updateFilter("expansionId", "all");
+              }
+            }}
+            className="whitespace-nowrap"
+          >
+            No Linked Games
+          </Button>
 
           {/* Photo Filter */}
           <Button
@@ -531,6 +655,34 @@ export function CollectionFilters({
                 <SheetDescription>Customize your collection view</SheetDescription>
               </SheetHeader>
               <div className="space-y-4 mt-6">
+                {/* Universe */}
+                <div>
+                  <Label htmlFor="mobile-universe">Universe</Label>
+                  <Select
+                    value={filters.universeId}
+                    onValueChange={(v) => {
+                      updateFilter("universeId", v);
+                      if (v === "all") {
+                        updateFilter("gameId", "all");
+                        updateFilter("editionId", "all");
+                        updateFilter("expansionId", "all");
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="mobile-universe">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Universes</SelectItem>
+                      {universes.map((universe) => (
+                        <SelectItem key={universe.id} value={universe.id}>
+                          {universe.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Game */}
                 <div>
                   <Label htmlFor="mobile-game">Game</Label>
@@ -538,7 +690,7 @@ export function CollectionFilters({
                     value={filters.gameId}
                     onValueChange={(v) => {
                       updateFilter("gameId", v);
-                      if (v === "all" || v === "none") {
+                      if (v === "all") {
                         updateFilter("editionId", "all");
                         updateFilter("expansionId", "all");
                       }
@@ -549,8 +701,7 @@ export function CollectionFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Games</SelectItem>
-                      <SelectItem value="none">No Linked Games</SelectItem>
-                      {games.map((game) => (
+                      {filteredGames.map((game) => (
                         <SelectItem key={game.id} value={game.id}>
                           {game.name}
                         </SelectItem>
@@ -624,7 +775,7 @@ export function CollectionFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Factions</SelectItem>
-                      {factions.map((faction) => (
+                      {filteredFactions.map((faction) => (
                         <SelectItem key={faction.id} value={faction.id}>
                           {faction.name}
                         </SelectItem>
@@ -634,7 +785,7 @@ export function CollectionFilters({
                 </div>
 
                 {/* Unit Type */}
-                {unitTypes.length > 0 && (
+                {availableUnitTypes.length > 0 && (
                   <div>
                     <Label htmlFor="mobile-unit">Unit</Label>
                     <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
@@ -643,7 +794,7 @@ export function CollectionFilters({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Units</SelectItem>
-                        {unitTypes.map((unitType) => (
+                        {availableUnitTypes.map((unitType) => (
                           <SelectItem key={unitType} value={unitType}>
                             {unitType}
                           </SelectItem>
@@ -697,7 +848,9 @@ export function CollectionFilters({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
+                      {STATUS_OPTIONS.filter(option => 
+                        option.value === "all" || availableStatuses.has(option.value)
+                      ).map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -745,7 +898,7 @@ export function CollectionFilters({
                     <SelectContent>
                       <SelectItem value="all">All Storage</SelectItem>
                       <SelectItem value="none">No Storage Box</SelectItem>
-                      {storageBoxes.map((box) => (
+                      {filteredStorageBoxes.map((box) => (
                         <SelectItem key={box.id} value={box.id}>
                           {box.name}
                           {box.location && ` (${box.location})`}
@@ -865,6 +1018,22 @@ export function CollectionFilters({
                   filters.storageBoxId}
               <button
                 onClick={() => updateFilter("storageBoxId", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.universeId !== "all" && (
+            <Badge variant="secondary">
+              Universe: {universes.find((u) => u.id === filters.universeId)?.name || filters.universeId}
+              <button
+                onClick={() => {
+                  updateFilter("universeId", "all");
+                  updateFilter("gameId", "all");
+                  updateFilter("editionId", "all");
+                  updateFilter("expansionId", "all");
+                }}
                 className="ml-1 hover:text-destructive"
               >
                 <X className="h-3 w-3" />

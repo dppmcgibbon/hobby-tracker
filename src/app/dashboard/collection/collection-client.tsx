@@ -51,6 +51,7 @@ interface CollectionClientProps {
   factions: { id: string; name: string }[];
   tags: Tag[];
   collections: Collection[];
+  universes: { id: string; name: string }[];
   storageBoxes: StorageBox[];
   recipes: Recipe[];
   games: { id: string; name: string }[];
@@ -68,6 +69,7 @@ export function CollectionClient({
   factions,
   tags,
   collections,
+  universes,
   storageBoxes,
   recipes,
   games,
@@ -220,11 +222,13 @@ export function CollectionClient({
         factions={factions}
         tags={tags}
         storageBoxes={storageBoxes}
+        universes={universes}
         games={games}
         editions={editions}
         expansions={expansions}
         unitTypes={unitTypes}
         bases={bases}
+        miniatures={miniatures}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />

@@ -21,6 +21,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { gameSchema, type GameInput } from "@/lib/validations/game";
@@ -30,11 +37,12 @@ import type { Game } from "@/types";
 
 interface GameFormDialogProps {
   game?: Game;
+  universes: { id: string; name: string }[];
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
 
-export function GameFormDialog({ game, trigger, onSuccess }: GameFormDialogProps) {
+export function GameFormDialog({ game, universes, trigger, onSuccess }: GameFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,6 +52,7 @@ export function GameFormDialog({ game, trigger, onSuccess }: GameFormDialogProps
       name: game?.name || "",
       description: game?.description || "",
       publisher: game?.publisher || "",
+      universe_id: (game as any)?.universe_id || undefined,
     },
   });
 
@@ -96,6 +105,35 @@ export function GameFormDialog({ game, trigger, onSuccess }: GameFormDialogProps
                   <FormControl>
                     <Input placeholder="e.g., Warhammer 40,000" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="universe_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Universe</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || "none"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a universe" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No universe</SelectItem>
+                      {universes.map((universe) => (
+                        <SelectItem key={universe.id} value={universe.id}>
+                          {universe.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
