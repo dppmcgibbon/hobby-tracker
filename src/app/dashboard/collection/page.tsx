@@ -210,20 +210,13 @@ export default async function CollectionPage({
 
   // Apply game filter (we'll do this client-side after fetching miniature_games)
   let gameFilteredMiniatureIds: Set<string> | null = null;
+  let excludeMiniaturesWithGames = false;
+  
   if (params.game && params.game !== "all") {
     if (params.game === "none") {
-      // Filter for miniatures with NO game links
-      const { data: allGameMiniatures } = await supabase
-        .from("miniature_games")
-        .select("miniature_id");
-      
-      if (allGameMiniatures) {
-        // Get all miniature IDs that have game links
-        const miniaturesWithGames = new Set(allGameMiniatures.map((g) => g.miniature_id));
-        
-        // Filter will be applied client-side to exclude these IDs
-        gameFilteredMiniatureIds = miniaturesWithGames;
-      }
+      // For "none", we'll filter client-side based on the miniature_games array
+      // This is more reliable than querying the junction table
+      excludeMiniaturesWithGames = true;
     } else {
       let gameQuery = supabase
         .from("miniature_games")
@@ -340,14 +333,14 @@ export default async function CollectionPage({
   }
 
   // Apply game filter
-  if (gameFilteredMiniatureIds) {
-    if (params.game === "none") {
-      // For "none", exclude miniatures that have game links
-      filteredMiniatures = filteredMiniatures.filter((m) => !gameFilteredMiniatureIds.has(m.id));
-    } else {
-      // For specific games, include only miniatures with game links
-      filteredMiniatures = filteredMiniatures.filter((m) => gameFilteredMiniatureIds.has(m.id));
-    }
+  if (excludeMiniaturesWithGames) {
+    // For "none", filter based on the actual miniature_games array
+    filteredMiniatures = filteredMiniatures.filter((m) => {
+      return !m.miniature_games || m.miniature_games.length === 0;
+    });
+  } else if (gameFilteredMiniatureIds !== null) {
+    // For specific games, include only miniatures with game links
+    filteredMiniatures = filteredMiniatures.filter((m) => gameFilteredMiniatureIds!.has(m.id));
   }
 
   // Apply status filter

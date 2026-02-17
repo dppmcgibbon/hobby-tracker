@@ -264,6 +264,47 @@ export async function bulkUpdateBases(
   return { success: true };
 }
 
+export async function bulkUpdateMetadata(
+  miniatureIds: string[],
+  year: number | null,
+  material: string | null,
+  sculptor: string | null
+) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // Build update object with only provided fields
+  const updateData: Record<string, number | string | null> = {};
+  if (year !== undefined) updateData.year = year;
+  if (material !== undefined) updateData.material = material;
+  if (sculptor !== undefined) updateData.sculptor = sculptor;
+
+  // Update metadata fields in miniatures table
+  const { error } = await supabase
+    .from("miniatures")
+    .update(updateData)
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
 export async function bulkDelete(miniatureIds: string[]) {
   const user = await requireAuth();
   const supabase = await createClient();

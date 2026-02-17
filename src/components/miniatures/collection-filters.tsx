@@ -351,7 +351,7 @@ export function CollectionFilters({
                 value={filters.gameId}
                 onValueChange={(v) => {
                   updateFilter("gameId", v);
-                  if (v === "all") {
+                  if (v === "all" || v === "none") {
                     updateFilter("editionId", "all");
                     updateFilter("expansionId", "all");
                   }
@@ -362,6 +362,7 @@ export function CollectionFilters({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Games</SelectItem>
+                  <SelectItem value="none">No Linked Games</SelectItem>
                   {filteredGames.map((game) => (
                     <SelectItem key={game.id} value={game.id}>
                       {game.name}
@@ -687,7 +688,7 @@ export function CollectionFilters({
                     value={filters.gameId}
                     onValueChange={(v) => {
                       updateFilter("gameId", v);
-                      if (v === "all") {
+                      if (v === "all" || v === "none") {
                         updateFilter("editionId", "all");
                         updateFilter("expansionId", "all");
                       }
@@ -698,6 +699,7 @@ export function CollectionFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Games</SelectItem>
+                      <SelectItem value="none">No Linked Games</SelectItem>
                       {filteredGames.map((game) => (
                         <SelectItem key={game.id} value={game.id}>
                           {game.name}

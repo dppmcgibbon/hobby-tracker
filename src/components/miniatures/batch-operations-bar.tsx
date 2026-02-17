@@ -4,13 +4,14 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen } from "lucide-react";
 import { toast } from "sonner";
-import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases, bulkUpdateFaction } from "@/app/actions/miniatures";
+import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases, bulkUpdateFaction, bulkUpdateMetadata } from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
 import { bulkLinkMinaturesToGame } from "@/app/actions/games";
 import { bulkLinkRecipes } from "@/app/actions/recipes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -138,6 +139,9 @@ export function BatchOperationsBar({
   const [selectedBaseShapeId, setSelectedBaseShapeId] = useState<string>("");
   const [selectedBaseTypeId, setSelectedBaseTypeId] = useState<string>("");
   const [selectedFactionId, setSelectedFactionId] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string>("");
+  const [selectedMaterial, setSelectedMaterial] = useState<string>("");
+  const [selectedSculptor, setSelectedSculptor] = useState<string>("");
   const [availableEditions, setAvailableEditions] = useState<Edition[]>([]);
   const [availableExpansions, setAvailableExpansions] = useState<Expansion[]>([]);
 
@@ -198,7 +202,6 @@ export function BatchOperationsBar({
       try {
         await bulkUpdateStatus(selectedIds, selectedStatus);
         toast.success(`Updated ${selectedIds.length} miniature(s)`);
-        onClearSelection();
         setSelectedStatus("");
         router.refresh(); // Force refresh to show updated status
       } catch (error) {
@@ -221,7 +224,6 @@ export function BatchOperationsBar({
           toast.success(`Tagged ${selectedIds.length} miniature(s)`);
         }
 
-        onClearSelection();
         setSelectedTagId("");
         router.refresh(); // Force refresh to show tags
       } catch (error) {
@@ -237,7 +239,6 @@ export function BatchOperationsBar({
       try {
         await addMiniaturesToCollection(selectedCollectionId, selectedIds);
         toast.success(`Added ${selectedIds.length} miniature(s) to collection`);
-        onClearSelection();
         setSelectedCollectionId("");
         router.refresh(); // Force refresh
       } catch (error) {
@@ -254,7 +255,6 @@ export function BatchOperationsBar({
           selectedStorageBoxId === "none" ? null : selectedStorageBoxId || null
         );
         toast.success(`Updated storage location for ${selectedIds.length} miniature(s)`);
-        onClearSelection();
         setSelectedStorageBoxId("");
         router.refresh();
       } catch (error) {
@@ -270,7 +270,6 @@ export function BatchOperationsBar({
       try {
         await bulkLinkRecipes(selectedIds, selectedRecipeIds);
         toast.success(`Linked ${selectedRecipeIds.length} recipe(s) to ${selectedIds.length} miniature(s)`);
-        onClearSelection();
         setSelectedRecipeIds([]);
         router.refresh();
       } catch (error) {
@@ -304,7 +303,6 @@ export function BatchOperationsBar({
           selectedExpansionId && selectedExpansionId !== "none" ? selectedExpansionId : null
         );
         toast.success(`Linked ${selectedIds.length} miniature(s) to game`);
-        onClearSelection();
         setSelectedGameId("");
         setSelectedEditionId("");
         setSelectedExpansionId("");
@@ -325,7 +323,6 @@ export function BatchOperationsBar({
           selectedBaseTypeId && selectedBaseTypeId !== "none" ? selectedBaseTypeId : null
         );
         toast.success(`Updated base information for ${selectedIds.length} miniature(s)`);
-        onClearSelection();
         setSelectedBaseId("");
         setSelectedBaseShapeId("");
         setSelectedBaseTypeId("");
@@ -344,11 +341,30 @@ export function BatchOperationsBar({
           selectedFactionId === "none" ? null : selectedFactionId || null
         );
         toast.success(`Updated faction for ${selectedIds.length} miniature(s)`);
-        onClearSelection();
         setSelectedFactionId("");
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to update faction");
+      }
+    });
+  };
+
+  const handleUpdateMetadata = () => {
+    startTransition(async () => {
+      try {
+        await bulkUpdateMetadata(
+          selectedIds,
+          selectedYear ? parseInt(selectedYear, 10) : null,
+          selectedMaterial || null,
+          selectedSculptor || null
+        );
+        toast.success(`Updated metadata for ${selectedIds.length} miniature(s)`);
+        setSelectedYear("");
+        setSelectedMaterial("");
+        setSelectedSculptor("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update metadata");
       }
     });
   };
@@ -686,6 +702,50 @@ export function BatchOperationsBar({
             </div>
           </div>
         )}
+
+        {/* Fourth Row - Metadata (Year, Material, Sculptor) */}
+        <div className="flex items-center gap-4 pt-2 border-t">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm">Update Metadata:</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Year */}
+            <Input
+              type="number"
+              placeholder="Year..."
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-[100px]"
+            />
+
+            {/* Material */}
+            <Input
+              type="text"
+              placeholder="Material..."
+              value={selectedMaterial}
+              onChange={(e) => setSelectedMaterial(e.target.value)}
+              className="w-[130px]"
+            />
+
+            {/* Sculptor */}
+            <Input
+              type="text"
+              placeholder="Sculptor..."
+              value={selectedSculptor}
+              onChange={(e) => setSelectedSculptor(e.target.value)}
+              className="w-[150px]"
+            />
+
+            <Button
+              size="sm"
+              onClick={handleUpdateMetadata}
+              disabled={(!selectedYear && !selectedMaterial && !selectedSculptor) || isPending}
+            >
+              Apply
+            </Button>
+          </div>
+        </div>
       </div>
     </Card>
   );

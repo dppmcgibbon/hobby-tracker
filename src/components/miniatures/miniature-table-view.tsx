@@ -88,13 +88,39 @@ export function MiniatureTableView({
   // State for expanded info rows
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   
-  // Pagination state
+  // Pagination state - persist in URL
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [hasHydrated, setHasHydrated] = useState(false);
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  
+  // Read pagination from URL after hydration (client-side only)
+  useEffect(() => {
+    if (hasHydrated) return; // Only run once after mount
+    
+    const params = new URLSearchParams(window.location.search);
+    const page = params.get('page');
+    const perPage = params.get('perPage');
+    
+    if (page) {
+      const pageNum = parseInt(page, 10);
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setCurrentPage(pageNum);
+      }
+    }
+    
+    if (perPage) {
+      const perPageNum = parseInt(perPage, 10);
+      if (!isNaN(perPageNum) && perPageNum > 0) {
+        setItemsPerPage(perPageNum);
+      }
+    }
+    
+    setHasHydrated(true);
+  }, [hasHydrated]);
   
   // Calculate pagination
   const totalItems = localMiniatures.length;
@@ -169,16 +195,58 @@ export function MiniatureTableView({
       setSortColumn(column);
       setSortDirection("asc");
     }
-    // Reset to first page when sorting changes
-    setCurrentPage(1);
+    // Don't reset page when sorting - user might want to see sorted results on current page
   };
 
   // Sync local state with incoming props when miniatures change (e.g., filtering)
   useEffect(() => {
     setLocalMiniatures(miniatures);
-    // Reset to first page when miniatures change
-    setCurrentPage(1);
+    // Reset to first page when miniatures change (but only if filters changed, not on refresh)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('page')) {
+        setCurrentPage(1);
+      }
+    }
   }, [miniatures]);
+  
+  // Validate current page when data size changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const newTotalPages = Math.ceil(localMiniatures.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [localMiniatures.length, itemsPerPage, currentPage]);
+
+  // Update URL when pagination changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const params = new URLSearchParams(window.location.search);
+    
+    if (currentPage > 1) {
+      params.set('page', currentPage.toString());
+    } else {
+      params.delete('page');
+    }
+    
+    if (itemsPerPage !== 25) {
+      params.set('perPage', itemsPerPage.toString());
+    } else {
+      params.delete('perPage');
+    }
+    
+    const newUrl = params.toString() 
+      ? `${window.location.pathname}?${params.toString()}` 
+      : window.location.pathname;
+    
+    // Only update if URL changed
+    if (newUrl !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [currentPage, itemsPerPage]);
 
   const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
 
@@ -641,8 +709,13 @@ export function MiniatureTableView({
             <select
               value={itemsPerPage}
               onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1);
+                const newItemsPerPage = Number(e.target.value);
+                setItemsPerPage(newItemsPerPage);
+                // Adjust current page if it would be out of bounds with new items per page
+                const newTotalPages = Math.ceil(totalItems / newItemsPerPage);
+                if (currentPage > newTotalPages) {
+                  setCurrentPage(Math.max(1, newTotalPages));
+                }
               }}
               className="text-sm border border-primary/20 rounded px-2 py-1 bg-background"
             >
