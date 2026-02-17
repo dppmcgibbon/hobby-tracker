@@ -27,9 +27,9 @@ export function MiniatureCSVImport() {
   const router = useRouter();
 
   const downloadTemplate = () => {
-    const template = `name,faction,unit_type,quantity,material,base_size,sculptor,year,notes,storage_box,status,game,edition,expansion
-Space Marine,Space Marines,Intercessor,10,Plastic,32mm,Games Workshop,2020,First tactical squad,Box 1,backlog,Warhammer 40000,10th Edition,
-Necron Warrior,Necrons,Warrior,20,Plastic,32mm,Games Workshop,2020,,Box 1,primed,Warhammer 40000,10th Edition,Leviathan`;
+    const template = `name,unit_type,quantity,material,base_size,sculptor,year
+Space Marine,Intercessor,10,Plastic,32mm,Games Workshop,2020
+Necron Warrior,Warrior,20,Plastic,32mm,Games Workshop,2020`;
 
     const blob = new Blob([template], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -119,24 +119,15 @@ Necron Warrior,Necrons,Warrior,20,Plastic,32mm,Games Workshop,2020,,Box 1,primed
             <p className="font-semibold">CSV Format:</p>
             <p>Required columns: <code className="bg-muted px-1 rounded">name</code></p>
             <p>
-              Optional columns: <code className="bg-muted px-1 rounded">faction</code>,{" "}
-              <code className="bg-muted px-1 rounded">unit_type</code>,{" "}
+              Optional columns: <code className="bg-muted px-1 rounded">unit_type</code>,{" "}
               <code className="bg-muted px-1 rounded">quantity</code>,{" "}
               <code className="bg-muted px-1 rounded">material</code>,{" "}
               <code className="bg-muted px-1 rounded">base_size</code>,{" "}
               <code className="bg-muted px-1 rounded">sculptor</code>,{" "}
-              <code className="bg-muted px-1 rounded">year</code>,{" "}
-              <code className="bg-muted px-1 rounded">notes</code>,{" "}
-              <code className="bg-muted px-1 rounded">storage_box</code>,{" "}
-              <code className="bg-muted px-1 rounded">status</code>,{" "}
-              <code className="bg-muted px-1 rounded">game</code>,{" "}
-              <code className="bg-muted px-1 rounded">edition</code>,{" "}
-              <code className="bg-muted px-1 rounded">expansion</code>
+              <code className="bg-muted px-1 rounded">year</code>
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              Note: Faction, storage box, game, edition, and expansion must match existing names exactly. 
-              Status values: unknown, missing, needs_stripped, backlog, built, primed, painting_started, 
-              needs_repair, sub_assembled, missing_arm, missing_leg, missing_head, complete
+              Note: All miniatures will be imported with default status (backlog).
             </p>
           </AlertDescription>
         </Alert>

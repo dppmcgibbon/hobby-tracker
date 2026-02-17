@@ -6,19 +6,12 @@ import { revalidatePath } from "next/cache";
 
 interface CSVRow {
   name: string;
-  faction?: string;
   unit_type?: string;
   quantity?: string;
   material?: string;
   base_size?: string;
   sculptor?: string;
   year?: string;
-  notes?: string;
-  storage_box?: string;
-  status?: string;
-  game?: string;
-  edition?: string;
-  expansion?: string;
 }
 
 export async function importMiniaturesFromCSV(csvContent: string) {
@@ -45,18 +38,14 @@ export async function importMiniaturesFromCSV(csvContent: string) {
     }
 
     // Fetch reference data for mapping
-    const [{ data: factions }, { data: storageBoxes }, { data: statuses }, { data: games }] = await Promise.all([
-      supabase.from("factions").select("id, name"),
-      supabase.from("storage_boxes").select("id, name").eq("user_id", user.id),
-      supabase.from("miniature_statuses").select("id, name").order("display_order"),
-      supabase.from("games").select("id, name"),
-    ]);
+    const { data: statuses } = await supabase
+      .from("miniature_statuses")
+      .select("id, name")
+      .order("display_order");
 
-    // Create mappings
-    const factionMap = new Map((factions || []).map((f) => [f.name.toLowerCase(), f.id]));
-    const storageMap = new Map((storageBoxes || []).map((s) => [s.name.toLowerCase(), s.id]));
+    // Get the default backlog status
     const statusMap = new Map((statuses || []).map((s) => [s.name.toLowerCase(), s.id]));
-    const gameMap = new Map((games || []).map((g) => [g.name.toLowerCase(), g.id]));
+    const defaultStatusId = statusMap.get("backlog") || null;
 
     let successCount = 0;
     let errorCount = 0;
@@ -71,22 +60,6 @@ export async function importMiniaturesFromCSV(csvContent: string) {
           continue;
         }
 
-        // Map faction
-        let factionId = null;
-        if (row.faction) {
-          factionId = factionMap.get(row.faction.toLowerCase()) || null;
-        }
-
-        // Map storage box
-        let storageBoxId = null;
-        if (row.storage_box) {
-          storageBoxId = storageMap.get(row.storage_box.toLowerCase()) || null;
-        }
-
-        // Map status
-        let statusName = (row.status || "backlog").toLowerCase();
-        const statusId = statusMap.get(statusName) || null;
-
         // Parse quantity
         const quantity = row.quantity ? parseInt(row.quantity) : 1;
 
@@ -98,15 +71,13 @@ export async function importMiniaturesFromCSV(csvContent: string) {
           .from("miniatures")
           .insert({
             name: row.name,
-            faction_id: factionId,
+            faction_id: null,
             unit_type: row.unit_type || null,
             quantity: quantity,
             material: row.material || null,
             base_size: row.base_size || null,
             sculptor: row.sculptor || "Unknown",
             year: year,
-            notes: row.notes || null,
-            storage_box_id: storageBoxId,
             user_id: user.id,
           })
           .select()
@@ -118,56 +89,13 @@ export async function importMiniaturesFromCSV(csvContent: string) {
           continue;
         }
 
-        // Insert status
-        if (miniature && statusId) {
+        // Insert default status (backlog)
+        if (miniature && defaultStatusId) {
           await supabase.from("miniature_status").insert({
             miniature_id: miniature.id,
             user_id: user.id,
-            status_id: statusId,
+            status_id: defaultStatusId,
           });
-        }
-
-        // Link game/edition/expansion if provided
-        if (miniature && row.game) {
-          const gameId = gameMap.get(row.game.toLowerCase());
-          if (gameId) {
-            let editionId = null;
-            let expansionId = null;
-
-            // Get edition if specified
-            if (row.edition) {
-              const { data: editions } = await supabase
-                .from("editions")
-                .select("id, name")
-                .eq("game_id", gameId);
-              
-              const editionMatch = editions?.find(
-                (e) => e.name.toLowerCase() === row.edition!.toLowerCase()
-              );
-              editionId = editionMatch?.id || null;
-            }
-
-            // Get expansion if specified (requires edition)
-            if (row.expansion && editionId) {
-              const { data: expansions } = await supabase
-                .from("expansions")
-                .select("id, name")
-                .eq("edition_id", editionId);
-              
-              const expansionMatch = expansions?.find(
-                (e) => e.name.toLowerCase() === row.expansion!.toLowerCase()
-              );
-              expansionId = expansionMatch?.id || null;
-            }
-
-            // Link to game
-            await supabase.from("miniature_games").insert({
-              miniature_id: miniature.id,
-              game_id: gameId,
-              edition_id: editionId,
-              expansion_id: expansionId,
-            });
-          }
         }
 
         successCount++;

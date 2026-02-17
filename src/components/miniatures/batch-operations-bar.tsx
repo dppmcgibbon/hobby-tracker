@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen } from "lucide-react";
 import { toast } from "sonner";
-import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases } from "@/app/actions/miniatures";
+import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases, bulkUpdateFaction } from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
 import { bulkLinkMinaturesToGame } from "@/app/actions/games";
@@ -87,6 +87,11 @@ interface BaseType {
   name: string;
 }
 
+interface Faction {
+  id: string;
+  name: string;
+}
+
 interface BatchOperationsBarProps {
   selectedIds: string[];
   onClearSelection: () => void;
@@ -100,6 +105,7 @@ interface BatchOperationsBarProps {
   bases?: Base[];
   baseShapes?: BaseShape[];
   baseTypes?: BaseType[];
+  factions?: Faction[];
 }
 
 export function BatchOperationsBar({
@@ -115,6 +121,7 @@ export function BatchOperationsBar({
   bases = [],
   baseShapes = [],
   baseTypes = [],
+  factions = [],
 }: BatchOperationsBarProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -130,6 +137,7 @@ export function BatchOperationsBar({
   const [selectedBaseId, setSelectedBaseId] = useState<string>("");
   const [selectedBaseShapeId, setSelectedBaseShapeId] = useState<string>("");
   const [selectedBaseTypeId, setSelectedBaseTypeId] = useState<string>("");
+  const [selectedFactionId, setSelectedFactionId] = useState<string>("");
   const [availableEditions, setAvailableEditions] = useState<Edition[]>([]);
   const [availableExpansions, setAvailableExpansions] = useState<Expansion[]>([]);
 
@@ -328,6 +336,23 @@ export function BatchOperationsBar({
     });
   };
 
+  const handleUpdateFaction = () => {
+    startTransition(async () => {
+      try {
+        await bulkUpdateFaction(
+          selectedIds,
+          selectedFactionId === "none" ? null : selectedFactionId || null
+        );
+        toast.success(`Updated faction for ${selectedIds.length} miniature(s)`);
+        onClearSelection();
+        setSelectedFactionId("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update faction");
+      }
+    });
+  };
+
   return (
     <Card className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-2xl">
       <div className="flex flex-col gap-4 p-4">
@@ -408,6 +433,32 @@ export function BatchOperationsBar({
               <FolderPlus className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Update Faction */}
+          {factions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Select value={selectedFactionId} onValueChange={setSelectedFactionId}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Set faction..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No faction</SelectItem>
+                  {factions.map((faction) => (
+                    <SelectItem key={faction.id} value={faction.id}>
+                      {faction.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleUpdateFaction}
+                disabled={!selectedFactionId || isPending}
+              >
+                Apply
+              </Button>
+            </div>
+          )}
 
           {/* Update Storage Box */}
           {storageBoxes.length > 0 && (

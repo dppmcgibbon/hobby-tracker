@@ -182,6 +182,49 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
   return { success: true };
 }
 
+export async function bulkUpdateFaction(miniatureIds: string[], factionId: string | null) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Verify all miniatures belong to user
+  const { data: miniatures } = await supabase
+    .from("miniatures")
+    .select("id")
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (!miniatures || miniatures.length !== miniatureIds.length) {
+    throw new Error("Some miniatures not found or access denied");
+  }
+
+  // If factionId is provided, verify it exists
+  if (factionId) {
+    const { data: faction } = await supabase
+      .from("factions")
+      .select("id")
+      .eq("id", factionId)
+      .single();
+
+    if (!faction) {
+      throw new Error("Faction not found");
+    }
+  }
+
+  // Update faction_id in miniatures table
+  const { error } = await supabase
+    .from("miniatures")
+    .update({ faction_id: factionId })
+    .in("id", miniatureIds)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/collection");
+  return { success: true };
+}
+
 export async function bulkUpdateBases(
   miniatureIds: string[],
   baseId: string | null,

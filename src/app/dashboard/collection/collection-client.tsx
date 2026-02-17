@@ -281,6 +281,7 @@ export function CollectionClient({
         bases={bases}
         baseShapes={baseShapes}
         baseTypes={baseTypes}
+        factions={factions}
       />
     </div>
   );
