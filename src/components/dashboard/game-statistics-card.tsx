@@ -39,7 +39,7 @@ export function GameStatisticsCard({ gameBreakdown, totalGames, totalLinkedMinia
           {gameBreakdown.map((game) => (
             <Link
               key={game.id}
-              href={`/dashboard/collection?game=${game.id}`}
+              href={`/dashboard/miniatures?game=${game.id}`}
               className="flex items-center justify-between p-3 rounded border border-primary/20 hover:bg-muted/30 transition-colors hover:border-primary/40 cursor-pointer block"
             >
               <div className="flex-1">

@@ -40,7 +40,8 @@ export async function createMiniature(data: MiniatureInput) {
     throw new Error(statusError.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true, miniature };
 }
 
@@ -64,8 +65,9 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
-  revalidatePath(`/dashboard/collection/${id}`);
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath(`/dashboard/miniatures/${id}`);
   return { success: true, miniature };
 }
 
@@ -79,7 +81,7 @@ export async function deleteMiniature(id: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -103,8 +105,9 @@ export async function updateMiniatureStatus(miniatureId: string, data: Miniature
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true, status };
 }
 
@@ -134,7 +137,8 @@ export async function bulkUpdateStatus(miniatureIds: string[], status: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -178,7 +182,8 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -221,7 +226,8 @@ export async function bulkUpdateFaction(miniatureIds: string[], factionId: strin
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -260,7 +266,8 @@ export async function bulkUpdateBases(
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -301,7 +308,8 @@ export async function bulkUpdateMetadata(
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -326,7 +334,8 @@ export async function bulkDelete(miniatureIds: string[]) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -473,6 +482,6 @@ export async function duplicateMiniature(id: string) {
     }
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true, miniature: duplicate };
 }

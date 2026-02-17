@@ -176,7 +176,7 @@ export function MiniatureForm({
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push("/dashboard/collection");
+        router.push("/dashboard/miniatures");
       }
       router.refresh();
     } catch (err) {

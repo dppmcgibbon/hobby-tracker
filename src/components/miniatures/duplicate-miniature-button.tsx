@@ -29,7 +29,7 @@ export function DuplicateMiniatureButton({
       const result = await duplicateMiniature(miniatureId);
       if (result.success) {
         toast.success("Miniature duplicated successfully!");
-        router.push(`/dashboard/collection/${result.miniature.id}/edit`);
+        router.push(`/dashboard/miniatures/${result.miniature.id}/edit`);
         router.refresh();
       }
     } catch (error) {

@@ -69,7 +69,7 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     throw new Error(dbError.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true, photo };
 }
 
@@ -98,6 +98,6 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
     // Don't throw error here as the database record is already deleted
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }

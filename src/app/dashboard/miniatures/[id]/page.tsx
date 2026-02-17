@@ -77,7 +77,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
         <div className="flex gap-2">
           <DuplicateMiniatureButton miniatureId={id} />
           <Button variant="outline" asChild>
-            <Link href={`/dashboard/collection/${id}/edit`}>
+            <Link href={`/dashboard/miniatures/${id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Link>

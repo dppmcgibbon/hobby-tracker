@@ -109,7 +109,7 @@ export async function importMiniaturesFromCSV(csvContent: string) {
       }
     }
 
-    revalidatePath("/dashboard/collection");
+    revalidatePath("/dashboard/miniatures");
 
     return {
       success: true,

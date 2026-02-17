@@ -39,7 +39,7 @@ export async function createShare(miniatureId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true, share };
 }
 
@@ -57,7 +57,7 @@ export async function deleteShare(miniatureId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true };
 }
 

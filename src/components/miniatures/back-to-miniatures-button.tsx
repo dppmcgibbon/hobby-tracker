@@ -13,7 +13,7 @@ export function BackToMiniaturesButton() {
       router.back();
     } else {
       // Fallback to collection page if no history
-      router.push("/dashboard/collection");
+      router.push("/dashboard/miniatures");
     }
   };
 

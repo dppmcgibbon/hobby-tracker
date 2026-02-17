@@ -40,7 +40,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="btn-warhammer-primary">
-              <Link href="/dashboard/collection/add">Deploy First Unit</Link>
+              <Link href="/dashboard/miniatures/add">Deploy First Unit</Link>
             </Button>
           </CardContent>
         </Card>

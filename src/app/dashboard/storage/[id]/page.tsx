@@ -168,7 +168,7 @@ export default async function StorageBoxDetailPage({ params }: PageProps) {
                 return (
                   <Link
                     key={miniature.id}
-                    href={`/dashboard/collection/${miniature.id}`}
+                    href={`/dashboard/miniatures/${miniature.id}`}
                     className="flex items-center justify-between p-3 rounded-sm border border-primary/20 hover:border-primary/50 hover:bg-muted/30 transition-all group"
                   >
                     <div className="flex items-center gap-3">

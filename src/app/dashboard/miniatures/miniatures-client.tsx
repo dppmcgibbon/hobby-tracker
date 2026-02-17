@@ -110,7 +110,7 @@ export function CollectionClient({
   const handleLoadFilter = () => {
     const filterToLoad = savedFilter || localStorage.getItem('savedFilter');
     if (filterToLoad) {
-      router.push(`/dashboard/collection?${filterToLoad}`);
+      router.push(`/dashboard/miniatures?${filterToLoad}`);
     }
   };
 

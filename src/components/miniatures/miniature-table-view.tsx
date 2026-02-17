@@ -376,7 +376,7 @@ export function MiniatureTableView({
                 className="h-8 w-8"
                 title="Add Miniature"
               >
-                <Link href="/dashboard/collection/add">
+                <Link href="/dashboard/miniatures/add">
                   <Plus className="h-4 w-4" />
                 </Link>
               </Button>
@@ -414,7 +414,7 @@ export function MiniatureTableView({
                       if (primaryGame?.edition_id) {
                         params.set('edition', primaryGame.edition_id);
                       }
-                      return `/dashboard/collection?${params.toString()}`;
+                      return `/dashboard/miniatures?${params.toString()}`;
                     })()}
                     className="hover:text-primary transition-colors"
                     onClick={(e) => e.stopPropagation()}
@@ -434,7 +434,7 @@ export function MiniatureTableView({
                       if (miniature.factions?.id) {
                         params.set('faction', miniature.factions.id);
                       }
-                      return `/dashboard/collection?${params.toString()}`;
+                      return `/dashboard/miniatures?${params.toString()}`;
                     })()}
                     className="hover:text-primary transition-colors"
                     onClick={(e) => e.stopPropagation()}
@@ -447,7 +447,7 @@ export function MiniatureTableView({
               </TableCell>
               <TableCell>
                 <Link
-                  href={`/dashboard/collection/${miniature.id}`}
+                  href={`/dashboard/miniatures/${miniature.id}`}
                   className="font-bold hover:text-primary transition-colors tracking-wide"
                 >
                   {miniature.name}
@@ -519,7 +519,7 @@ export function MiniatureTableView({
                   size="icon"
                   asChild
                 >
-                  <Link href={`/dashboard/collection/${miniature.id}/edit`}>
+                  <Link href={`/dashboard/miniatures/${miniature.id}/edit`}>
                     <Edit className="h-4 w-4" />
                   </Link>
                 </Button>

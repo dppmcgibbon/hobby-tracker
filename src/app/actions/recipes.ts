@@ -194,7 +194,7 @@ export async function linkRecipeToMiniature(miniatureId: string, recipeId: strin
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   revalidatePath(`/dashboard/recipes/${recipeId}`);
   return { success: true };
 }
@@ -225,7 +225,7 @@ export async function unlinkRecipeFromMiniature(miniatureId: string, recipeId: s
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   revalidatePath(`/dashboard/recipes/${recipeId}`);
   return { success: true };
 }
@@ -266,6 +266,6 @@ export async function bulkLinkRecipes(miniatureIds: string[], recipeIds: string[
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }

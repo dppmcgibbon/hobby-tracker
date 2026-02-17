@@ -128,7 +128,7 @@ export default async function TagDetailPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">
               Go to your miniatures and assign this tag to organize them
             </p>
-            <Link href="/dashboard/collection">
+            <Link href="/dashboard/miniatures">
               <Button className="mt-4">Browse Miniatures</Button>
             </Link>
           </CardContent>

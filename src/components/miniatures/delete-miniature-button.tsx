@@ -29,7 +29,7 @@ export function DeleteMiniatureButton({ miniatureId }: DeleteMiniatureButtonProp
     setDeleting(true);
     try {
       await deleteMiniature(miniatureId);
-      router.push("/dashboard/collection");
+      router.push("/dashboard/miniatures");
       router.refresh();
     } catch (error) {
       console.error("Failed to delete miniature:", error);

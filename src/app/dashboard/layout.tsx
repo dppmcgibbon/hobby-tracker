@@ -47,11 +47,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Dashboard
             </Link>
             <Link
-              href="/dashboard/collection"
+              href="/dashboard/miniatures"
               className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
               <Package className="h-4 w-4 inline-block mr-1.5" />
-              Miniatures
+              Minis
             </Link>
             <Link
               href="/dashboard/collections"

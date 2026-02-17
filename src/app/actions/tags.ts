@@ -25,7 +25,7 @@ export async function createTag(data: TagInput) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true, tag };
 }
 
@@ -39,7 +39,7 @@ export async function deleteTag(tagId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -69,8 +69,8 @@ export async function addTagToMiniature(miniatureId: string, tagId: string) {
 
   // If already assigned, silently succeed (idempotent operation)
   if (existing) {
-    revalidatePath(`/dashboard/collection/${miniatureId}`);
-    revalidatePath("/dashboard/collection");
+    revalidatePath(`/dashboard/miniatures/${miniatureId}`);
+    revalidatePath("/dashboard/miniatures");
     return { success: true, alreadyExists: true };
   }
 
@@ -83,8 +83,8 @@ export async function addTagToMiniature(miniatureId: string, tagId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
-  revalidatePath("/dashboard/collection");
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
+  revalidatePath("/dashboard/miniatures");
   return { success: true, alreadyExists: false };
 }
 
@@ -114,8 +114,8 @@ export async function removeTagFromMiniature(miniatureId: string, tagId: string)
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
-  revalidatePath("/dashboard/collection");
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
+  revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
@@ -147,7 +147,7 @@ export async function bulkAddTags(miniatureIds: string[], tagId: string) {
 
   // Only insert if there are new assignments
   if (newMiniatureIds.length === 0) {
-    revalidatePath("/dashboard/collection");
+    revalidatePath("/dashboard/miniatures");
     return {
       success: true,
       message: "All selected miniatures already have this tag",
@@ -167,7 +167,7 @@ export async function bulkAddTags(miniatureIds: string[], tagId: string) {
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return {
     success: true,
     message:

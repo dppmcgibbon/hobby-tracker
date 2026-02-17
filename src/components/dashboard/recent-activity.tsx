@@ -42,7 +42,7 @@ export function RecentActivity({
         name: m.name,
         faction: factions?.name,
         date: new Date(m.created_at),
-        link: `/dashboard/collection/${m.id}`,
+        link: `/dashboard/miniatures/${m.id}`,
       };
     }),
     ...recentCompletions.map((c) => {
@@ -53,7 +53,7 @@ export function RecentActivity({
         name: miniatures?.name,
         faction: undefined,
         date: new Date(c.completed_at),
-        link: `/dashboard/collection/${c.miniature_id}`,
+        link: `/dashboard/miniatures/${c.miniature_id}`,
       };
     }),
     ...recentPhotos.map((p) => {
@@ -64,7 +64,7 @@ export function RecentActivity({
         name: miniatures?.name,
         faction: undefined,
         date: new Date(p.uploaded_at),
-        link: `/dashboard/collection/${miniatures?.id}`,
+        link: `/dashboard/miniatures/${miniatures?.id}`,
       };
     }),
   ]

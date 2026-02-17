@@ -223,7 +223,7 @@ export async function linkMiniatureToGame(data: MiniatureGameInput) {
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${validated.miniature_id}`);
+  revalidatePath(`/dashboard/miniatures/${validated.miniature_id}`);
   return { success: true };
 }
 
@@ -253,7 +253,7 @@ export async function unlinkMiniatureFromGame(miniatureId: string, gameId: strin
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true };
 }
 
@@ -287,7 +287,7 @@ export async function updateMiniatureGame(
     throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/collection/${miniatureId}`);
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
   return { success: true };
 }
 
@@ -328,6 +328,6 @@ export async function bulkLinkMinaturesToGame(
     throw new Error(error.message);
   }
 
-  revalidatePath("/dashboard/collection");
+  revalidatePath("/dashboard/miniatures");
   return { success: true, count: miniatureIds.length };
 }
