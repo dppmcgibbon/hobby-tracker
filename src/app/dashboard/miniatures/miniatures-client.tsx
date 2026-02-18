@@ -61,6 +61,13 @@ interface CollectionClientProps {
   bases: { id: string; name: string }[];
   baseShapes: { id: string; name: string }[];
   baseTypes: { id: string; name: string }[];
+  savedFilters?: Array<{
+    id: string;
+    name: string;
+    filters: Record<string, string>;
+    logo_url?: string | null;
+    is_starred: boolean;
+  }>;
   initialFilters: FilterState;
 }
 
@@ -79,6 +86,7 @@ export function CollectionClient({
   bases,
   baseShapes,
   baseTypes,
+  savedFilters = [],
   initialFilters,
 }: CollectionClientProps) {
   const router = useRouter();
@@ -229,6 +237,7 @@ export function CollectionClient({
         unitTypes={unitTypes}
         bases={bases}
         miniatures={miniatures}
+        savedFilters={savedFilters}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
       />

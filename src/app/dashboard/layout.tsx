@@ -51,7 +51,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
               className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
               <Package className="h-4 w-4 inline-block mr-1.5" />
-              Minis
+              Miniatures
+            </Link>
+            <Link
+              href="/dashboard/shortcuts"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+            >
+              <Package className="h-4 w-4 inline-block mr-1.5" />
+              Shortcuts
             </Link>
             <Link
               href="/dashboard/collections"

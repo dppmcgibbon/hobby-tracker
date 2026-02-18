@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 import { useDebounce } from "use-debounce";
+import { SaveFilterDialog } from "./save-filter-dialog";
+import { SavedFiltersSheet } from "./saved-filters-sheet";
 import {
   Sheet,
   SheetContent,
@@ -37,6 +39,13 @@ interface CollectionFiltersProps {
   miniatures: any[]; // The miniatures to determine available options
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
+  savedFilters?: Array<{
+    id: string;
+    name: string;
+    filters: Record<string, string>;
+    logo_url?: string | null;
+    is_starred: boolean;
+  }>;
 }
 
 export interface FilterState {
@@ -86,6 +95,7 @@ export function CollectionFilters({
   miniatures,
   onFiltersChange,
   initialFilters,
+  savedFilters = [],
 }: CollectionFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -210,8 +220,6 @@ export function CollectionFilters({
       based: "all",
     };
     setFilters(defaultFilters);
-    // Navigate to clean URL immediately
-    router.replace(pathname, { scroll: false });
   };
 
   const hasActiveFilters =
@@ -638,6 +646,12 @@ export function CollectionFilters({
               Clear
             </Button>
           )}
+
+          {/* Save Filter Button */}
+          <SaveFilterDialog currentFilters={filters} />
+
+          {/* Saved Filters Sheet */}
+          <SavedFiltersSheet savedFilters={savedFilters} />
         </div>
       </div>
 

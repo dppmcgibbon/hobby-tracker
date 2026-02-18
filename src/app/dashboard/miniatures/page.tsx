@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { CollectionClient } from "./miniatures-client";
+import { getSavedFilters } from "@/app/actions/saved-filters";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -194,8 +195,8 @@ export default async function MiniaturesPage({
     filteredMiniatures = filteredMiniatures.filter((m) => taggedIds.has(m.id));
   }
 
-  // Universe filter
-  if (params.universe && params.universe !== "all") {
+  // Universe filter (only apply if no specific game is selected)
+  if (params.universe && params.universe !== "all" && (!params.game || params.game === "all")) {
     const { data: universeGames } = await supabase
       .from("games")
       .select("id")
@@ -270,6 +271,9 @@ export default async function MiniaturesPage({
     });
   }
 
+  // Get user's saved filters
+  const savedFilters = await getSavedFilters();
+
   return (
     <CollectionClient
       miniatures={filteredMiniatures}
@@ -290,6 +294,7 @@ export default async function MiniaturesPage({
       bases={basesData || []}
       baseShapes={baseShapesData || []}
       baseTypes={baseTypesData || []}
+      savedFilters={savedFilters}
       initialFilters={{
         search: params.search || "",
         factionId: params.faction || "all",
