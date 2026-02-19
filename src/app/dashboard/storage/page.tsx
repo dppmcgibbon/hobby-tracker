@@ -2,6 +2,10 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { StorageClient } from "@/components/storage/storage-client";
 
+// Force dynamic rendering so totals update on each request
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function StoragePage() {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -13,24 +17,25 @@ export default async function StoragePage() {
     .eq("user_id", user.id)
     .order("name");
 
-  // Fetch miniature counts (sum of quantities) for each storage box
-  const storageBoxIds = (storageBoxes || []).map(box => box.id);
-  
+  // Fetch miniature counts via RPC (avoids 1000-row limit, aggregates in DB)
+  const storageBoxIds = (storageBoxes || []).map((box) => box.id);
+
   let miniatureCounts: Record<string, number> = {};
   if (storageBoxIds.length > 0) {
-    const { data: miniatures } = await supabase
-      .from("miniatures")
-      .select("storage_box_id, quantity")
-      .in("storage_box_id", storageBoxIds);
-    
-    // Sum quantities for each storage box
-    miniatureCounts = (miniatures || []).reduce((acc, mini) => {
-      const boxId = mini.storage_box_id;
-      if (boxId) {
-        acc[boxId] = (acc[boxId] || 0) + (mini.quantity || 0);
-      }
-      return acc;
-    }, {} as Record<string, number>);
+    const { data: counts } = await supabase.rpc("get_storage_box_miniature_counts", {
+      p_box_ids: storageBoxIds,
+      p_user_id: user.id,
+    });
+
+    miniatureCounts = (counts || []).reduce(
+      (acc: Record<string, number>, row: { storage_box_id: string; total_quantity: number }) => {
+        if (row.storage_box_id) {
+          acc[row.storage_box_id] = Number(row.total_quantity);
+        }
+        return acc;
+      },
+      {}
+    );
   }
 
   // Add miniature counts to storage boxes
