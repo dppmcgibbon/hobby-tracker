@@ -20,7 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, ArrowUp, ArrowDown, Check, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Check, X, ChevronDown, ChevronRight, ImageIcon } from "lucide-react";
 import { CollectRowForm } from "@/components/collect/collect-row-form";
 import type { CollectConfigRow } from "@/lib/queries/collect";
 
@@ -42,12 +43,13 @@ export function CollectDataTable({
   const [sortAsc, setSortAsc] = useState(true);
   const [filterValue, setFilterValue] = useState<string>("all");
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const displayColumns = tableConfig.filter((c) => c.display === 1);
 
-  // Column with sequence 1 from collect_config - used for filter dropdown
+  // Column marked as filter in collect_config (filter = 1) - used for filter dropdown
   const filterColumn = useMemo(
-    () => tableConfig.find((c) => c.sequence === 1),
+    () => tableConfig.find((c) => c.filter === 1),
     [tableConfig]
   );
 
@@ -99,8 +101,9 @@ export function CollectDataTable({
 
   const renderCell = (column: CollectConfigRow, row: Record<string, unknown>) => {
     const val = row[column.column_name];
+    const type = column.column_type?.toLowerCase();
 
-    switch (column.column_type) {
+    switch (type) {
       case "checkbox":
         return val ? (
           <Check className="h-4 w-4 text-green-500 inline" />
@@ -120,15 +123,23 @@ export function CollectDataTable({
             {String(val ?? "")}
           </Badge>
         );
-      case "image":
-        if (val && typeof val === "string") {
-          return (
-            <span className="text-xs text-muted-foreground truncate max-w-[80px] block">
-              {val}
-            </span>
-          );
-        }
-        return <span className="text-muted-foreground">—</span>;
+      case "image": {
+        const imageUrl = val != null && val !== "" ? String(val) : null;
+        return (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-default disabled:hover:text-muted-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (imageUrl) setImagePreviewUrl(imageUrl);
+            }}
+            title={imageUrl ? "View image" : "No image"}
+            disabled={!imageUrl}
+          >
+            <ImageIcon className="h-5 w-5" />
+          </button>
+        );
+      }
       case "url":
         if (val && typeof val === "string" && val.startsWith("http")) {
           return (
@@ -155,10 +166,11 @@ export function CollectDataTable({
   };
 
   const isSortable = (column: CollectConfigRow) => {
-    return !["image", "url", "paint"].includes(column.column_type);
+    return !["image", "url", "paint"].includes(column.column_type?.toLowerCase() ?? "");
   };
 
   return (
+    <>
     <Card className="warhammer-card border-primary/30 overflow-hidden">
       <CardContent className="p-0">
         {filterColumn && filterOptions.length > 0 && (
@@ -183,42 +195,33 @@ export function CollectDataTable({
             <TableHeader>
               <TableRow className="border-primary/20 hover:bg-primary/5">
                 <TableHead className="w-8 p-4" />
-                {displayColumns.map((column) => (
-                  <TableHead
-                    key={column.id}
-                    className={cn(
-                      "p-4",
-                      isSortable(column)
-                        ? "cursor-pointer select-none font-bold uppercase tracking-wide text-primary hover:text-primary/80"
-                        : "font-bold uppercase tracking-wide text-muted-foreground"
-                    )}
-                    onClick={() => isSortable(column) && handleSort(column.column_name)}
-                  >
-                    <div className="flex items-center gap-1">
-                      {column.column_type === "sequence" && (
-                        <span className="text-xs">#</span>
+                {displayColumns.map((column) => {
+                  const isCentered = ["center", "number", "sequence", "status", "image"].includes(column.column_type?.toLowerCase() ?? "");
+                  return (
+                    <TableHead
+                      key={column.id}
+                      className={cn(
+                        "p-4",
+                        isCentered && "text-center",
+                        isSortable(column)
+                          ? "cursor-pointer select-none font-bold uppercase tracking-wide text-primary hover:text-primary/80"
+                          : "font-bold uppercase tracking-wide text-muted-foreground"
                       )}
-                      {column.column_type !== "sequence" && (
-                        <span>
-                          {column.column_name.replace(/_/g, " ")}
-                        </span>
-                      )}
-                      {isSortable(column) && (
-                        <span className="opacity-60">
-                          {sortKey === column.column_name ? (
-                            sortAsc ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="h-3 w-3" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </TableHead>
-                ))}
+                      onClick={() => isSortable(column) && handleSort(column.column_name)}
+                    >
+                      <div className={cn("flex items-center gap-1", isCentered && "justify-center")}>
+                        {column.column_type === "sequence" && (
+                          <span className="text-xs">#</span>
+                        )}
+                        {column.column_type !== "sequence" && (
+                          <span>
+                            {column.column_name.replace(/_/g, " ")}
+                          </span>
+                        )}
+                      </div>
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -243,8 +246,8 @@ export function CollectDataTable({
                           key={column.id}
                           className={cn(
                             "p-4",
-                            ["checkbox", "number", "sequence", "status"].includes(
-                              column.column_type
+                            ["checkbox", "center", "number", "sequence", "status", "image"].includes(
+                              column.column_type?.toLowerCase() ?? ""
                             )
                               ? "text-center"
                               : ""
@@ -281,5 +284,22 @@ export function CollectDataTable({
         </div>
       </CardContent>
     </Card>
+    <Dialog
+      open={imagePreviewUrl !== null}
+      onOpenChange={(open) => !open && setImagePreviewUrl(null)}
+    >
+        <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col items-center">
+        {imagePreviewUrl && (
+          <div className="flex justify-center overflow-auto">
+            <img
+              src={imagePreviewUrl}
+              alt=""
+              className="max-w-full max-h-[70vh] object-contain"
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

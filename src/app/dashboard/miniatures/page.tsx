@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { CollectionClient } from "./miniatures-client";
 import { getSavedFilters } from "@/app/actions/saved-filters";
+import { STATUS_GROUP_IN_PROGRESS, STATUS_GROUP_BACKLOG } from "@/lib/constants/miniature-status";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -130,7 +131,13 @@ export default async function MiniaturesPage({
   // Apply server-side filters
   if (params.search) query = query.ilike("name", `%${params.search}%`);
   if (params.unit) query = query.eq("unit_type", params.unit);
-  if (params.faction && params.faction !== "all") query = query.eq("faction_id", params.faction);
+  if (params.faction && params.faction !== "all") {
+    if (params.faction === "none") {
+      query = query.is("faction_id", null);
+    } else {
+      query = query.eq("faction_id", params.faction);
+    }
+  }
   if (params.base_size && params.base_size !== "all") {
     if (params.base_size === "none") {
       query = query.is("base_id", null);
@@ -238,10 +245,12 @@ export default async function MiniaturesPage({
     }
   }
 
-  // Status filter
+  // Status filter (single status or status group: in_progress / not_started)
   if (params.status && params.status !== "all") {
     filteredMiniatures = filteredMiniatures.filter((m) => {
-      const status = m.miniature_status?.status || "backlog";
+      const status = (m.miniature_status?.status || "backlog") as string;
+      if (params.status === "in_progress") return STATUS_GROUP_IN_PROGRESS.has(status as any);
+      if (params.status === "not_started") return STATUS_GROUP_BACKLOG.has(status as any);
       return status === params.status;
     });
   }

@@ -57,3 +57,21 @@ export type MiniatureStatusValue =
   | "missing_leg"
   | "missing_head"
   | "complete";
+
+/** Status groups used for filtering (e.g. "In Progress" = multiple statuses). */
+export const STATUS_GROUP_IN_PROGRESS = new Set<MiniatureStatusValue>([
+  "sub_assembled",
+  "built",
+  "primed",
+  "painting_started",
+]);
+export const STATUS_GROUP_BACKLOG = new Set<MiniatureStatusValue>([
+  "backlog",
+  "unknown",
+  "missing",
+  "needs_stripped",
+  "needs_repair",
+  "missing_arm",
+  "missing_leg",
+  "missing_head",
+]);

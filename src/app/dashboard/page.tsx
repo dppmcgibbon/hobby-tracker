@@ -62,59 +62,75 @@ export default async function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider">Total Forces</CardTitle>
-            <Package className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-primary">{stats.totalMiniatures}</div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">
-              {stats.uniqueModels} unique units
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/army-distribution" className="block">
+          <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider">Total Forces</CardTitle>
+              <Package className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-black text-primary">{stats.totalMiniatures}</div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                {stats.uniqueModels} unique units
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider">Battle Ready</CardTitle>
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-primary">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">
-              {stats.completionPercentage.toFixed(1)}% complete
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/army-distribution?filter=complete" className="block">
+          <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider">Battle Ready</CardTitle>
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-black text-primary">{stats.completed}</div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                {stats.completionPercentage.toFixed(1)}% complete
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider">In Progress</CardTitle>
-            <Clock className="h-5 w-5 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-accent">{stats.painting}</div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">On the workbench</p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/army-distribution?filter=in_progress" className="block">
+          <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider">In Progress</CardTitle>
+              <Clock className="h-5 w-5 text-accent" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-black text-accent">{stats.painting}</div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Sub-assembled, Built, Primed, Painting started
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider">Backlog</CardTitle>
-            <Package className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-muted-foreground">{stats.backlog}</div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Awaiting deployment</p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/army-distribution?filter=backlog" className="block">
+          <Card className="warhammer-card border-primary/20 hover:border-primary/50 transition-all hover:shadow-gold cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider">Not Started</CardTitle>
+              <Package className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-black text-muted-foreground">{stats.backlog}</div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Backlog, Unknown, Missing, Needs stripped, Needs repair, Missing arm, Missing leg, Missing head
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 items-stretch">
         <StatusDistributionChart data={stats.statusBreakdown} />
-        <FactionBreakdownChart factionBreakdown={stats.factionBreakdown} />
+        <FactionBreakdownChart
+          factionBreakdown={stats.factionBreakdown}
+          limit={10}
+          href="/dashboard/army-distribution"
+        />
       </div>
 
       {/* Top Paints */}

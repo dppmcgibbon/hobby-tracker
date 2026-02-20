@@ -1,48 +1,69 @@
 import { createClient } from "@/lib/supabase/server";
+import { STATUS_GROUP_IN_PROGRESS, STATUS_GROUP_BACKLOG } from "@/lib/constants/miniature-status";
+
+const PAGE_SIZE = 1000;
+
+/** Fetch all miniatures for a user with pagination (matches miniatures page behaviour). */
+async function fetchAllMiniaturesForStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const select =
+    "id, quantity, created_at, faction_id, factions(name), miniature_status(status, completed_at)";
+  let all: any[] = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("miniatures")
+      .select(select)
+      .eq("user_id", userId)
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    all = all.concat(data);
+    hasMore = data.length === PAGE_SIZE;
+    offset += PAGE_SIZE;
+  }
+
+  return all;
+}
+
+/** Same as miniatures page: sum uses quantity, treating null/undefined as 0. */
+function qty(m: { quantity?: number | null }): number {
+  const q = m.quantity;
+  return typeof q === "number" && q >= 0 ? q : 0;
+}
 
 export async function getCollectionStatistics(userId: string) {
   const supabase = await createClient();
 
-  // Get all miniatures with status
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select(
-      `
-      id,
-      quantity,
-      created_at,
-      faction_id,
-      factions(name),
-      miniature_status(status, completed_at)
-    `
-    )
-    .eq("user_id", userId);
+  const miniatures = await fetchAllMiniaturesForStats(supabase, userId);
+  if (miniatures.length === 0) return null;
 
-  if (!miniatures) return null;
-
-  // Calculate totals
-  const totalMiniatures = miniatures.reduce((sum, m) => sum + m.quantity, 0);
+  // Calculate totals (use qty() so null/undefined quantity is treated as 1, matching miniatures page)
+  const totalMiniatures = miniatures.reduce((sum, m) => sum + qty(m), 0);
   const uniqueModels = miniatures.length;
 
   // Status breakdown
   const statusBreakdown = miniatures.reduce(
     (acc, m) => {
       const status = m.miniature_status?.status || "backlog";
-      acc[status] = (acc[status] || 0) + m.quantity;
+      acc[status] = (acc[status] || 0) + qty(m);
       return acc;
     },
     {} as Record<string, number>
   );
 
   const completed = statusBreakdown.complete || 0;
-  const painting = 
-    (statusBreakdown.painting_started || 0) +
-    (statusBreakdown.primed || 0) +
+  // In Progress: Built, Primed, Painting Started, Sub Assembled
+  const painting =
     (statusBreakdown.built || 0) +
+    (statusBreakdown.primed || 0) +
+    (statusBreakdown.painting_started || 0) +
     (statusBreakdown.sub_assembled || 0);
   const primed = statusBreakdown.primed || 0;
   const assembled = statusBreakdown.built || 0;
-  const backlog = 
+  const backlog =
     (statusBreakdown.backlog || 0) +
     (statusBreakdown.unknown || 0) +
     (statusBreakdown.missing || 0) +
@@ -58,7 +79,7 @@ export async function getCollectionStatistics(userId: string) {
   const factionBreakdown = miniatures.reduce(
     (acc, m) => {
       const factionName = m.factions?.name || "Unknown";
-      acc[factionName] = (acc[factionName] || 0) + m.quantity;
+      acc[factionName] = (acc[factionName] || 0) + qty(m);
       return acc;
     },
     {} as Record<string, number>
@@ -78,7 +99,7 @@ export async function getCollectionStatistics(userId: string) {
       (acc, m) => {
         const date = new Date(m.miniature_status.completed_at);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        acc[monthKey] = (acc[monthKey] || 0) + m.quantity;
+        acc[monthKey] = (acc[monthKey] || 0) + qty(m);
         return acc;
       },
       {} as Record<string, number>
@@ -89,7 +110,7 @@ export async function getCollectionStatistics(userId: string) {
     (acc, m) => {
       const date = new Date(m.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      acc[monthKey] = (acc[monthKey] || 0) + m.quantity;
+      acc[monthKey] = (acc[monthKey] || 0) + qty(m);
       return acc;
     },
     {} as Record<string, number>
@@ -109,6 +130,74 @@ export async function getCollectionStatistics(userId: string) {
     completionsByMonth,
     additionsByMonth,
   };
+}
+
+export type FactionBreakdownFilter = "all" | "complete" | "in_progress" | "backlog";
+
+/** Faction breakdown for a subset of miniatures by status filter (for army distribution page). */
+export async function getFactionBreakdown(
+  userId: string,
+  filter: FactionBreakdownFilter = "all"
+): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const miniatures = await fetchAllMiniaturesForStats(supabase, userId);
+  const filtered =
+    filter === "all"
+      ? miniatures
+      : miniatures.filter((m) => {
+          const status = m.miniature_status?.status || "backlog";
+          if (filter === "complete") return status === "complete";
+          if (filter === "in_progress") return STATUS_GROUP_IN_PROGRESS.has(status as any);
+          if (filter === "backlog") return STATUS_GROUP_BACKLOG.has(status as any);
+          return true;
+        });
+  return filtered.reduce(
+    (acc, m) => {
+      const factionName = m.factions?.name || "Unknown";
+      acc[factionName] = (acc[factionName] || 0) + qty(m);
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+}
+
+export type FactionBreakdownEntry = {
+  factionId: string | null;
+  factionName: string;
+  count: number;
+};
+
+/** Like getFactionBreakdown but returns array with faction ids for building miniatures links. */
+export async function getFactionBreakdownWithIds(
+  userId: string,
+  filter: FactionBreakdownFilter = "all"
+): Promise<FactionBreakdownEntry[]> {
+  const supabase = await createClient();
+  const miniatures = await fetchAllMiniaturesForStats(supabase, userId);
+  const filtered =
+    filter === "all"
+      ? miniatures
+      : miniatures.filter((m) => {
+          const status = m.miniature_status?.status || "backlog";
+          if (filter === "complete") return status === "complete";
+          if (filter === "in_progress") return STATUS_GROUP_IN_PROGRESS.has(status as any);
+          if (filter === "backlog") return STATUS_GROUP_BACKLOG.has(status as any);
+          return true;
+        });
+  const byKey = new Map<string, { factionId: string | null; factionName: string; count: number }>();
+  for (const m of filtered) {
+    const factionId = m.faction_id ?? null;
+    const factionName = m.factions?.name ?? "Unknown";
+    const key = factionId ?? "null";
+    const existing = byKey.get(key);
+    const add = qty(m);
+    if (existing) {
+      existing.count += add;
+    } else {
+      byKey.set(key, { factionId, factionName, count: add });
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => b.count - a.count);
 }
 
 export async function getRecentActivity(userId: string) {

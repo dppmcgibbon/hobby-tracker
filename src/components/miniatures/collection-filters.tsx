@@ -67,6 +67,9 @@ export interface FilterState {
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "not_started", label: "Not Started" },
+  { value: "complete", label: "Complete" },
   { value: "unknown", label: "Unknown" },
   { value: "missing", label: "Missing" },
   { value: "needs_stripped", label: "Needs Stripped" },
@@ -79,7 +82,6 @@ const STATUS_OPTIONS = [
   { value: "missing_arm", label: "Missing Arm" },
   { value: "missing_leg", label: "Missing Leg" },
   { value: "missing_head", label: "Missing Head" },
-  { value: "complete", label: "Complete" },
 ];
 
 export function CollectionFilters({
@@ -465,6 +467,7 @@ export function CollectionFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Factions</SelectItem>
+                <SelectItem value="none">No Faction</SelectItem>
                 {filteredFactions.map((faction) => (
                   <SelectItem key={faction.id} value={faction.id}>
                     {faction.name}
@@ -520,8 +523,12 @@ export function CollectionFilters({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.filter(option => 
-                  option.value === "all" || availableStatuses.has(option.value)
+                {STATUS_OPTIONS.filter(
+                  (option) =>
+                    option.value === "all" ||
+                    option.value === "in_progress" ||
+                    option.value === "not_started" ||
+                    availableStatuses.has(option.value)
                 ).map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -812,6 +819,7 @@ export function CollectionFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Factions</SelectItem>
+                      <SelectItem value="none">No Faction</SelectItem>
                       {filteredFactions.map((faction) => (
                         <SelectItem key={faction.id} value={faction.id}>
                           {faction.name}
@@ -885,8 +893,12 @@ export function CollectionFilters({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.filter(option => 
-                        option.value === "all" || availableStatuses.has(option.value)
+                      {STATUS_OPTIONS.filter(
+                        (option) =>
+                          option.value === "all" ||
+                          option.value === "in_progress" ||
+                          option.value === "backlog" ||
+                          availableStatuses.has(option.value)
                       ).map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -979,7 +991,7 @@ export function CollectionFilters({
           )}
           {filters.factionId !== "all" && (
             <Badge variant="secondary">
-              Faction: {factions.find((f) => f.id === filters.factionId)?.name || filters.factionId}
+              Faction: {filters.factionId === "none" ? "No Faction" : factions.find((f) => f.id === filters.factionId)?.name || filters.factionId}
               <button
                 onClick={() => updateFilter("factionId", "all")}
                 className="ml-1 hover:text-destructive"

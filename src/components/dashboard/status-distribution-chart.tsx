@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants/miniature-status";
 
 interface StatusDistributionChartProps {
@@ -59,15 +59,15 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
   };
 
   return (
-    <Card className="warhammer-card border-primary/30">
+    <Card className="warhammer-card border-primary/30 h-full flex flex-col">
       <CardHeader>
         <CardTitle className="text-xl uppercase tracking-wide text-primary">
           Force Composition
         </CardTitle>
         <CardDescription>Battle readiness by status</CardDescription>
       </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+      <CardContent className="flex-1 flex flex-col min-h-0">
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
             <Pie
               data={chartData}
@@ -88,11 +88,6 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
                 />
               ))}
             </Pie>
-            <Legend 
-              verticalAlign="bottom" 
-              height={36}
-              formatter={(value) => <span className="text-sm">{value}</span>}
-            />
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(0, 0%, 10%)",
@@ -110,6 +105,20 @@ export function StatusDistributionChart({ data }: StatusDistributionChartProps) 
             />
           </PieChart>
         </ResponsiveContainer>
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center pt-2 border-t border-border/50 mt-2">
+          {chartData.map((entry) => (
+            <div
+              key={entry.status}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <span
+                className="shrink-0 w-2.5 h-2.5 rounded-full border border-border"
+                style={{ backgroundColor: STATUS_COLORS[entry.status] || "hsl(0, 0%, 50%)" }}
+              />
+              <span>{entry.name}</span>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

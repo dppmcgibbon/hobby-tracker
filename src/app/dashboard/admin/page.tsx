@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload, Layers } from "lucide-react";
+import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload, Layers, Palette } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -49,6 +49,13 @@ export default async function AdminPage() {
       icon: Shield,
       href: "/dashboard/admin/army-types",
       color: "text-cyan-500",
+    },
+    {
+      title: "Paint management",
+      description: "Add paints, update hex codes, and manage brands",
+      icon: Palette,
+      href: "/dashboard/admin/paints",
+      color: "text-rose-500",
     },
     {
       title: "Collect Apps Config",
