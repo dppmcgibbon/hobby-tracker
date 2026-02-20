@@ -73,11 +73,11 @@ export function findMatchingPaints(
  * Convert RGB to Lab color space for Delta E calculation (more accurate)
  * Reference: http://www.easyrgb.com/en/math.php
  */
-function rgbToLab(r: number, g: number, b: number): { l: number; a: number; b: number } {
+function rgbToLab(r: number, g: number, blue: number): { l: number; a: number; b: number } {
   // Convert RGB to XYZ
   let varR = r / 255;
   let varG = g / 255;
-  let varB = b / 255;
+  let varB = blue / 255;
 
   varR = varR > 0.04045 ? Math.pow((varR + 0.055) / 1.055, 2.4) : varR / 12.92;
   varG = varG > 0.04045 ? Math.pow((varG + 0.055) / 1.055, 2.4) : varG / 12.92;

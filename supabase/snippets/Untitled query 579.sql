@@ -1,1 +1,1 @@
-ALTER TABLE public.saved_filters ADD COLUMN IF NOT EXISTS logo_url TEXT;
+select * from paints

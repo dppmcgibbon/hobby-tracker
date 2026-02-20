@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/server";
+import { getPaintEquivalents as fetchPaintEquivalents } from "@/lib/queries/paints";
 import { addPaintToInventorySchema, updatePaintInventorySchema } from "@/lib/validations/paint";
 import type { AddPaintToInventoryInput, UpdatePaintInventoryInput } from "@/lib/validations/paint";
 
@@ -65,4 +66,8 @@ export async function removePaintFromInventory(id: string) {
 
   revalidatePath("/dashboard/paints");
   return { success: true };
+}
+
+export async function getPaintEquivalents(paintId: string) {
+  return fetchPaintEquivalents(paintId);
 }

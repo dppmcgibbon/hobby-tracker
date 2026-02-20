@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 
 interface Paint {
   id: string;
@@ -118,7 +119,7 @@ export function PaintMatcher({ paints }: PaintMatcherProps) {
                       <Card key={match.paint.id} className="relative overflow-hidden">
                         <div
                           className="absolute left-0 top-0 bottom-0 w-2"
-                          style={{ backgroundColor: match.paint.color_hex }}
+                          style={{ backgroundColor: match.paint.color_hex || "#888" }}
                         />
                         <CardContent className="p-4 pl-6">
                           <div className="flex items-start justify-between mb-2">
@@ -133,9 +134,13 @@ export function PaintMatcher({ paints }: PaintMatcherProps) {
                                 {match.paint.brand} • {match.paint.type}
                               </p>
                             </div>
-                            <div
-                              className="w-12 h-12 rounded-md border-2 border-gray-200 flex-shrink-0"
-                              style={{ backgroundColor: match.paint.color_hex }}
+                            <PaintSwatch
+                              type={match.paint.type}
+                              name={match.paint.name}
+                              colorHex={match.paint.color_hex}
+                              size="md"
+                              paintId={match.paint.id}
+                              brand={match.paint.brand}
                             />
                           </div>
                           <div className="space-y-1">

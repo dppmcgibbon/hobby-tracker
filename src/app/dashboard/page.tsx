@@ -12,6 +12,7 @@ import { GameStatisticsCard } from "@/components/dashboard/game-statistics-card"
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 
 export default async function DashboardPage() {
   const user = await requireAuth();
@@ -131,7 +132,13 @@ export default async function DashboardPage() {
                 .slice(0, 10)
                 .map(
                   (
-                    paint: { name: string; brand: string; color_hex?: string; count: number },
+                    paint: {
+                      name: string;
+                      brand: string;
+                      type: string;
+                      color_hex?: string;
+                      count: number;
+                    },
                     index: number
                   ) => (
                     <div
@@ -139,9 +146,12 @@ export default async function DashboardPage() {
                       className="flex items-center justify-between p-2 rounded hover:bg-muted/30 transition-colors border border-transparent hover:border-primary/20"
                     >
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-sm border-2 border-primary/30 shadow-inner"
-                          style={{ backgroundColor: paint.color_hex || "#888" }}
+                        <PaintSwatch
+                          type={paint.type}
+                          name={paint.name}
+                          colorHex={paint.color_hex}
+                          size="sm"
+                          className="border-2 border-primary/30 shadow-inner"
                         />
                         <div>
                           <p className="text-sm font-bold uppercase tracking-wide">{paint.name}</p>

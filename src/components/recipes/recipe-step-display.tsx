@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 import type { RecipeStep, Paint } from "@/types";
 
 interface RecipeStepWithPaint extends RecipeStep {
@@ -53,9 +54,13 @@ export function RecipeStepDisplay({ step, stepNumber }: RecipeStepDisplayProps) 
 
           {step.paint && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted">
-              <div
-                className="w-5 h-5 rounded border border-border"
-                style={{ backgroundColor: step.paint.color_hex || "#888" }}
+              <PaintSwatch
+                type={step.paint.type}
+                name={step.paint.name}
+                colorHex={step.paint.color_hex}
+                size="xs"
+                paintId={step.paint.id}
+                brand={step.paint.brand}
               />
               <span className="text-sm font-medium">
                 {step.paint.brand} - {step.paint.name}

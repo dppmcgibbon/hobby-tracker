@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { createRecipeWithStepsSchema } from "@/lib/validations/recipe";
 import { createRecipe } from "@/app/actions/recipes";
 import { Plus, Trash2, GripVertical } from "lucide-react";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 import type { Paint, Faction } from "@/types";
 import type { CreateRecipeWithStepsInput } from "@/lib/validations/recipe";
 
@@ -198,9 +199,13 @@ export function RecipeForm({ paints, factions }: RecipeFormProps) {
                         {paints.map((paint) => (
                           <SelectItem key={paint.id} value={paint.id}>
                             <div className="flex items-center gap-2">
-                              <div
-                                className="w-4 h-4 rounded border"
-                                style={{ backgroundColor: paint.color_hex || "#888" }}
+                              <PaintSwatch
+                                type={paint.type}
+                                name={paint.name}
+                                colorHex={paint.color_hex}
+                                size="xs"
+                                paintId={paint.id}
+                                brand={paint.brand}
                               />
                               {paint.brand} - {paint.name}
                             </div>

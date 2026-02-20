@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updatePaintInventory, removePaintFromInventory } from "@/app/actions/paints";
 import { Edit2, Trash2, Search } from "lucide-react";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 import type { UserPaint, Paint } from "@/types";
 
 interface UserPaintWithPaint extends UserPaint {
@@ -118,9 +119,13 @@ export function PaintInventoryList({ userPaints }: PaintInventoryListProps) {
             {filteredPaints.map((userPaint) => (
               <TableRow key={userPaint.id}>
                 <TableCell>
-                  <div
-                    className="w-8 h-8 rounded border"
-                    style={{ backgroundColor: userPaint.paint.color_hex || "#888" }}
+                  <PaintSwatch
+                    type={userPaint.paint.type}
+                    name={userPaint.paint.name}
+                    colorHex={userPaint.paint.color_hex}
+                    size="sm"
+                    paintId={userPaint.paint.id}
+                    brand={userPaint.paint.brand}
                   />
                 </TableCell>
                 <TableCell className="font-medium">{userPaint.paint.name}</TableCell>

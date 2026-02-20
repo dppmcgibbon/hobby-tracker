@@ -176,7 +176,7 @@ export async function getPaintStatistics(userId: string) {
     .select(
       `
       paint_id,
-      paints(name, brand, type),
+      paints(name, brand, type, color_hex),
       painting_recipes!inner(user_id)
     `
     )

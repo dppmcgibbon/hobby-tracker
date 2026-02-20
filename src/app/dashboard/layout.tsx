@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import { Home, Package, Palette, User, FolderOpen, Settings } from "lucide-react";
+import { Home, Package, Palette, User, FolderOpen, Settings, Layers } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -75,6 +75,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Paints
             </Link>
             <Link
+              href="/dashboard/collect-apps"
+              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+            >
+              <Layers className="h-4 w-4 inline-block mr-1.5" />
+              Collect
+            </Link>
+            <Link
               href="/dashboard/admin"
               className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
             >
@@ -117,7 +124,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       {/* Main Content */}
-      <main className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 py-8 mx-auto max-w-[1600px]">
+      <main className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 py-8 mx-auto max-w-[1920px]">
         {children}
       </main>
     </div>

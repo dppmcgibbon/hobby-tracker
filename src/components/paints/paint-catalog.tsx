@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { addPaintToInventory } from "@/app/actions/paints";
 import { Plus, Search, Check } from "lucide-react";
+import { PaintSwatch } from "@/components/paints/paint-swatch";
 import type { Paint, UserPaint } from "@/types";
 
 interface PaintCatalogProps {
@@ -37,7 +38,7 @@ export function PaintCatalog({ paints, userPaints }: PaintCatalogProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [brandFilter, setBrandFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("Citadel");
   const [adding, setAdding] = useState<string | null>(null);
 
   const userPaintIds = new Set(userPaints.map((up) => up.paint_id));
@@ -118,9 +119,13 @@ export function PaintCatalog({ paints, userPaints }: PaintCatalogProps) {
             <Card key={paint.id}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded border flex-shrink-0"
-                    style={{ backgroundColor: paint.color_hex || "#888" }}
+                  <PaintSwatch
+                    type={paint.type}
+                    name={paint.name}
+                    colorHex={paint.color_hex}
+                    size="md"
+                    paintId={paint.id}
+                    brand={paint.brand}
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm line-clamp-1">{paint.name}</h3>
