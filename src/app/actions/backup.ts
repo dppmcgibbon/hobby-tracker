@@ -199,22 +199,12 @@ export async function createDatabaseBackup() {
             }
           }
           
-          // Process the combined data
-          if (allData.length > 0) {
-            const csv = convertToCSV(allData, table);
-            backups.push({
-              tableName: table,
-              csv,
-              rowCount: allData.length,
-            });
-          }
-          
-          // Skip the normal query execution
-          continue;
-        } else {
-          // No miniatures, skip this table
+          const csv = allData.length > 0 ? convertToCSV(allData, table) : "";
+          backups.push({ tableName: table, csv, rowCount: allData.length });
           continue;
         }
+        backups.push({ tableName: table, csv: "", rowCount: 0 });
+        continue;
       }
 
       if (table === "collection_miniatures") {
@@ -248,22 +238,12 @@ export async function createDatabaseBackup() {
             }
           }
           
-          // Process the combined data
-          if (allData.length > 0) {
-            const csv = convertToCSV(allData, table);
-            backups.push({
-              tableName: table,
-              csv,
-              rowCount: allData.length,
-            });
-          }
-          
-          // Skip the normal query execution
-          continue;
-        } else {
-          // No collections, skip this table
+          const csv = allData.length > 0 ? convertToCSV(allData, table) : "";
+          backups.push({ tableName: table, csv, rowCount: allData.length });
           continue;
         }
+        backups.push({ tableName: table, csv: "", rowCount: 0 });
+        continue;
       }
 
       if (table === "recipe_steps") {
@@ -297,22 +277,12 @@ export async function createDatabaseBackup() {
             }
           }
           
-          // Process the combined data
-          if (allData.length > 0) {
-            const csv = convertToCSV(allData, table);
-            backups.push({
-              tableName: table,
-              csv,
-              rowCount: allData.length,
-            });
-          }
-          
-          // Skip the normal query execution
-          continue;
-        } else {
-          // No recipes, skip this table
+          const csv = allData.length > 0 ? convertToCSV(allData, table) : "";
+          backups.push({ tableName: table, csv, rowCount: allData.length });
           continue;
         }
+        backups.push({ tableName: table, csv: "", rowCount: 0 });
+        continue;
       }
 
       const { data, error } = await query;
@@ -322,34 +292,31 @@ export async function createDatabaseBackup() {
         throw new Error(`Failed to backup ${table}: ${error.message}`);
       }
 
-      if (data && data.length > 0) {
-        const csv = convertToCSV(data, table);
-        backups.push({
-          tableName: table,
-          csv,
-          rowCount: data.length,
-        });
+      const csv = data && data.length > 0 ? convertToCSV(data, table) : "";
+      backups.push({
+        tableName: table,
+        csv,
+        rowCount: data?.length ?? 0,
+      });
 
-        // Download actual photo files if this is the miniature_photos table
-        if (table === "miniature_photos") {
-          for (const photo of data) {
-            if (photo.storage_path) {
-              try {
-                const { data: fileData, error: downloadError } = await supabase.storage
-                  .from("miniature-photos")
-                  .download(photo.storage_path);
+      if (table === "miniature_photos" && data && data.length > 0) {
+        for (const photo of data) {
+          if (photo.storage_path) {
+            try {
+              const { data: fileData, error: downloadError } = await supabase.storage
+                .from("miniature-photos")
+                .download(photo.storage_path);
 
-                if (!downloadError && fileData) {
-                  photoFiles.push({
-                    path: photo.storage_path,
-                    blob: fileData,
-                  });
-                } else {
-                  console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
-                }
-              } catch (downloadError) {
-                console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
+              if (!downloadError && fileData) {
+                photoFiles.push({
+                  path: photo.storage_path,
+                  blob: fileData,
+                });
+              } else {
+                console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
               }
+            } catch (downloadError) {
+              console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
             }
           }
         }
@@ -1174,13 +1141,12 @@ export async function importDatabaseBackup(backupData: {
   }
 }
 
-/** Extract table name from ZIP entry path (normalize slashes and prefix). */
+/** Extract table name from ZIP entry path. Accepts data/table.csv or any path ending in .csv. */
 function tableNameFromZipPath(filename: string): string | null {
-  const normalized = filename.replace(/\\/g, "/").replace(/^\/+/, "");
-  if (normalized.startsWith("data/") && normalized.endsWith(".csv")) {
-    return normalized.slice(5, -4);
-  }
-  return null;
+  const normalized = filename.replace(/\\/g, "/").replace(/^\/+/, "").trim();
+  if (!normalized.endsWith(".csv")) return null;
+  const base = normalized.split("/").pop();
+  return base ? base.slice(0, -4) : null;
 }
 
 /** Extract photo path from ZIP entry (photos/ prefix removed). */
