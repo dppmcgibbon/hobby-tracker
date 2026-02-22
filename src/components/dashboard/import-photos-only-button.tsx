@@ -56,10 +56,18 @@ export function ImportPhotosOnlyButton() {
       const storagePath = `${user.id}/import-photos-${Date.now()}.zip`;
       const { error: uploadError } = await supabase.storage
         .from(BACKUP_IMPORTS_BUCKET)
-        .upload(storagePath, pendingFile, { contentType: "application/zip", upsert: true });
+        .upload(storagePath, pendingFile, {
+          contentType: "application/zip",
+          upsert: true,
+        });
 
       if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+        const msg = uploadError.message || "Unknown error";
+        const hint =
+          uploadError.message?.toLowerCase().includes("bucket") || uploadError.message?.toLowerCase().includes("400")
+            ? " Ensure the backup-imports bucket exists: run supabase db push on your project."
+            : "";
+        throw new Error(`Upload failed: ${msg}${hint}`);
       }
 
       const result = await importPhotosOnlyFromStoragePath(storagePath);
@@ -137,13 +145,13 @@ export function ImportPhotosOnlyButton() {
       </Button>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby="import-photos-only-description">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <ImagePlus className="h-5 w-5 text-primary" />
               Import photos only
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            <AlertDialogDescription id="import-photos-only-description" asChild>
               <div className="space-y-3 pt-2 text-sm text-muted-foreground">
                 <p>
                   This will extract and upload only the photos from the backup ZIP. Use a ZIP created by the app&apos;s
