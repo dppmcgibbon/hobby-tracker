@@ -42,12 +42,15 @@ function convertToCSV(data: any[], tableName: string): string {
 
 // Helper function to parse CSV back to array of objects
 function parseCSV(csv: string): any[] {
-  if (!csv || csv.trim().length === 0) return [];
+  if (!csv || typeof csv !== "string") return [];
+  // Strip BOM and normalize line endings so split("\n") works
+  csv = csv.replace(/\uFEFF/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (csv.trim().length === 0) return [];
 
   const lines = csv.split("\n").filter((line) => line.trim().length > 0);
   if (lines.length === 0) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/\uFEFF/g, ""));
   const data: any[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -1199,6 +1202,21 @@ async function importFromZipBuffer(
     if (photoPath) {
       const buffer = await zipFile.async("arraybuffer");
       photoEntries.push({ path: photoPath, buffer });
+    }
+  }
+
+  // Fallback: ensure junction/photo tables are found (some ZIP tools use different path formats)
+  const criticalTables = ["miniature_photos", "miniature_status", "miniature_tags", "miniature_games"];
+  for (const name of criticalTables) {
+    if (backupData[name]) continue;
+    const suffix = `${name}.csv`;
+    for (const [filename, zipFile] of Object.entries(zip.files)) {
+      if (zipFile.dir) continue;
+      const norm = filename.replace(/\\/g, "/").toLowerCase();
+      if (norm.endsWith("/" + suffix) || norm === suffix) {
+        backupData[name] = await zipFile.async("text");
+        break;
+      }
     }
   }
 
