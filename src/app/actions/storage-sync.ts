@@ -8,16 +8,25 @@ const BUCKET = "miniature-photos";
 
 type ListItem = { name: string; id?: string | null };
 
-async function listAllPaths(
-  supabase: ReturnType<typeof createClient>,
-  prefix: string
-): Promise<string[]> {
+/** Minimal type so both createClient (local) and createServiceRoleClient (remote) are accepted. */
+type StorageClient = {
+  storage: {
+    from: (bucket: string) => {
+      list: (prefix: string, options?: { limit?: number }) => Promise<{ data: unknown; error: Error | null }>;
+      download: (path: string) => Promise<{ data: Blob | null; error: Error | null }>;
+      upload: (path: string, body: Blob, options?: { contentType?: string; upsert?: boolean }) => Promise<{ error: Error | null }>;
+    };
+  };
+};
+
+async function listAllPaths(supabase: StorageClient, prefix: string): Promise<string[]> {
   const { data, error } = await supabase.storage.from(BUCKET).list(prefix, { limit: 1000 });
   if (error) throw error;
   const paths: string[] = [];
-  for (const item of data || []) {
+  const items = (Array.isArray(data) ? data : []) as ListItem[];
+  for (const item of items) {
     const path = prefix ? `${prefix}/${item.name}` : item.name;
-    if ((item as ListItem).id != null) {
+    if (item.id != null) {
       paths.push(path);
     } else {
       paths.push(...(await listAllPaths(supabase, path)));
