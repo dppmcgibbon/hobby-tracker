@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export function EditionFormDialog({ gameId, edition, trigger, onSuccess }: Editi
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<EditionInput>({
-    resolver: zodResolver(editionSchema),
+    resolver: zodResolver(editionSchema) as Resolver<EditionInput>,
     defaultValues: {
       game_id: gameId,
       name: edition?.name || "",

@@ -31,6 +31,6 @@ export const miniatureGameSchema = z.object({
 });
 
 export type GameInput = z.infer<typeof gameSchema>;
-export type EditionInput = z.infer<typeof editionSchema>;
-export type ExpansionInput = z.infer<typeof expansionSchema>;
+export type EditionInput = z.output<typeof editionSchema>;
+export type ExpansionInput = z.output<typeof expansionSchema>;
 export type MiniatureGameInput = z.infer<typeof miniatureGameSchema>;

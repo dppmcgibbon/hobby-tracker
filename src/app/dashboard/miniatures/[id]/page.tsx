@@ -66,6 +66,16 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
   // Get selected tag IDs
   const selectedTagIds = miniatureTags?.map((mt) => mt.tag_id) || [];
 
+  // Normalize miniature_games: Supabase returns nested relations as arrays
+  const normalizedMiniatureGames = (miniatureGames || []).map((row: any) => ({
+    game_id: row.game_id,
+    edition_id: row.edition_id ?? null,
+    expansion_id: row.expansion_id ?? null,
+    games: Array.isArray(row.games) ? row.games[0] : row.games,
+    editions: Array.isArray(row.editions) ? row.editions[0] : row.editions,
+    expansions: Array.isArray(row.expansions) ? row.expansions[0] : row.expansions,
+  }));
+
   // Count linked recipes from miniature data
   const linkedRecipeCount = miniature.recipes?.length || 0;
 
@@ -216,7 +226,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
           </Card>
 
           {/* Game Links */}
-          <GameLinkManager miniatureId={id} currentLinks={miniatureGames || []} />
+          <GameLinkManager miniatureId={id} currentLinks={normalizedMiniatureGames} />
         </div>
 
         {/* Right Column - Photos & Recipes */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { miniatureSchema, type MiniatureInput } from "@/lib/validations/miniature";
@@ -86,7 +86,7 @@ export function MiniatureForm({
     watch,
     formState: { errors },
   } = useForm<MiniatureInput>({
-    resolver: zodResolver(miniatureSchema),
+    resolver: zodResolver(miniatureSchema) as Resolver<MiniatureInput>,
     defaultValues: miniature
       ? {
           name: miniature.name,

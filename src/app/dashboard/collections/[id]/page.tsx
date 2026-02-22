@@ -13,7 +13,8 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-interface CollectionMiniature {
+// Supabase returns nested relations as arrays
+interface CollectionMiniatureRow {
   miniature_id: string;
   display_order: number;
   miniatures: {
@@ -26,7 +27,7 @@ interface CollectionMiniature {
       | { status: string; completed_at: string | null; based?: boolean; magnetised?: boolean }
       | { status: string; completed_at: string | null; based?: boolean; magnetised?: boolean }[];
     miniature_photos: { id: string; storage_path: string }[];
-  } | null;
+  }[] | null;
 }
 
 export default async function CollectionDetailPage({ params }: Props) {
@@ -65,21 +66,16 @@ export default async function CollectionDetailPage({ params }: Props) {
     .eq("collection_id", id)
     .order("display_order", { ascending: true });
 
-  // Transform the data structure
+  // Transform the data structure (Supabase returns nested relations as arrays)
   const miniatures = (collectionMiniatures || [])
-    .map((cm: CollectionMiniature) => {
-      if (!cm.miniatures) return null;
+    .map((cm: CollectionMiniatureRow) => {
+      const m = Array.isArray(cm.miniatures) ? cm.miniatures[0] : cm.miniatures;
+      if (!m) return null;
       return {
-        ...cm.miniatures,
-        factions: Array.isArray(cm.miniatures.factions)
-          ? cm.miniatures.factions[0]
-          : cm.miniatures.factions,
-        miniature_status: Array.isArray(cm.miniatures.miniature_status)
-          ? cm.miniatures.miniature_status[0]
-          : cm.miniatures.miniature_status,
-        miniature_photos: Array.isArray(cm.miniatures.miniature_photos)
-          ? cm.miniatures.miniature_photos
-          : [],
+        ...m,
+        factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
+        miniature_status: Array.isArray(m.miniature_status) ? m.miniature_status[0] : m.miniature_status,
+        miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

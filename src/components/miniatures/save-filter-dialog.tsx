@@ -55,7 +55,7 @@ export function SaveFilterDialog({ currentFilters }: SaveFilterDialogProps) {
 
     setIsLoading(true);
     try {
-      await saveFilter(name, currentFilters as Record<string, string>, logoUrl || undefined);
+      await saveFilter(name, currentFilters as unknown as Record<string, string>, logoUrl || undefined);
       toast.success("Filter saved successfully!");
       setOpen(false);
       setName("");

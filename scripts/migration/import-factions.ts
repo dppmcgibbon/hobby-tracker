@@ -5,8 +5,8 @@ import { supabase, config } from "./config";
 interface FactionRow {
   name: string;
   army_type: string;
-  description: string;
-  color_hex: string;
+  description?: string | null;
+  color_hex?: string | null;
 }
 
 async function importFactions(csvPath: string) {

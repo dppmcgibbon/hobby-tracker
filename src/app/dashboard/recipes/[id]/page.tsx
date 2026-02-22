@@ -19,7 +19,7 @@ import { deleteRecipe } from "@/app/actions/recipes";
 import { Edit2, Trash2, ArrowLeft, Globe } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { RecipeStepDisplay } from "@/components/recipes/recipe-step-display";
+import { RecipeStepDisplay, type RecipeStepWithPaint } from "@/components/recipes/recipe-step-display";
 
 interface RecipeDetailPageProps {
   params: Promise<{
@@ -115,12 +115,9 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
         <CardContent>
           {recipe.steps && recipe.steps.length > 0 ? (
             <div className="space-y-4">
-              {recipe.steps
-                .sort(
-                  (a: { step_order: number }, b: { step_order: number }) =>
-                    a.step_order - b.step_order
-                )
-                .map((step: { id: string; step_order: number }, index: number) => (
+              {(recipe.steps as RecipeStepWithPaint[])
+                .sort((a, b) => (a.step_order ?? 0) - (b.step_order ?? 0))
+                .map((step: RecipeStepWithPaint, index: number) => (
                   <div key={step.id}>
                     <RecipeStepDisplay step={step} stepNumber={index + 1} />
                     {index < recipe.steps.length - 1 && <Separator className="mt-4" />}

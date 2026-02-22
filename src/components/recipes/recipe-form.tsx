@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,7 @@ export function RecipeForm({ paints, factions }: RecipeFormProps) {
     formState: { errors },
     setValue,
   } = useForm<CreateRecipeWithStepsInput>({
-    resolver: zodResolver(createRecipeWithStepsSchema),
+    resolver: zodResolver(createRecipeWithStepsSchema) as Resolver<CreateRecipeWithStepsInput>,
     defaultValues: {
       recipe: {
         name: "",

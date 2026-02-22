@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export function ExpansionFormDialog({
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<ExpansionInput>({
-    resolver: zodResolver(expansionSchema),
+    resolver: zodResolver(expansionSchema) as Resolver<ExpansionInput>,
     defaultValues: {
       edition_id: editionId,
       name: expansion?.name || "",

@@ -282,12 +282,21 @@ export async function getPaintStatistics(userId: string) {
   const paintUsage = recipePaints?.reduce(
     (acc, step) => {
       if (step.paint_id && step.paints) {
-        const paintInfo = step.paints;
-        const key = step.paint_id;
-        if (!acc[key]) {
-          acc[key] = { ...paintInfo, count: 0 };
+        const raw = Array.isArray(step.paints) ? step.paints[0] : step.paints;
+        const paintInfo = raw as { name?: string; brand?: string; type?: string; color_hex?: string } | null;
+        if (paintInfo) {
+          const key = step.paint_id;
+          if (!acc[key]) {
+            acc[key] = {
+              name: paintInfo.name ?? "",
+              brand: paintInfo.brand ?? "",
+              type: paintInfo.type ?? "",
+              color_hex: paintInfo.color_hex,
+              count: 0,
+            };
+          }
+          acc[key].count++;
         }
-        acc[key].count++;
       }
       return acc;
     },

@@ -15,6 +15,27 @@ import { DeleteExpansionButton } from "@/components/games/delete-expansion-butto
 import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+interface EditionWithExpansions {
+  id: string;
+  game_id: string;
+  name: string;
+  sequence: number;
+  year: number | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  expansions?: Array<{
+    id: string;
+    edition_id: string;
+    name: string;
+    sequence: number;
+    year: number | null;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
 async function GameDetailsContent({ id, universes }: { id: string; universes: { id: string; name: string }[] }) {
   const supabase = await createClient();
 
@@ -39,10 +60,10 @@ async function GameDetailsContent({ id, universes }: { id: string; universes: { 
   }
 
   // Sort editions and expansions
-  const sortedEditions = game.editions?.sort((a, b) => a.sequence - b.sequence) || [];
+  const sortedEditions: EditionWithExpansions[] = game.editions?.sort((a: { sequence: number }, b: { sequence: number }) => a.sequence - b.sequence) || [];
   sortedEditions.forEach((edition) => {
     if (edition.expansions) {
-      edition.expansions.sort((a, b) => a.sequence - b.sequence);
+      edition.expansions.sort((a: { sequence: number }, b: { sequence: number }) => a.sequence - b.sequence);
     }
   });
 
@@ -107,7 +128,7 @@ async function GameDetailsContent({ id, universes }: { id: string; universes: { 
             </p>
           ) : (
             <div className="space-y-4">
-              {sortedEditions.map((edition) => (
+              {sortedEditions.map((edition: EditionWithExpansions) => (
                 <EditionCard key={edition.id} edition={edition} gameId={game.id} />
               ))}
             </div>
@@ -122,20 +143,7 @@ function EditionCard({
   edition,
   gameId,
 }: {
-  edition: {
-    id: string;
-    name: string;
-    sequence: number;
-    year: number | null;
-    description: string | null;
-    expansions?: Array<{
-      id: string;
-      name: string;
-      sequence: number;
-      year: number | null;
-      description: string | null;
-    }>;
-  };
+  edition: EditionWithExpansions;
   gameId: string;
 }) {
   const expansionCount = edition.expansions?.length || 0;

@@ -1,1 +1,1 @@
-select * from paints
+select count(*) from paints

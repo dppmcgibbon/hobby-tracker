@@ -23,7 +23,18 @@ async function importMiniatures(csvPath: string, userId: string) {
   const { data: factions } = await supabase.from("factions").select("id, name");
   const factionMap = new Map(factions?.map((f) => [f.name, f.id]) || []);
 
-  const miniatures: Array<{ name: string; faction_id?: string; quantity: number }> = [];
+  const miniatures: Array<{
+    user_id: string;
+    name: string;
+    faction_id?: string | null;
+    unit_type?: string | null;
+    quantity: number;
+    material?: string | null;
+    base_size?: string | null;
+    sculptor?: string | null;
+    year?: number | null;
+    notes?: string | null;
+  }> = [];
   let skipped = 0;
 
   // Read CSV file

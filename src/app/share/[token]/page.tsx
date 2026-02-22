@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { StatusBadge } from "@/components/miniatures/status-badge";
+import type { MiniatureStatus } from "@/types";
 
 interface Props {
   params: { token: string };
@@ -34,6 +35,13 @@ interface Recipe {
 interface MiniatureData {
   id: string;
   name: string;
+  status?: string;
+  quantity?: number;
+  unit_type?: string | null;
+  sculptor?: string | null;
+  year?: number | null;
+  magnetised?: boolean | null;
+  based?: boolean | null;
   factions?: { name: string };
   photos?: Array<{ id: string; storage_path: string; caption?: string; photo_type?: string }>;
   recipes?: Recipe[];
@@ -102,7 +110,12 @@ export default async function SharedMiniaturePage({ params }: Props) {
             <p className="text-xl text-muted-foreground">{miniature.factions.name}</p>
           )}
           <div className="flex items-center justify-center gap-4 mt-4">
-            {miniature.status && <StatusBadge status={miniature.status} />}
+            {miniature.status && (
+              <StatusBadge
+                miniatureId={miniature.id}
+                status={{ status: miniature.status } as MiniatureStatus}
+              />
+            )}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Eye className="h-4 w-4" />
               <span>{share.view_count || 0} views</span>
@@ -113,7 +126,7 @@ export default async function SharedMiniaturePage({ params }: Props) {
         {/* Photo Gallery */}
         {photos.length > 0 && (
           <div className="mb-12">
-            <PhotoGallery photos={photos} />
+            <PhotoGallery photos={photos} miniatureName={miniature.name} />
           </div>
         )}
 

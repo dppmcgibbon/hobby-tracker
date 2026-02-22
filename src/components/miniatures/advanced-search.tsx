@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, X, SlidersHorizontal } from "lucide-react";
-import { useMiniatureFilters } from "@/lib/hooks/use-miniature-filters";
+import { useMiniatureFilters, type MiniatureFilters } from "@/lib/hooks/use-miniature-filters";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

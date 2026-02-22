@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Layers } from "lucide-react";
 import type { PaintingRecipe } from "@/types";
 
-interface RecipeWithRelations extends PaintingRecipe {
+interface RecipeWithRelations extends Omit<PaintingRecipe, "description" | "is_public"> {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_public?: boolean;
   faction?: { name: string } | null;
   steps?: Array<{ id: string }>;
 }

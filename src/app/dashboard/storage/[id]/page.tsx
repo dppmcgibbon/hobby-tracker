@@ -158,9 +158,10 @@ export default async function StorageBoxDetailPage({ params }: PageProps) {
           ) : (
             <div className="space-y-2">
               {miniatures.map((miniature) => {
-                const status = Array.isArray(miniature.miniature_status)
-                  ? miniature.miniature_status[0]?.status
-                  : miniature.miniature_status?.status;
+                const statusRow = Array.isArray(miniature.miniature_status)
+                  ? miniature.miniature_status[0]
+                  : (miniature.miniature_status as { status?: string } | null);
+                const status = statusRow?.status;
                 const faction = Array.isArray(miniature.factions)
                   ? miniature.factions[0]
                   : miniature.factions;

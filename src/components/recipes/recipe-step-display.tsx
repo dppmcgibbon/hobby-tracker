@@ -1,8 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { PaintSwatch } from "@/components/paints/paint-swatch";
-import type { RecipeStep, Paint } from "@/types";
+import type { Paint } from "@/types";
 
-interface RecipeStepWithPaint extends RecipeStep {
+export interface RecipeStepWithPaint {
+  id: string;
+  step_order?: number;
+  technique: string;
+  notes?: string | null;
   paint?: Paint | null;
 }
 

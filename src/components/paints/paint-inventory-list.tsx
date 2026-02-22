@@ -27,8 +27,11 @@ import { Edit2, Trash2, Search } from "lucide-react";
 import { PaintSwatch } from "@/components/paints/paint-swatch";
 import type { UserPaint, Paint } from "@/types";
 
-interface UserPaintWithPaint extends UserPaint {
+interface UserPaintWithPaint extends Omit<UserPaint, "quantity" | "notes"> {
+  id: string;
   paint: Paint;
+  quantity?: number;
+  notes?: string | null;
 }
 
 interface PaintInventoryListProps {
@@ -60,7 +63,7 @@ export function PaintInventoryList({ userPaints }: PaintInventoryListProps) {
 
   const handleEdit = (userPaint: UserPaintWithPaint) => {
     setEditingPaint(userPaint);
-    setQuantity(userPaint.quantity);
+    setQuantity(userPaint.quantity ?? 1);
     setNotes(userPaint.notes || "");
   };
 

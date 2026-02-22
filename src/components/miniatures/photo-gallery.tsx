@@ -25,7 +25,7 @@ interface Photo {
   id: string;
   storage_path: string;
   caption?: string;
-  uploaded_at: string;
+  uploaded_at?: string;
 }
 
 interface PhotoGalleryProps {

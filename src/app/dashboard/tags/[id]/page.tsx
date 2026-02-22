@@ -12,7 +12,8 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-interface TaggedMiniature {
+// Supabase returns nested relations as arrays
+interface TaggedMiniatureRow {
   miniature_id: string;
   miniatures: {
     id: string;
@@ -24,7 +25,7 @@ interface TaggedMiniature {
       | { status: string; completed_at: string | null }
       | { status: string; completed_at: string | null }[];
     miniature_photos: { id: string; storage_path: string }[];
-  } | null;
+  }[] | null;
 }
 
 export default async function TagDetailPage({ params }: Props) {
@@ -63,21 +64,16 @@ export default async function TagDetailPage({ params }: Props) {
     )
     .eq("tag_id", id);
 
-  // Transform the data structure
+  // Transform the data structure (Supabase returns nested relations as arrays)
   const miniatures = (taggedMiniatures || [])
-    .map((tm: TaggedMiniature) => {
-      if (!tm.miniatures) return null;
+    .map((tm: TaggedMiniatureRow) => {
+      const m = Array.isArray(tm.miniatures) ? tm.miniatures[0] : tm.miniatures;
+      if (!m) return null;
       return {
-        ...tm.miniatures,
-        factions: Array.isArray(tm.miniatures.factions)
-          ? tm.miniatures.factions[0]
-          : tm.miniatures.factions,
-        miniature_status: Array.isArray(tm.miniatures.miniature_status)
-          ? tm.miniatures.miniature_status[0]
-          : tm.miniatures.miniature_status,
-        miniature_photos: Array.isArray(tm.miniatures.miniature_photos)
-          ? tm.miniatures.miniature_photos
-          : [],
+        ...m,
+        factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
+        miniature_status: Array.isArray(m.miniature_status) ? m.miniature_status[0] : m.miniature_status,
+        miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

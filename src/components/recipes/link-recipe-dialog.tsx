@@ -18,6 +18,8 @@ import { Plus, Search, BookOpen } from "lucide-react";
 import type { PaintingRecipe } from "@/types";
 
 interface RecipeWithRelations extends PaintingRecipe {
+  id: string;
+  name: string;
   faction?: { name: string } | null;
   steps?: Array<{ id: string }>;
 }

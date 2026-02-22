@@ -6,7 +6,7 @@ interface PaintRow {
   brand: string;
   name: string;
   type: string;
-  color_hex: string;
+  color_hex?: string | null;
 }
 
 async function importPaints(csvPath: string) {

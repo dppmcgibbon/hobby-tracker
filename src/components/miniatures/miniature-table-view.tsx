@@ -255,7 +255,7 @@ export function MiniatureTableView({
     miniatureId: string,
     field: "magnetised" | "based",
     value: boolean,
-    currentStatus: MiniatureStatus | null
+    currentStatus: { status?: string; magnetised?: boolean | null; based?: boolean | null } | null
   ) => {
     setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: true }));
     
