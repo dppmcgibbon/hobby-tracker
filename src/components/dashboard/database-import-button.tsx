@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
-import { importDatabaseBackup } from "@/app/actions/backup";
+import { importDatabaseBackup, updatePhotoPathsAfterImport } from "@/app/actions/backup";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import {
@@ -60,8 +60,8 @@ export function DatabaseImportButton() {
             const tableName = filename.replace("data/", "").replace(".csv", "");
             const csvContent = await file.async("text");
             backupData[tableName] = csvContent;
-          } else if (filename.startsWith("photos/")) {
-            const photoPath = filename.replace("photos/", "");
+          } else if (filename.startsWith("photos/") || filename.startsWith("photos\\")) {
+            const photoPath = filename.replace(/^photos[/\\]/, "").replace(/\\/g, "/");
             const photoBlob = await file.async("blob");
             photoFiles.push({ path: photoPath, blob: photoBlob });
           }
@@ -133,27 +133,10 @@ export function DatabaseImportButton() {
           }
         }
         
-        // Update miniature_photos storage_path in the database to reflect new paths
+        // Update miniature_photos.storage_path on the server so paths match uploaded files
         if (Object.keys(pathMapping).length > 0) {
           try {
-            // Fetch all miniature_photos for this user
-            const { data: photos } = await supabase
-              .from("miniature_photos")
-              .select("id, storage_path")
-              .eq("user_id", user.id);
-            
-            if (photos) {
-              // Update each photo with the new path
-              for (const photo of photos) {
-                const newPath = pathMapping[photo.storage_path];
-                if (newPath) {
-                  await supabase
-                    .from("miniature_photos")
-                    .update({ storage_path: newPath })
-                    .eq("id", photo.id);
-                }
-              }
-            }
+            await updatePhotoPathsAfterImport(pathMapping);
           } catch (updateError) {
             console.error("Error updating photo paths in database:", updateError);
           }

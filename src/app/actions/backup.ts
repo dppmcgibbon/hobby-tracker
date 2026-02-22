@@ -20,8 +20,12 @@ function convertToCSV(data: any[], tableName: string): string {
         const value = row[header];
         // Handle null, undefined, and special characters
         if (value === null || value === undefined) return "";
-        // Convert to string and escape quotes
-        const stringValue = String(value).replace(/"/g, '""');
+        // Serialize objects/arrays (e.g. JSONB) so they round-trip
+        const raw =
+          typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value);
+        const stringValue = raw.replace(/"/g, '""');
         // Wrap in quotes if contains comma, newline, or quote
         if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes('"')) {
           return `"${stringValue}"`;
@@ -107,15 +111,29 @@ export async function createDatabaseBackup() {
       "tags",
       "shared_miniatures",
       "storage_boxes",
+      "saved_filters",
       // Reference tables (shared data)
+      "universes",
       "factions",
+      "army_types",
       "games",
       "editions",
       "expansions",
       "paints",
+      "paint_equivalents",
       "bases",
       "base_shapes",
       "base_types",
+      "miniature_statuses",
+      // Profile (current user only)
+      "profiles",
+      // Collect-app tables (catalog data)
+      "collect_apps",
+      "collect_config",
+      "boardgames",
+      "magazines",
+      "records",
+      "stories",
     ];
 
     const backups: Array<{ tableName: string; csv: string; rowCount: number }> = [];
@@ -136,10 +154,15 @@ export async function createDatabaseBackup() {
         "tags",
         "shared_miniatures",
         "storage_boxes",
+        "saved_filters",
       ];
 
       if (userTables.includes(table)) {
         query = query.eq("user_id", user.id);
+      }
+
+      if (table === "profiles") {
+        query = query.eq("id", user.id);
       }
 
       // For junction tables, we need to filter by related records
@@ -343,6 +366,46 @@ export async function createDatabaseBackup() {
   }
 }
 
+/** Normalize storage path for consistent matching (ZIP paths may use \\ or extra slashes). */
+function normalizeStoragePath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();
+}
+
+/** Server action: update miniature_photos.storage_path after import using path mapping. */
+export async function updatePhotoPathsAfterImport(pathMapping: Record<string, string>) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const normalizedMapping = new Map<string, string>();
+  for (const [oldPath, newPath] of Object.entries(pathMapping)) {
+    if (oldPath && newPath) {
+      normalizedMapping.set(normalizeStoragePath(oldPath), normalizeStoragePath(newPath));
+    }
+  }
+  if (normalizedMapping.size === 0) return { success: true, updated: 0 };
+
+  const { data: photos } = await supabase
+    .from("miniature_photos")
+    .select("id, storage_path")
+    .eq("user_id", user.id);
+
+  if (!photos?.length) return { success: true, updated: 0 };
+
+  let updated = 0;
+  for (const photo of photos) {
+    const stored = photo.storage_path ? normalizeStoragePath(photo.storage_path) : "";
+    const newPath = normalizedMapping.get(stored);
+    if (newPath) {
+      const { error } = await supabase
+        .from("miniature_photos")
+        .update({ storage_path: newPath })
+        .eq("id", photo.id);
+      if (!error) updated++;
+    }
+  }
+  return { success: true, updated };
+}
+
 export async function importDatabaseBackup(backupData: {
   [tableName: string]: string;
 }) {
@@ -350,9 +413,186 @@ export async function importDatabaseBackup(backupData: {
   const supabase = await createClient();
 
   try {
+    // --- Insert missing reference data: universes, army_types, miniature_statuses ---
+    const universeMapping: { [oldId: string]: string | null } = {};
+    if (backupData.universes) {
+      const backupUniverses = parseCSV(backupData.universes);
+      const { data: existingUniverses } = await supabase.from("universes").select("id, name");
+      const existingByName = new Map((existingUniverses || []).map((u) => [u.name, u.id]));
+      for (const row of backupUniverses) {
+        const name = row.name?.trim();
+        if (!name) continue;
+        if (existingByName.has(name)) {
+          const id = existingByName.get(name)!;
+          universeMapping[row.id] = id;
+        } else {
+          const { data: inserted } = await supabase
+            .from("universes")
+            .insert({ name: row.name })
+            .select("id, name")
+            .single();
+          if (inserted) {
+            existingByName.set(inserted.name, inserted.id);
+            universeMapping[row.id] = inserted.id;
+          }
+        }
+      }
+    }
+
+    if (backupData.army_types) {
+      const backupArmyTypes = parseCSV(backupData.army_types);
+      const { data: existing } = await supabase.from("army_types").select("id, name");
+      const existingByName = new Map((existing || []).map((a) => [a.name, a.id]));
+      for (const row of backupArmyTypes) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const { data: inserted } = await supabase
+          .from("army_types")
+          .insert({ name: row.name, description: row.description ?? null })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    if (backupData.miniature_statuses) {
+      const backupStatuses = parseCSV(backupData.miniature_statuses);
+      const { data: existing } = await supabase.from("miniature_statuses").select("id, name");
+      const existingByName = new Map((existing || []).map((s) => [s.name, s.id]));
+      for (const row of backupStatuses) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const { data: inserted } = await supabase
+          .from("miniature_statuses")
+          .insert({
+            name: row.name,
+            display_order: parseInt(String(row.display_order), 10) || 0,
+          })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    // --- Insert missing reference data: games, editions, expansions ---
+    // So production has the same games as the backup and miniature_games links resolve.
+    if (backupData.games) {
+      const backupGames = parseCSV(backupData.games);
+      const { data: existingGames } = await supabase.from("games").select("id, name");
+      const existingByName = new Map((existingGames || []).map((g) => [g.name, g.id]));
+
+      for (const row of backupGames) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const universeId = row.universe_id ? (universeMapping[row.universe_id] ?? null) : null;
+        const { data: inserted } = await supabase
+          .from("games")
+          .insert({
+            name: row.name,
+            description: row.description ?? null,
+            publisher: row.publisher ?? null,
+            universe_id: universeId,
+          })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    if (backupData.editions && backupData.games) {
+      const backupEditions = parseCSV(backupData.editions);
+      const backupGames = parseCSV(backupData.games);
+      const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+      const { data: existingEditions } = await supabase
+        .from("editions")
+        .select("id, game_id, name");
+      const { data: existingGames } = await supabase.from("games").select("id, name");
+      const gameNameToId = new Map((existingGames || []).map((g) => [g.name, g.id]));
+      const editionKey = (gameName: string, editionName: string) => `${gameName}:${editionName}`;
+      const existingEditionKeys = new Set<string>();
+      for (const e of existingEditions || []) {
+        const g = (existingGames || []).find((x) => x.id === e.game_id);
+        if (g) existingEditionKeys.add(editionKey(g.name, e.name));
+      }
+
+      for (const row of backupEditions) {
+        const gameName = gameIdToName.get(row.game_id);
+        if (!gameName) continue;
+        const key = editionKey(gameName, (row.name || "").trim());
+        if (existingEditionKeys.has(key)) continue;
+        const gameId = gameNameToId.get(gameName);
+        if (!gameId) continue;
+        const { data: inserted } = await supabase
+          .from("editions")
+          .insert({
+            game_id: gameId,
+            name: row.name,
+            sequence: parseInt(String(row.sequence), 10) || 1,
+            year: row.year != null && row.year !== "" ? parseInt(String(row.year), 10) : null,
+            description: row.description ?? null,
+          })
+          .select("id, name")
+          .single();
+        if (inserted) existingEditionKeys.add(editionKey(gameName, inserted.name));
+      }
+    }
+
+    if (backupData.expansions && backupData.editions && backupData.games) {
+      const backupExpansions = parseCSV(backupData.expansions);
+      const backupEditions = parseCSV(backupData.editions);
+      const backupGames = parseCSV(backupData.games);
+      const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+      const editionIdToGameNameAndEditionName = new Map<string, { gameName: string; editionName: string }>();
+      for (const e of backupEditions) {
+        const gameName = gameIdToName.get(e.game_id);
+        if (gameName) editionIdToGameNameAndEditionName.set(e.id, { gameName, editionName: e.name });
+      }
+      const { data: existingExpansions } = await supabase
+        .from("expansions")
+        .select("id, edition_id, name");
+      const { data: existingEditions } = await supabase
+        .from("editions")
+        .select("id, name, game_id");
+      const { data: existingGames } = await supabase
+        .from("games")
+        .select("id, name");
+      const gameIdToNameCurrent = new Map((existingGames || []).map((g) => [g.id, g.name]));
+      const expansionKey = (editionId: string, expansionName: string) => `${editionId}:${expansionName}`;
+      const existingExpansionKeys = new Set<string>();
+      for (const ex of existingExpansions || []) {
+        existingExpansionKeys.add(expansionKey(ex.edition_id, ex.name));
+      }
+
+      for (const row of backupExpansions) {
+        const meta = editionIdToGameNameAndEditionName.get(row.edition_id);
+        if (!meta) continue;
+        const key = expansionKey(row.edition_id, (row.name || "").trim());
+        if (existingExpansionKeys.has(key)) continue;
+        const editionRow = (existingEditions || []).find(
+          (e) => {
+            const gName = gameIdToNameCurrent.get(e.game_id);
+            return gName === meta.gameName && e.name === meta.editionName;
+          }
+        );
+        if (!editionRow) continue;
+        const { data: inserted } = await supabase
+          .from("expansions")
+          .insert({
+            edition_id: editionRow.id,
+            name: row.name,
+            sequence: parseInt(String(row.sequence), 10) || 1,
+            year: row.year != null && row.year !== "" ? parseInt(String(row.year), 10) : null,
+            description: row.description ?? null,
+          })
+          .select("id")
+          .single();
+        if (inserted) existingExpansionKeys.add(expansionKey(editionRow.id, row.name));
+      }
+    }
+
     // Define table order for import (respecting foreign key dependencies)
-    // NOTE: We skip reference tables (factions, paints, games, editions, expansions)
-    // as these are system-wide data that users shouldn't modify
+    // NOTE: Reference tables (factions, paints, games, editions, expansions) are either
+    // already present or were inserted above; we only map IDs when importing user data.
     const importOrder = [
       // User-owned tables
       "tags",
@@ -365,6 +605,7 @@ export async function importDatabaseBackup(backupData: {
       "collections",
       "collection_miniatures",
       "user_paints",
+      "saved_filters",
       // Junction tables last
       "miniature_tags",
       "miniature_recipes",
@@ -529,8 +770,23 @@ export async function importDatabaseBackup(backupData: {
       }
     }
 
-    // Delete existing user data first
-    const userTables = [
+    // Insert paint_equivalents with mapped paint IDs (only where both sides exist)
+    if (backupData.paint_equivalents) {
+      const backupEquivalents = parseCSV(backupData.paint_equivalents);
+      for (const row of backupEquivalents) {
+        const paintId = paintMapping[row.paint_id];
+        const equivalentId = paintMapping[row.equivalent_paint_id];
+        if (paintId && equivalentId && paintId !== equivalentId) {
+          await supabase.from("paint_equivalents").upsert(
+            [{ paint_id: paintId, equivalent_paint_id: equivalentId }],
+            { onConflict: "paint_id,equivalent_paint_id" }
+          );
+        }
+      }
+    }
+
+    // Delete existing user data first (order: child/junction then parents to avoid FK issues)
+    const userTablesToDelete = [
       "miniatures",
       "miniature_status",
       "miniature_photos",
@@ -540,9 +796,10 @@ export async function importDatabaseBackup(backupData: {
       "tags",
       "shared_miniatures",
       "storage_boxes",
+      "saved_filters",
     ];
 
-    for (const table of userTables) {
+    for (const table of userTablesToDelete) {
       const { error } = await supabase.from(table).delete().eq("user_id", user.id);
       if (error) {
         console.error(`Error deleting ${table}:`, error);
@@ -563,7 +820,7 @@ export async function importDatabaseBackup(backupData: {
         const processedRow = { ...row };
         
         // Replace user_id for user-owned tables
-        if (userTables.includes(tableName) && processedRow.user_id) {
+        if (userTablesToDelete.includes(tableName) && processedRow.user_id) {
           processedRow.user_id = user.id;
         }
 
@@ -675,6 +932,43 @@ export async function importDatabaseBackup(backupData: {
       }
 
       results[tableName] = insertedCount;
+    }
+
+    // Update current user's profile from backup (display_name, avatar_url) if present
+    if (backupData.profiles) {
+      const backupProfiles = parseCSV(backupData.profiles);
+      const myProfile = backupProfiles.find((p) => p.id === user.id);
+      if (myProfile && (myProfile.display_name != null || myProfile.avatar_url != null)) {
+        await supabase
+          .from("profiles")
+          .update({
+            display_name: myProfile.display_name ?? undefined,
+            avatar_url: myProfile.avatar_url ?? undefined,
+          })
+          .eq("id", user.id);
+      }
+    }
+
+    // Insert missing collect-app rows (by id) so we don't overwrite existing
+    const collectTables = ["collect_apps", "collect_config", "boardgames", "magazines", "records", "stories"] as const;
+    for (const tableName of collectTables) {
+      if (!backupData[tableName]) continue;
+      const rows = parseCSV(backupData[tableName]);
+      if (rows.length === 0) continue;
+      const { data: existing } = await supabase.from(tableName).select("id");
+      const existingIds = new Set((existing || []).map((r: { id: number }) => r.id));
+      const toInsert = rows.filter((r) => {
+        const id = r.id != null ? parseInt(String(r.id), 10) : NaN;
+        return !Number.isNaN(id) && !existingIds.has(id);
+      });
+      if (toInsert.length === 0) continue;
+      const batchSize = 50;
+      for (let i = 0; i < toInsert.length; i += batchSize) {
+        const batch = toInsert.slice(i, i + batchSize);
+        const { error } = await supabase.from(tableName).insert(batch);
+        if (error) console.error(`Error importing ${tableName}:`, error);
+        else results[tableName] = (results[tableName] || 0) + batch.length;
+      }
     }
 
     return {
