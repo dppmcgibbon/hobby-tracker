@@ -685,6 +685,9 @@ export async function importDatabaseBackup(backupData: {
 
     const results: { [table: string]: number } = {};
 
+    // Normalize ID for mapping keys/lookups (CSV can have spaces or different formatting)
+    const tid = (x: unknown): string => (x != null && x !== "") ? String(x).trim() : "";
+
     // Build mappings for reference tables (old UUID -> new UUID)
     const factionMapping: { [oldId: string]: string | null } = {};
     const paintMapping: { [oldId: string]: string | null } = {};
@@ -695,90 +698,89 @@ export async function importDatabaseBackup(backupData: {
     const baseShapeMapping: { [oldId: string]: string | null } = {};
     const baseTypeMapping: { [oldId: string]: string | null } = {};
 
-    // Map factions by name
+    // Map factions by name (trimmed keys for lookup consistency)
     if (backupData.factions) {
       const backupFactions = parseCSV(backupData.factions);
       const { data: currentFactions } = await supabase.from("factions").select("id, name");
-      
       if (currentFactions) {
-        const factionNameMap = new Map(currentFactions.map((f) => [f.name, f.id]));
+        const factionNameMap = new Map(currentFactions.map((f) => [String(f.name ?? "").trim(), f.id]));
         backupFactions.forEach((oldFaction) => {
-          const newId = factionNameMap.get(oldFaction.name) || null;
-          factionMapping[oldFaction.id] = newId;
+          const name = String(oldFaction.name ?? "").trim();
+          const newId = name ? factionNameMap.get(name) ?? null : null;
+          const oldId = tid(oldFaction.id);
+          if (oldId) factionMapping[oldId] = newId;
         });
       }
     }
 
-    // Map paints by brand, name, and type
+    // Map paints by brand, name, and type (trimmed keys)
     if (backupData.paints) {
       const backupPaints = parseCSV(backupData.paints);
       const { data: currentPaints } = await supabase.from("paints").select("id, brand, name, type");
-      
       if (currentPaints) {
         const paintKeyMap = new Map(
-          currentPaints.map((p) => [`${p.brand}:${p.name}:${p.type}`, p.id])
+          currentPaints.map((p) => [`${String(p.brand ?? "").trim()}:${String(p.name ?? "").trim()}:${String(p.type ?? "").trim()}`, p.id])
         );
         backupPaints.forEach((oldPaint) => {
-          const type = oldPaint.type?.trim() || "layer";
-          const key = `${oldPaint.brand}:${oldPaint.name}:${type}`;
-          const newId = paintKeyMap.get(key) || null;
-          paintMapping[oldPaint.id] = newId;
+          const b = String(oldPaint.brand ?? "").trim();
+          const n = String(oldPaint.name ?? "").trim();
+          const t = oldPaint.type?.trim() || "layer";
+          const newId = b && n ? paintKeyMap.get(`${b}:${n}:${t}`) ?? null : null;
+          const oldId = tid(oldPaint.id);
+          if (oldId) paintMapping[oldId] = newId;
         });
       }
     }
 
-    // Map games by name
+    // Map games by name (use trimmed ids as keys so CSV formatting matches)
     if (backupData.games) {
       const backupGames = parseCSV(backupData.games);
       const { data: currentGames } = await supabase.from("games").select("id, name");
       
       if (currentGames) {
-        const gameNameMap = new Map(currentGames.map((g) => [g.name, g.id]));
+        const gameNameMap = new Map(
+          currentGames.map((g) => [String(g.name || "").trim(), g.id])
+        );
         backupGames.forEach((oldGame) => {
-          const newId = gameNameMap.get(oldGame.name) || null;
-          gameMapping[oldGame.id] = newId;
+          const name = String(oldGame.name ?? "").trim();
+          const newId = name ? gameNameMap.get(name) ?? null : null;
+          const oldId = tid(oldGame.id);
+          if (oldId) gameMapping[oldId] = newId;
         });
       }
     }
 
-    // Map bases by name
+    // Map bases, base_shapes, base_types by name (trimmed keys)
     if (backupData.bases) {
       const backupBases = parseCSV(backupData.bases);
       const { data: currentBases } = await supabase.from("bases").select("id, name");
-      
       if (currentBases) {
-        const baseNameMap = new Map(currentBases.map((b) => [b.name, b.id]));
-        backupBases.forEach((oldBase) => {
-          const newId = baseNameMap.get(oldBase.name) || null;
-          baseMapping[oldBase.id] = newId;
+        const m = new Map(currentBases.map((b) => [String(b.name ?? "").trim(), b.id]));
+        backupBases.forEach((old) => {
+          const id = tid(old.id);
+          if (id) baseMapping[id] = (m.get(String(old.name ?? "").trim()) ?? null) as string | null;
         });
       }
     }
-
-    // Map base_shapes by name
     if (backupData.base_shapes) {
       const backupBaseShapes = parseCSV(backupData.base_shapes);
-      const { data: currentBaseShapes } = await supabase.from("base_shapes").select("id, name");
-      
-      if (currentBaseShapes) {
-        const baseShapeNameMap = new Map(currentBaseShapes.map((bs) => [bs.name, bs.id]));
-        backupBaseShapes.forEach((oldBaseShape) => {
-          const newId = baseShapeNameMap.get(oldBaseShape.name) || null;
-          baseShapeMapping[oldBaseShape.id] = newId;
+      const { data: current } = await supabase.from("base_shapes").select("id, name");
+      if (current) {
+        const m = new Map(current.map((b) => [String(b.name ?? "").trim(), b.id]));
+        backupBaseShapes.forEach((old) => {
+          const id = tid(old.id);
+          if (id) baseShapeMapping[id] = (m.get(String(old.name ?? "").trim()) ?? null) as string | null;
         });
       }
     }
-
-    // Map base_types by name
     if (backupData.base_types) {
       const backupBaseTypes = parseCSV(backupData.base_types);
-      const { data: currentBaseTypes } = await supabase.from("base_types").select("id, name");
-      
-      if (currentBaseTypes) {
-        const baseTypeNameMap = new Map(currentBaseTypes.map((bt) => [bt.name, bt.id]));
-        backupBaseTypes.forEach((oldBaseType) => {
-          const newId = baseTypeNameMap.get(oldBaseType.name) || null;
-          baseTypeMapping[oldBaseType.id] = newId;
+      const { data: current } = await supabase.from("base_types").select("id, name");
+      if (current) {
+        const m = new Map(current.map((b) => [String(b.name ?? "").trim(), b.id]));
+        backupBaseTypes.forEach((old) => {
+          const id = tid(old.id);
+          if (id) baseTypeMapping[id] = (m.get(String(old.name ?? "").trim()) ?? null) as string | null;
         });
       }
     }
@@ -791,10 +793,10 @@ export async function importDatabaseBackup(backupData: {
       
       if (currentEditions) {
         // Create a map of old game_id -> game name
-        const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+        const gameIdToName = new Map(backupGames.map((g) => [tid(g.id), g.name]));
         
         // Create a map of (game_name, edition_name) -> edition_id
-        const editionKeyMap = new Map();
+        const editionKeyMap = new Map<string, string>();
         for (const edition of currentEditions) {
           const { data: game } = await supabase.from("games").select("name").eq("id", edition.game_id).single();
           if (game) {
@@ -803,11 +805,12 @@ export async function importDatabaseBackup(backupData: {
         }
         
         backupEditions.forEach((oldEdition) => {
-          const gameName = gameIdToName.get(oldEdition.game_id);
+          const gameName = gameIdToName.get(tid(oldEdition.game_id));
           if (gameName) {
-            const key = `${gameName}:${oldEdition.name}`;
+            const key = `${gameName}:${String(oldEdition.name ?? "").trim()}`;
             const newId = editionKeyMap.get(key) || null;
-            editionMapping[oldEdition.id] = newId;
+            const oldId = tid(oldEdition.id);
+            if (oldId) editionMapping[oldId] = newId;
           }
         });
       }
@@ -821,10 +824,10 @@ export async function importDatabaseBackup(backupData: {
       
       if (currentExpansions) {
         // Create a map of old game_id -> game name
-        const gameIdToName = new Map(backupGames.map((g) => [g.id, g.name]));
+        const gameIdToName = new Map(backupGames.map((g) => [tid(g.id), g.name]));
         
         // Create a map of (game_name, expansion_name) -> expansion_id
-        const expansionKeyMap = new Map();
+        const expansionKeyMap = new Map<string, string>();
         for (const expansion of currentExpansions) {
           const { data: game } = await supabase.from("games").select("name").eq("id", expansion.game_id).single();
           if (game) {
@@ -833,11 +836,12 @@ export async function importDatabaseBackup(backupData: {
         }
         
         backupExpansions.forEach((oldExpansion) => {
-          const gameName = gameIdToName.get(oldExpansion.game_id);
+          const gameName = gameIdToName.get(tid(oldExpansion.game_id));
           if (gameName) {
-            const key = `${gameName}:${oldExpansion.name}`;
+            const key = `${gameName}:${String(oldExpansion.name ?? "").trim()}`;
             const newId = expansionKeyMap.get(key) || null;
-            expansionMapping[oldExpansion.id] = newId;
+            const oldId = tid(oldExpansion.id);
+            if (oldId) expansionMapping[oldId] = newId;
           }
         });
       }
@@ -850,8 +854,9 @@ export async function importDatabaseBackup(backupData: {
       const { data: currentStatuses } = await supabase.from("miniature_statuses").select("id, name");
       const statusNameToId = new Map((currentStatuses || []).map((s) => [s.name, s.id]));
       backupStatuses.forEach((oldStatus) => {
-        const newId = statusNameToId.get(oldStatus.name) ?? null;
-        statusMapping[oldStatus.id] = newId;
+        const newId = statusNameToId.get(String(oldStatus.name ?? "").trim()) ?? null;
+        const oldId = tid(oldStatus.id);
+        if (oldId) statusMapping[oldId] = newId;
       });
     }
 
@@ -916,145 +921,98 @@ export async function importDatabaseBackup(backupData: {
           processedRow.user_id = user.id;
         }
 
-        // Map foreign keys for miniatures
+        // Map foreign keys for miniatures (trimmed lookup)
         if (tableName === "miniatures") {
-          if (processedRow.faction_id) {
-            if (factionMapping[processedRow.faction_id] !== undefined) {
-              processedRow.faction_id = factionMapping[processedRow.faction_id];
-            } else {
-              processedRow.faction_id = null;
-            }
-          }
-          if (processedRow.base_id) {
-            if (baseMapping[processedRow.base_id] !== undefined) {
-              processedRow.base_id = baseMapping[processedRow.base_id];
-            } else {
-              processedRow.base_id = null;
-            }
-          }
-          if (processedRow.base_shape_id) {
-            if (baseShapeMapping[processedRow.base_shape_id] !== undefined) {
-              processedRow.base_shape_id = baseShapeMapping[processedRow.base_shape_id];
-            } else {
-              processedRow.base_shape_id = null;
-            }
-          }
-          if (processedRow.base_type_id) {
-            if (baseTypeMapping[processedRow.base_type_id] !== undefined) {
-              processedRow.base_type_id = baseTypeMapping[processedRow.base_type_id];
-            } else {
-              processedRow.base_type_id = null;
-            }
-          }
-          if (processedRow.storage_box_id) {
-            processedRow.storage_box_id = storageBoxIdMapping[processedRow.storage_box_id] ?? null;
-          }
+          processedRow.faction_id = factionMapping[tid(processedRow.faction_id)] ?? null;
+          processedRow.base_id = baseMapping[tid(processedRow.base_id)] ?? null;
+          processedRow.base_shape_id = baseShapeMapping[tid(processedRow.base_shape_id)] ?? null;
+          processedRow.base_type_id = baseTypeMapping[tid(processedRow.base_type_id)] ?? null;
+          processedRow.storage_box_id = storageBoxIdMapping[tid(processedRow.storage_box_id)] ?? null;
         }
 
-        // Map miniature_id for tables that reference miniatures (use mapping built during insert)
+        // Map miniature_id for tables that reference miniatures (trimmed lookup)
         if (
-          (tableName === "miniature_photos" ||
-            tableName === "miniature_status" ||
-            tableName === "miniature_tags" ||
-            tableName === "miniature_games" ||
-            tableName === "shared_miniatures") &&
-          processedRow.miniature_id
+          tableName === "miniature_photos" ||
+          tableName === "miniature_status" ||
+          tableName === "miniature_tags" ||
+          tableName === "miniature_games" ||
+          tableName === "shared_miniatures"
         ) {
-          processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
+          const mid = tid(processedRow.miniature_id);
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
         }
-        if (tableName === "miniature_tags" && processedRow.tag_id) {
-          processedRow.tag_id = tagIdMapping[processedRow.tag_id] ?? processedRow.tag_id;
+        if (tableName === "miniature_tags") {
+          const tagId = tid(processedRow.tag_id);
+          processedRow.tag_id = (tagId && tagIdMapping[tagId]) ?? null;
         }
         if (tableName === "collection_miniatures") {
-          if (processedRow.collection_id) {
-            processedRow.collection_id = collectionIdMapping[processedRow.collection_id] ?? processedRow.collection_id;
-          }
-          if (processedRow.miniature_id) {
-            processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
-          }
+          const cid = tid(processedRow.collection_id);
+          const mid = tid(processedRow.miniature_id);
+          processedRow.collection_id = (cid && collectionIdMapping[cid]) ?? null;
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
         }
-        if (tableName === "recipe_steps" && processedRow.recipe_id) {
-          processedRow.recipe_id = recipeIdMapping[processedRow.recipe_id] ?? processedRow.recipe_id;
+        if (tableName === "recipe_steps") {
+          const rid = tid(processedRow.recipe_id);
+          const pid = tid(processedRow.paint_id);
+          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? null;
+          processedRow.paint_id = (pid && paintMapping[pid]) ?? null;
         }
         if (tableName === "miniature_recipes") {
-          if (processedRow.miniature_id) {
-            processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
-          }
-          if (processedRow.recipe_id) {
-            processedRow.recipe_id = recipeIdMapping[processedRow.recipe_id] ?? processedRow.recipe_id;
-          }
+          const mid = tid(processedRow.miniature_id);
+          const rid = tid(processedRow.recipe_id);
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
+          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? null;
         }
 
-        // Map foreign keys for recipe_steps
-        if (tableName === "recipe_steps") {
-          if (processedRow.paint_id) {
-            if (paintMapping[processedRow.paint_id] !== undefined) {
-              processedRow.paint_id = paintMapping[processedRow.paint_id];
-            } else {
-              // If no mapping found, set to null to avoid FK violation
-              processedRow.paint_id = null;
-            }
-          }
-        }
-
-        // Map foreign keys for miniature_games
+        // Map foreign keys for miniature_games (trimmed lookup)
         if (tableName === "miniature_games") {
-          if (processedRow.game_id) {
-            if (gameMapping[processedRow.game_id] !== undefined) {
-              processedRow.game_id = gameMapping[processedRow.game_id];
-            } else {
-              // If no mapping found, set to null to avoid FK violation
-              processedRow.game_id = null;
-            }
-          }
-          if (processedRow.edition_id) {
-            if (editionMapping[processedRow.edition_id] !== undefined) {
-              processedRow.edition_id = editionMapping[processedRow.edition_id];
-            } else {
-              // If no mapping found, set to null to avoid FK violation
-              processedRow.edition_id = null;
-            }
-          }
-          if (processedRow.expansion_id) {
-            if (expansionMapping[processedRow.expansion_id] !== undefined) {
-              processedRow.expansion_id = expansionMapping[processedRow.expansion_id];
-            } else {
-              // If no mapping found, set to null to avoid FK violation
-              processedRow.expansion_id = null;
-            }
-          }
+          const gid = tid(processedRow.game_id);
+          const eid = tid(processedRow.edition_id);
+          const exid = tid(processedRow.expansion_id);
+          processedRow.game_id = (gid && gameMapping[gid]) ?? null;
+          processedRow.edition_id = (eid && editionMapping[eid]) ?? null;
+          processedRow.expansion_id = (exid && expansionMapping[exid]) ?? null;
         }
 
-        // Map foreign keys for user_paints
+        // Map foreign keys for user_paints (paint_id NOT NULL)
         if (tableName === "user_paints") {
-          if (processedRow.paint_id) {
-            if (paintMapping[processedRow.paint_id] !== undefined) {
-              processedRow.paint_id = paintMapping[processedRow.paint_id];
-            } else {
-              // If no mapping found, set to null to avoid FK violation
-              processedRow.paint_id = null;
-            }
-          }
+          const pid = tid(processedRow.paint_id);
+          processedRow.paint_id = (pid && paintMapping[pid]) ?? null;
         }
 
-        // Map foreign keys for miniature_status (status_id -> new miniature_statuses id)
-        if (tableName === "miniature_status" && processedRow.status_id) {
-          if (statusMapping[processedRow.status_id] !== undefined) {
-            processedRow.status_id = statusMapping[processedRow.status_id];
-          } else {
-            processedRow.status_id = null;
-          }
+        // Map status_id for miniature_status (trimmed lookup)
+        if (tableName === "miniature_status") {
+          const sid = tid(processedRow.status_id);
+          processedRow.status_id = (sid && statusMapping[sid]) ?? null;
         }
 
         return processedRow;
       });
 
+      // Skip rows with missing required FKs to avoid NOT NULL / FK violations (all junction and child tables)
+      let rowsToInsert = processedRows;
+      if (tableName === "miniature_games") {
+        rowsToInsert = processedRows.filter((r) => r.game_id != null && r.game_id !== "");
+      } else if (tableName === "miniature_tags") {
+        rowsToInsert = processedRows.filter((r) => r.miniature_id && r.tag_id);
+      } else if (tableName === "miniature_recipes") {
+        rowsToInsert = processedRows.filter((r) => r.miniature_id && r.recipe_id);
+      } else if (tableName === "collection_miniatures") {
+        rowsToInsert = processedRows.filter((r) => r.collection_id && r.miniature_id);
+      } else if (tableName === "miniature_photos" || tableName === "miniature_status" || tableName === "shared_miniatures") {
+        rowsToInsert = processedRows.filter((r) => r.miniature_id != null && r.miniature_id !== "");
+      } else if (tableName === "recipe_steps") {
+        rowsToInsert = processedRows.filter((r) => r.recipe_id != null && r.recipe_id !== "");
+      } else if (tableName === "user_paints") {
+        rowsToInsert = processedRows.filter((r) => r.paint_id != null && r.paint_id !== "");
+      }
+
       // Insert data in batches of 100 to avoid timeouts; use .select('id') to build id mappings
       const batchSize = 100;
       let insertedCount = 0;
 
-      for (let i = 0; i < processedRows.length; i += batchSize) {
-        const batch = processedRows.slice(i, i + batchSize);
+      for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+        const batch = rowsToInsert.slice(i, i + batchSize);
         const { data: inserted, error } = await supabase
           .from(tableName)
           .insert(batch)
@@ -1069,23 +1027,28 @@ export async function importDatabaseBackup(backupData: {
         if (inserted && inserted.length === batch.length) {
           if (tableName === "tags") {
             batch.forEach((row, idx) => {
-              if (row.id != null) tagIdMapping[row.id] = inserted[idx].id;
+              const k = tid(row.id);
+              if (k) tagIdMapping[k] = inserted[idx].id;
             });
           } else if (tableName === "storage_boxes") {
             batch.forEach((row, idx) => {
-              if (row.id != null) storageBoxIdMapping[row.id] = inserted[idx].id;
+              const k = tid(row.id);
+              if (k) storageBoxIdMapping[k] = inserted[idx].id;
             });
           } else if (tableName === "miniatures") {
             batch.forEach((row, idx) => {
-              if (row.id != null) miniatureIdMapping[row.id] = inserted[idx].id;
+              const k = tid(row.id);
+              if (k) miniatureIdMapping[k] = inserted[idx].id;
             });
           } else if (tableName === "painting_recipes") {
             batch.forEach((row, idx) => {
-              if (row.id != null) recipeIdMapping[row.id] = inserted[idx].id;
+              const k = tid(row.id);
+              if (k) recipeIdMapping[k] = inserted[idx].id;
             });
           } else if (tableName === "collections") {
             batch.forEach((row, idx) => {
-              if (row.id != null) collectionIdMapping[row.id] = inserted[idx].id;
+              const k = tid(row.id);
+              if (k) collectionIdMapping[k] = inserted[idx].id;
             });
           }
         }
