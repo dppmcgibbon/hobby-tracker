@@ -1,5 +1,6 @@
 "use server";
 
+import JSZip from "jszip";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -883,6 +884,13 @@ export async function importDatabaseBackup(backupData: {
       });
     }
 
+    // Mappings from backup id -> inserted id (built as we insert parent tables)
+    const tagIdMapping: { [oldId: string]: string } = {};
+    const storageBoxIdMapping: { [oldId: string]: string } = {};
+    const miniatureIdMapping: { [oldId: string]: string } = {};
+    const recipeIdMapping: { [oldId: string]: string } = {};
+    const collectionIdMapping: { [oldId: string]: string } = {};
+
     // Insert paint_equivalents with mapped paint IDs (only where both sides exist)
     if (backupData.paint_equivalents) {
       const backupEquivalents = parseCSV(backupData.paint_equivalents);
@@ -943,7 +951,6 @@ export async function importDatabaseBackup(backupData: {
             if (factionMapping[processedRow.faction_id] !== undefined) {
               processedRow.faction_id = factionMapping[processedRow.faction_id];
             } else {
-              // If no mapping found, set to null to avoid FK violation
               processedRow.faction_id = null;
             }
           }
@@ -951,7 +958,6 @@ export async function importDatabaseBackup(backupData: {
             if (baseMapping[processedRow.base_id] !== undefined) {
               processedRow.base_id = baseMapping[processedRow.base_id];
             } else {
-              // If no mapping found, set to null to avoid FK violation
               processedRow.base_id = null;
             }
           }
@@ -959,7 +965,6 @@ export async function importDatabaseBackup(backupData: {
             if (baseShapeMapping[processedRow.base_shape_id] !== undefined) {
               processedRow.base_shape_id = baseShapeMapping[processedRow.base_shape_id];
             } else {
-              // If no mapping found, set to null to avoid FK violation
               processedRow.base_shape_id = null;
             }
           }
@@ -967,9 +972,45 @@ export async function importDatabaseBackup(backupData: {
             if (baseTypeMapping[processedRow.base_type_id] !== undefined) {
               processedRow.base_type_id = baseTypeMapping[processedRow.base_type_id];
             } else {
-              // If no mapping found, set to null to avoid FK violation
               processedRow.base_type_id = null;
             }
+          }
+          if (processedRow.storage_box_id) {
+            processedRow.storage_box_id = storageBoxIdMapping[processedRow.storage_box_id] ?? null;
+          }
+        }
+
+        // Map miniature_id for tables that reference miniatures (use mapping built during insert)
+        if (
+          (tableName === "miniature_photos" ||
+            tableName === "miniature_status" ||
+            tableName === "miniature_tags" ||
+            tableName === "miniature_games" ||
+            tableName === "shared_miniatures") &&
+          processedRow.miniature_id
+        ) {
+          processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
+        }
+        if (tableName === "miniature_tags" && processedRow.tag_id) {
+          processedRow.tag_id = tagIdMapping[processedRow.tag_id] ?? processedRow.tag_id;
+        }
+        if (tableName === "collection_miniatures") {
+          if (processedRow.collection_id) {
+            processedRow.collection_id = collectionIdMapping[processedRow.collection_id] ?? processedRow.collection_id;
+          }
+          if (processedRow.miniature_id) {
+            processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
+          }
+        }
+        if (tableName === "recipe_steps" && processedRow.recipe_id) {
+          processedRow.recipe_id = recipeIdMapping[processedRow.recipe_id] ?? processedRow.recipe_id;
+        }
+        if (tableName === "miniature_recipes") {
+          if (processedRow.miniature_id) {
+            processedRow.miniature_id = miniatureIdMapping[processedRow.miniature_id] ?? processedRow.miniature_id;
+          }
+          if (processedRow.recipe_id) {
+            processedRow.recipe_id = recipeIdMapping[processedRow.recipe_id] ?? processedRow.recipe_id;
           }
         }
 
@@ -1037,17 +1078,45 @@ export async function importDatabaseBackup(backupData: {
         return processedRow;
       });
 
-      // Insert data in batches of 100 to avoid timeouts
+      // Insert data in batches of 100 to avoid timeouts; use .select('id') to build id mappings
       const batchSize = 100;
       let insertedCount = 0;
 
       for (let i = 0; i < processedRows.length; i += batchSize) {
         const batch = processedRows.slice(i, i + batchSize);
-        const { error } = await supabase.from(tableName).insert(batch);
+        const { data: inserted, error } = await supabase
+          .from(tableName)
+          .insert(batch)
+          .select("id");
 
         if (error) {
           console.error(`Error importing ${tableName} (batch ${i / batchSize + 1}):`, error);
           throw new Error(`Failed to import ${tableName}: ${error.message}`);
+        }
+
+        // Build backup id -> inserted id mapping for parent tables (order matches batch)
+        if (inserted && inserted.length === batch.length) {
+          if (tableName === "tags") {
+            batch.forEach((row, idx) => {
+              if (row.id != null) tagIdMapping[row.id] = inserted[idx].id;
+            });
+          } else if (tableName === "storage_boxes") {
+            batch.forEach((row, idx) => {
+              if (row.id != null) storageBoxIdMapping[row.id] = inserted[idx].id;
+            });
+          } else if (tableName === "miniatures") {
+            batch.forEach((row, idx) => {
+              if (row.id != null) miniatureIdMapping[row.id] = inserted[idx].id;
+            });
+          } else if (tableName === "painting_recipes") {
+            batch.forEach((row, idx) => {
+              if (row.id != null) recipeIdMapping[row.id] = inserted[idx].id;
+            });
+          } else if (tableName === "collections") {
+            batch.forEach((row, idx) => {
+              if (row.id != null) collectionIdMapping[row.id] = inserted[idx].id;
+            });
+          }
         }
 
         insertedCount += batch.length;
@@ -1101,5 +1170,139 @@ export async function importDatabaseBackup(backupData: {
   } catch (error) {
     console.error("Database import error:", error);
     throw error;
+  }
+}
+
+/** Extract table name from ZIP entry path (normalize slashes and prefix). */
+function tableNameFromZipPath(filename: string): string | null {
+  const normalized = filename.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (normalized.startsWith("data/") && normalized.endsWith(".csv")) {
+    return normalized.slice(5, -4);
+  }
+  return null;
+}
+
+/** Extract photo path from ZIP entry (photos/ prefix removed). */
+function photoPathFromZipPath(filename: string): string | null {
+  const normalized = filename.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (normalized.startsWith("photos/")) {
+    return normalized.slice(7).replace(/\\/g, "/");
+  }
+  return null;
+}
+
+/**
+ * Import a database backup from a ZIP file (server-side).
+ * Parses the ZIP on the server to avoid payload size limits that drop tables.
+ */
+export async function importDatabaseBackupFromFile(formData: FormData): Promise<{
+  success: boolean;
+  results?: { [table: string]: number };
+  totalRows?: number;
+  uploadedPhotos: number;
+  failedPhotos: number;
+  photoErrors: string[];
+  error?: string;
+}> {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const file = formData.get("file");
+  if (!file || !(file instanceof File)) {
+    return { success: false, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["No file provided"] };
+  }
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    const backupData: { [tableName: string]: string } = {};
+    const photoEntries: { path: string; buffer: ArrayBuffer }[] = [];
+
+    for (const [filename, zipFile] of Object.entries(zip.files)) {
+      if (zipFile.dir) continue;
+
+      const tableName = tableNameFromZipPath(filename);
+      if (tableName) {
+        const csvContent = await zipFile.async("text");
+        backupData[tableName] = csvContent;
+        continue;
+      }
+
+      const photoPath = photoPathFromZipPath(filename);
+      if (photoPath) {
+        const buffer = await zipFile.async("arraybuffer");
+        photoEntries.push({ path: photoPath, buffer });
+      }
+    }
+
+    if (Object.keys(backupData).length === 0) {
+      return {
+        success: false,
+        uploadedPhotos: 0,
+        failedPhotos: 0,
+        photoErrors: ["No CSV files found in backup"],
+      };
+    }
+
+    const result = await importDatabaseBackup(backupData);
+    if (!result.success) {
+      return {
+        success: false,
+        uploadedPhotos: 0,
+        failedPhotos: 0,
+        photoErrors: ["Import failed"],
+      };
+    }
+
+    const pathMapping: Record<string, string> = {};
+    let uploadedPhotos = 0;
+    const photoErrors: string[] = [];
+
+    for (const { path, buffer } of photoEntries) {
+      const pathParts = path.split("/");
+      if (pathParts.length !== 3) {
+        photoErrors.push(`${path}: Invalid path format`);
+        continue;
+      }
+      const [, miniatureId, filename] = pathParts;
+      const newPath = `${user.id}/${miniatureId}/${filename}`;
+      pathMapping[path] = newPath;
+
+      const { error: uploadError } = await supabase.storage
+        .from("miniature-photos")
+        .upload(newPath, buffer, {
+          upsert: true,
+          contentType: "image/jpeg",
+        });
+
+      if (uploadError) {
+        photoErrors.push(`${path}: ${uploadError.message}`);
+      } else {
+        uploadedPhotos++;
+      }
+    }
+
+    if (Object.keys(pathMapping).length > 0) {
+      await updatePhotoPathsAfterImport(pathMapping);
+    }
+
+    return {
+      success: true,
+      results: result.results,
+      totalRows: result.totalRows,
+      uploadedPhotos,
+      failedPhotos: photoEntries.length - uploadedPhotos,
+      photoErrors,
+    };
+  } catch (error) {
+    console.error("Import from file error:", error);
+    return {
+      success: false,
+      uploadedPhotos: 0,
+      failedPhotos: 0,
+      photoErrors: [error instanceof Error ? error.message : "Unknown error"],
+      error: error instanceof Error ? error.message : "Import failed",
+    };
   }
 }

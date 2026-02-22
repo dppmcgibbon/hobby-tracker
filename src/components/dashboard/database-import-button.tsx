@@ -3,9 +3,8 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
-import { importDatabaseBackup, updatePhotoPathsAfterImport } from "@/app/actions/backup";
+import { importDatabaseBackupFromFile } from "@/app/actions/backup";
 import { toast } from "sonner";
-import JSZip from "jszip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +16,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 export function DatabaseImportButton() {
   const [isImporting, setIsImporting] = useState(false);
@@ -25,7 +23,6 @@ export function DatabaseImportButton() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -46,125 +43,34 @@ export function DatabaseImportButton() {
     setIsImporting(true);
 
     try {
-      // Read and extract the ZIP file
-      const zip = new JSZip();
-      const zipContent = await zip.loadAsync(pendingFile);
+      // Send ZIP file to server so it parses there (avoids payload size limit that dropped tables)
+      const formData = new FormData();
+      formData.append("file", pendingFile);
 
-      // Extract all CSV files
-      const backupData: { [tableName: string]: string } = {};
-      const photoFiles: { path: string; blob: Blob }[] = [];
-
-      for (const [filename, file] of Object.entries(zipContent.files)) {
-        if (!file.dir) {
-          if (filename.startsWith("data/") && filename.endsWith(".csv")) {
-            const tableName = filename.replace("data/", "").replace(".csv", "");
-            const csvContent = await file.async("text");
-            backupData[tableName] = csvContent;
-          } else if (filename.startsWith("photos/") || filename.startsWith("photos\\")) {
-            const photoPath = filename.replace(/^photos[/\\]/, "").replace(/\\/g, "/");
-            const photoBlob = await file.async("blob");
-            photoFiles.push({ path: photoPath, blob: photoBlob });
-          }
-        }
-      }
-
-      if (Object.keys(backupData).length === 0) {
-        throw new Error("No CSV files found in backup");
-      }
-
-      // Import the database data (without photos)
-      const result = await importDatabaseBackup(backupData);
+      const result = await importDatabaseBackupFromFile(formData);
 
       if (!result.success) {
-        throw new Error("Import failed");
+        throw new Error(result.error ?? result.photoErrors[0] ?? "Import failed");
       }
 
-      // Upload photo files to Supabase Storage (client-side)
-      let uploadedPhotos = 0;
-      let failedPhotos = 0;
-      const photoErrors: string[] = [];
-      
-      if (photoFiles.length > 0) {
-        toast.info(`Uploading ${photoFiles.length} photos...`);
-        
-        // Get current user ID
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error("User not authenticated");
-        }
-        
-        // Build a map of old photo paths to new photo paths
-        const pathMapping: { [oldPath: string]: string } = {};
-        
-        for (const { path, blob } of photoFiles) {
-          try {
-            // Parse the old path: oldUserId/miniatureId/filename.ext
-            const pathParts = path.split("/");
-            if (pathParts.length !== 3) {
-              failedPhotos++;
-              photoErrors.push(`${path}: Invalid path format`);
-              continue;
-            }
-            
-            const [oldUserId, miniatureId, filename] = pathParts;
-            
-            // Create new path with current user ID
-            const newPath = `${user.id}/${miniatureId}/${filename}`;
-            pathMapping[path] = newPath;
-            
-            const { error: uploadError } = await supabase.storage
-              .from("miniature-photos")
-              .upload(newPath, blob, {
-                upsert: true,
-                contentType: blob.type || "image/jpeg",
-              });
+      const photoMessage =
+        result.uploadedPhotos > 0
+          ? `, ${result.uploadedPhotos} photo${result.uploadedPhotos !== 1 ? "s" : ""} uploaded${result.failedPhotos > 0 ? `, ${result.failedPhotos} failed` : ""}`
+          : "";
 
-            if (!uploadError) {
-              uploadedPhotos++;
-            } else {
-              failedPhotos++;
-              console.error(`Failed to upload photo: ${path} -> ${newPath}`, uploadError);
-              photoErrors.push(`${path}: ${uploadError.message}`);
-            }
-          } catch (uploadError) {
-            failedPhotos++;
-            console.error(`Error uploading photo: ${path}`, uploadError);
-            photoErrors.push(`${path}: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`);
-          }
-        }
-        
-        // Update miniature_photos.storage_path on the server so paths match uploaded files
-        if (Object.keys(pathMapping).length > 0) {
-          try {
-            await updatePhotoPathsAfterImport(pathMapping);
-          } catch (updateError) {
-            console.error("Error updating photo paths in database:", updateError);
-          }
-        }
-        
-        // Log detailed errors if any failed
-        if (failedPhotos > 0) {
-          console.error("Photo upload errors:", photoErrors);
-        }
-      }
-
-      const photoMessage = uploadedPhotos > 0 
-        ? `, ${uploadedPhotos} photo${uploadedPhotos !== 1 ? "s" : ""} uploaded${failedPhotos > 0 ? `, ${failedPhotos} failed` : ""}`
-        : "";
-        
-      if (failedPhotos > 0) {
+      if (result.failedPhotos > 0 && result.photoErrors.length > 0) {
+        console.error("Photo upload errors:", result.photoErrors);
         toast.warning(
-          `Database imported with warnings: ${uploadedPhotos}/${photoFiles.length} photos uploaded successfully. Check console for details.`
+          `Database imported with warnings: ${result.uploadedPhotos} photos uploaded, ${result.failedPhotos} failed. Check console for details.`
         );
       } else {
         toast.success(
-          `Database imported successfully! ${result.totalRows} rows restored across ${
-            Object.keys(result.results).length
+          `Database imported successfully! ${result.totalRows ?? 0} rows restored across ${
+            result.results ? Object.keys(result.results).length : 0
           } tables${photoMessage}`
         );
       }
 
-      // Refresh the page to show updated data
       router.refresh();
     } catch (error) {
       console.error("Import error:", error);
