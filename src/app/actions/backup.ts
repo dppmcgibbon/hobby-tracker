@@ -2,7 +2,7 @@
 
 import JSZip from "jszip";
 import { requireAuth } from "@/lib/auth/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
 
 // Helper function to convert array of objects to CSV
@@ -378,11 +378,11 @@ export async function updatePhotoPathsAfterImport(pathMapping: Record<string, st
   return { success: true, updated };
 }
 
-export async function importDatabaseBackup(backupData: {
-  [tableName: string]: string;
-}) {
+export async function importDatabaseBackup(
+  backupData: { [tableName: string]: string },
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
   const user = await requireAuth();
-  const supabase = await createClient();
 
   try {
     const results: { [table: string]: number } = {};
@@ -577,7 +577,10 @@ async function importFromZipBuffer(
   }
 
   // Fallback: ensure junction/photo tables are found (some ZIP tools use different path formats)
-  const criticalTables = ["miniature_photos", "miniature_status", "miniature_tags", "miniature_games"];
+  const criticalTables = [
+    "miniature_photos", "miniature_status", "miniature_tags", "miniature_games",
+    "miniature_recipes", "collection_miniatures",
+  ];
   for (const name of criticalTables) {
     if (backupData[name]) continue;
     const suffix = `${name}.csv`;
@@ -595,7 +598,7 @@ async function importFromZipBuffer(
     return { ...IMPORT_RESULT_FAIL, photoErrors: ["No CSV files found in backup"] };
   }
 
-  const result = await importDatabaseBackup(backupData);
+  const result = await importDatabaseBackup(backupData, supabase);
   if (!result.success) {
     return { ...IMPORT_RESULT_FAIL, photoErrors: ["Import failed"] };
   }
@@ -648,7 +651,7 @@ async function importFromZipBuffer(
  */
 export async function importDatabaseBackupFromFile(formData: FormData): Promise<ImportFromZipResult> {
   const user = await requireAuth();
-  const supabase = await createClient();
+  const supabase = createServiceRoleClient();
 
   const file = formData.get("file");
   if (!file || !(file instanceof File)) {
@@ -674,7 +677,8 @@ export async function importDatabaseBackupFromFile(formData: FormData): Promise<
  */
 export async function importDatabaseBackupFromStoragePath(storagePath: string): Promise<ImportFromZipResult> {
   const user = await requireAuth();
-  const supabase = await createClient();
+  const supabaseAnon = await createClient();
+  const supabaseAdmin = createServiceRoleClient();
 
   if (!storagePath || typeof storagePath !== "string") {
     return { ...IMPORT_RESULT_FAIL, photoErrors: ["No storage path provided"] };
@@ -686,7 +690,7 @@ export async function importDatabaseBackupFromStoragePath(storagePath: string): 
   }
 
   try {
-    const { data, error: downloadError } = await supabase.storage
+    const { data, error: downloadError } = await supabaseAnon.storage
       .from(BACKUP_IMPORTS_BUCKET)
       .download(normalized);
 
@@ -700,9 +704,9 @@ export async function importDatabaseBackupFromStoragePath(storagePath: string): 
     }
 
     const arrayBuffer = await data.arrayBuffer();
-    const result = await importFromZipBuffer(arrayBuffer, user.id, supabase);
+    const result = await importFromZipBuffer(arrayBuffer, user.id, supabaseAdmin);
 
-    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+    await supabaseAnon.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
 
     return result;
   } catch (error) {
