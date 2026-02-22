@@ -645,6 +645,108 @@ async function importFromZipBuffer(
   };
 }
 
+export type ImportPhotosOnlyResult = {
+  success: boolean;
+  uploadedPhotos: number;
+  failedPhotos: number;
+  photoErrors: string[];
+  error?: string;
+};
+
+/**
+ * Parse a backup ZIP and upload only the photos to storage. No database rows are imported or changed.
+ * ZIP must be from the app export (contains a photos/ folder with paths like photos/userId/miniatureId/filename).
+ */
+export async function importPhotosOnlyFromStoragePath(storagePath: string): Promise<ImportPhotosOnlyResult> {
+  const user = await requireAuth();
+  const supabase = createServiceRoleClient();
+
+  if (!storagePath || typeof storagePath !== "string") {
+    return { success: false, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["No storage path provided"] };
+  }
+
+  const normalized = storagePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized.startsWith(`${user.id}/`)) {
+    return { success: false, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["Invalid path: must be under your user folder"] };
+  }
+
+  try {
+    const { data, error: downloadError } = await supabase.storage
+      .from(BACKUP_IMPORTS_BUCKET)
+      .download(normalized);
+
+    if (downloadError || !data) {
+      return {
+        success: false,
+        uploadedPhotos: 0,
+        failedPhotos: 0,
+        photoErrors: [downloadError?.message ?? "Failed to download backup from storage"],
+        error: "Failed to download backup",
+      };
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const photoEntries: { path: string; buffer: ArrayBuffer }[] = [];
+
+    for (const [filename, zipFile] of Object.entries(zip.files)) {
+      if (zipFile.dir) continue;
+      const photoPath = photoPathFromZipPath(filename);
+      if (photoPath) {
+        const buffer = await zipFile.async("arraybuffer");
+        photoEntries.push({ path: photoPath, buffer });
+      }
+    }
+
+    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+
+    if (photoEntries.length === 0) {
+      return { success: true, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["No photos found in ZIP (expected photos/ folder from app export)"] };
+    }
+
+    let uploadedPhotos = 0;
+    const photoErrors: string[] = [];
+
+    for (const { path, buffer } of photoEntries) {
+      const pathParts = path.split("/");
+      if (pathParts.length !== 3) {
+        photoErrors.push(`${path}: Invalid path format`);
+        continue;
+      }
+      const [, miniatureId, filename] = pathParts;
+      const storagePathForUpload = `${user.id}/${miniatureId}/${filename}`;
+      const ext = filename.split(".").pop()?.toLowerCase();
+      const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+      const { error: uploadError } = await supabase.storage
+        .from("miniature-photos")
+        .upload(storagePathForUpload, buffer, { upsert: true, contentType });
+
+      if (uploadError) {
+        photoErrors.push(`${path}: ${uploadError.message}`);
+      } else {
+        uploadedPhotos++;
+      }
+    }
+
+    return {
+      success: true,
+      uploadedPhotos,
+      failedPhotos: photoEntries.length - uploadedPhotos,
+      photoErrors,
+    };
+  } catch (error) {
+    console.error("Import photos only error:", error);
+    return {
+      success: false,
+      uploadedPhotos: 0,
+      failedPhotos: 0,
+      photoErrors: [error instanceof Error ? error.message : "Unknown error"],
+      error: error instanceof Error ? error.message : "Import failed",
+    };
+  }
+}
+
 /**
  * Import a database backup from a ZIP file (server-side).
  * Parses the ZIP on the server to avoid payload size limits that drop tables.

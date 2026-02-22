@@ -1,8 +1,9 @@
 import { requireAuth } from "@/lib/auth/server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Database, ImagePlus } from "lucide-react";
 import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 import { DatabaseImportButton } from "@/components/dashboard/database-import-button";
+import { ImportPhotosOnlyButton } from "@/components/dashboard/import-photos-only-button";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,18 @@ export default async function DatabaseManagementPage() {
                   Download a complete backup of your collection data including miniatures, recipes, and all metadata
                 </p>
                 <DatabaseBackupButton />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-sm border border-primary/20">
+              <ImagePlus className="h-5 w-5 mt-0.5 text-primary" />
+              <div className="flex-1">
+                <p className="font-semibold text-sm uppercase tracking-wide mb-1">Import photos only</p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload a backup ZIP from the app&apos;s export. Only the photos are extracted and uploaded to storage;
+                  no database rows are imported or changed.
+                </p>
+                <ImportPhotosOnlyButton />
               </div>
             </div>
 

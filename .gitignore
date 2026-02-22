@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+supabase/tmp_local_data.sql
+supabase/tmp_auth_users.sql
+supabase/tmp_user_id_mapping.txt
+supabase/tmp_local_data.sql.rewrite
 
 # debug
 npm-debug.log*
