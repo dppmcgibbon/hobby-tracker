@@ -677,8 +677,7 @@ export async function importDatabaseBackupFromFile(formData: FormData): Promise<
  */
 export async function importDatabaseBackupFromStoragePath(storagePath: string): Promise<ImportFromZipResult> {
   const user = await requireAuth();
-  const supabaseAnon = await createClient();
-  const supabaseAdmin = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
 
   if (!storagePath || typeof storagePath !== "string") {
     return { ...IMPORT_RESULT_FAIL, photoErrors: ["No storage path provided"] };
@@ -690,7 +689,7 @@ export async function importDatabaseBackupFromStoragePath(storagePath: string): 
   }
 
   try {
-    const { data, error: downloadError } = await supabaseAnon.storage
+    const { data, error: downloadError } = await supabase.storage
       .from(BACKUP_IMPORTS_BUCKET)
       .download(normalized);
 
@@ -704,9 +703,9 @@ export async function importDatabaseBackupFromStoragePath(storagePath: string): 
     }
 
     const arrayBuffer = await data.arrayBuffer();
-    const result = await importFromZipBuffer(arrayBuffer, user.id, supabaseAdmin);
+    const result = await importFromZipBuffer(arrayBuffer, user.id, supabase);
 
-    await supabaseAnon.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
 
     return result;
   } catch (error) {
