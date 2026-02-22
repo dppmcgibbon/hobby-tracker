@@ -3,7 +3,11 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
-import { importDatabaseBackupFromFile } from "@/app/actions/backup";
+import {
+  importDatabaseBackupFromStoragePath,
+  BACKUP_IMPORTS_BUCKET,
+} from "@/app/actions/backup";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -43,11 +47,25 @@ export function DatabaseImportButton() {
     setIsImporting(true);
 
     try {
-      // Send ZIP file to server so it parses there (avoids payload size limit that dropped tables)
-      const formData = new FormData();
-      formData.append("file", pendingFile);
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("You must be signed in to import");
+      }
 
-      const result = await importDatabaseBackupFromFile(formData);
+      // Upload ZIP to storage first so the server action only receives a path (avoids 413 on Vercel)
+      const storagePath = `${user.id}/import-${Date.now()}.zip`;
+      const { error: uploadError } = await supabase.storage
+        .from(BACKUP_IMPORTS_BUCKET)
+        .upload(storagePath, pendingFile, { contentType: "application/zip", upsert: true });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      const result = await importDatabaseBackupFromStoragePath(storagePath);
 
       if (!result.success) {
         throw new Error(result.error ?? result.photoErrors[0] ?? "Import failed");

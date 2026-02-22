@@ -1191,11 +1191,14 @@ function photoPathFromZipPath(filename: string): string | null {
   return null;
 }
 
-/**
- * Import a database backup from a ZIP file (server-side).
- * Parses the ZIP on the server to avoid payload size limits that drop tables.
- */
-export async function importDatabaseBackupFromFile(formData: FormData): Promise<{
+const IMPORT_RESULT_FAIL = {
+  success: false as const,
+  uploadedPhotos: 0,
+  failedPhotos: 0,
+  photoErrors: [] as string[],
+};
+
+type ImportFromZipResult = {
   success: boolean;
   results?: { [table: string]: number };
   totalRows?: number;
@@ -1203,104 +1206,156 @@ export async function importDatabaseBackupFromFile(formData: FormData): Promise<
   failedPhotos: number;
   photoErrors: string[];
   error?: string;
-}> {
+};
+
+/** Parse ZIP buffer and run import + photo uploads. Shared by file and storage-path flows. */
+async function importFromZipBuffer(
+  arrayBuffer: ArrayBuffer,
+  userId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<ImportFromZipResult> {
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  const backupData: { [tableName: string]: string } = {};
+  const photoEntries: { path: string; buffer: ArrayBuffer }[] = [];
+
+  for (const [filename, zipFile] of Object.entries(zip.files)) {
+    if (zipFile.dir) continue;
+
+    const tableName = tableNameFromZipPath(filename);
+    if (tableName) {
+      const csvContent = await zipFile.async("text");
+      backupData[tableName] = csvContent;
+      continue;
+    }
+
+    const photoPath = photoPathFromZipPath(filename);
+    if (photoPath) {
+      const buffer = await zipFile.async("arraybuffer");
+      photoEntries.push({ path: photoPath, buffer });
+    }
+  }
+
+  if (Object.keys(backupData).length === 0) {
+    return { ...IMPORT_RESULT_FAIL, photoErrors: ["No CSV files found in backup"] };
+  }
+
+  const result = await importDatabaseBackup(backupData);
+  if (!result.success) {
+    return { ...IMPORT_RESULT_FAIL, photoErrors: ["Import failed"] };
+  }
+
+  const pathMapping: Record<string, string> = {};
+  let uploadedPhotos = 0;
+  const photoErrors: string[] = [];
+
+  for (const { path, buffer } of photoEntries) {
+    const pathParts = path.split("/");
+    if (pathParts.length !== 3) {
+      photoErrors.push(`${path}: Invalid path format`);
+      continue;
+    }
+    const [, miniatureId, filename] = pathParts;
+    const newPath = `${userId}/${miniatureId}/${filename}`;
+    pathMapping[path] = newPath;
+
+    const { error: uploadError } = await supabase.storage
+      .from("miniature-photos")
+      .upload(newPath, buffer, {
+        upsert: true,
+        contentType: "image/jpeg",
+      });
+
+    if (uploadError) {
+      photoErrors.push(`${path}: ${uploadError.message}`);
+    } else {
+      uploadedPhotos++;
+    }
+  }
+
+  if (Object.keys(pathMapping).length > 0) {
+    await updatePhotoPathsAfterImport(pathMapping);
+  }
+
+  return {
+    success: true,
+    results: result.results,
+    totalRows: result.totalRows,
+    uploadedPhotos,
+    failedPhotos: photoEntries.length - uploadedPhotos,
+    photoErrors,
+  };
+}
+
+/**
+ * Import a database backup from a ZIP file (server-side).
+ * Parses the ZIP on the server to avoid payload size limits that drop tables.
+ */
+export async function importDatabaseBackupFromFile(formData: FormData): Promise<ImportFromZipResult> {
   const user = await requireAuth();
   const supabase = await createClient();
 
   const file = formData.get("file");
   if (!file || !(file instanceof File)) {
-    return { success: false, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["No file provided"] };
+    return { ...IMPORT_RESULT_FAIL, photoErrors: ["No file provided"] };
   }
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const zip = await JSZip.loadAsync(arrayBuffer);
-
-    const backupData: { [tableName: string]: string } = {};
-    const photoEntries: { path: string; buffer: ArrayBuffer }[] = [];
-
-    for (const [filename, zipFile] of Object.entries(zip.files)) {
-      if (zipFile.dir) continue;
-
-      const tableName = tableNameFromZipPath(filename);
-      if (tableName) {
-        const csvContent = await zipFile.async("text");
-        backupData[tableName] = csvContent;
-        continue;
-      }
-
-      const photoPath = photoPathFromZipPath(filename);
-      if (photoPath) {
-        const buffer = await zipFile.async("arraybuffer");
-        photoEntries.push({ path: photoPath, buffer });
-      }
-    }
-
-    if (Object.keys(backupData).length === 0) {
-      return {
-        success: false,
-        uploadedPhotos: 0,
-        failedPhotos: 0,
-        photoErrors: ["No CSV files found in backup"],
-      };
-    }
-
-    const result = await importDatabaseBackup(backupData);
-    if (!result.success) {
-      return {
-        success: false,
-        uploadedPhotos: 0,
-        failedPhotos: 0,
-        photoErrors: ["Import failed"],
-      };
-    }
-
-    const pathMapping: Record<string, string> = {};
-    let uploadedPhotos = 0;
-    const photoErrors: string[] = [];
-
-    for (const { path, buffer } of photoEntries) {
-      const pathParts = path.split("/");
-      if (pathParts.length !== 3) {
-        photoErrors.push(`${path}: Invalid path format`);
-        continue;
-      }
-      const [, miniatureId, filename] = pathParts;
-      const newPath = `${user.id}/${miniatureId}/${filename}`;
-      pathMapping[path] = newPath;
-
-      const { error: uploadError } = await supabase.storage
-        .from("miniature-photos")
-        .upload(newPath, buffer, {
-          upsert: true,
-          contentType: "image/jpeg",
-        });
-
-      if (uploadError) {
-        photoErrors.push(`${path}: ${uploadError.message}`);
-      } else {
-        uploadedPhotos++;
-      }
-    }
-
-    if (Object.keys(pathMapping).length > 0) {
-      await updatePhotoPathsAfterImport(pathMapping);
-    }
-
-    return {
-      success: true,
-      results: result.results,
-      totalRows: result.totalRows,
-      uploadedPhotos,
-      failedPhotos: photoEntries.length - uploadedPhotos,
-      photoErrors,
-    };
+    return await importFromZipBuffer(arrayBuffer, user.id, supabase);
   } catch (error) {
     console.error("Import from file error:", error);
     return {
-      success: false,
-      uploadedPhotos: 0,
-      failedPhotos: 0,
+      ...IMPORT_RESULT_FAIL,
+      photoErrors: [error instanceof Error ? error.message : "Unknown error"],
+      error: error instanceof Error ? error.message : "Import failed",
+    };
+  }
+}
+
+/** Bucket used for temporary backup uploads (client uploads here to avoid 413). */
+export const BACKUP_IMPORTS_BUCKET = "backup-imports";
+
+/**
+ * Import from a ZIP already uploaded to Supabase Storage.
+ * Use this when the client uploads the file to storage first so the server action request stays small.
+ */
+export async function importDatabaseBackupFromStoragePath(storagePath: string): Promise<ImportFromZipResult> {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  if (!storagePath || typeof storagePath !== "string") {
+    return { ...IMPORT_RESULT_FAIL, photoErrors: ["No storage path provided"] };
+  }
+
+  const normalized = storagePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized.startsWith(`${user.id}/`)) {
+    return { ...IMPORT_RESULT_FAIL, photoErrors: ["Invalid path: must be under your user folder"] };
+  }
+
+  try {
+    const { data, error: downloadError } = await supabase.storage
+      .from(BACKUP_IMPORTS_BUCKET)
+      .download(normalized);
+
+    if (downloadError || !data) {
+      console.error("Backup download error:", downloadError);
+      return {
+        ...IMPORT_RESULT_FAIL,
+        photoErrors: [downloadError?.message ?? "Failed to download backup from storage"],
+        error: "Failed to download backup",
+      };
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    const result = await importFromZipBuffer(arrayBuffer, user.id, supabase);
+
+    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+
+    return result;
+  } catch (error) {
+    console.error("Import from storage path error:", error);
+    return {
+      ...IMPORT_RESULT_FAIL,
       photoErrors: [error instanceof Error ? error.message : "Unknown error"],
       error: error instanceof Error ? error.message : "Import failed",
     };
