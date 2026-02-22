@@ -686,7 +686,12 @@ export async function importDatabaseBackup(backupData: {
     const results: { [table: string]: number } = {};
 
     // Normalize ID for mapping keys/lookups (CSV can have spaces or different formatting)
-    const tid = (x: unknown): string => (x != null && x !== "") ? String(x).trim() : "";
+    const tid = (x: unknown): string => {
+      if (x == null || x === "") return "";
+      let s = String(x).trim();
+      if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
+      return s;
+    };
 
     // Build mappings for reference tables (old UUID -> new UUID)
     const factionMapping: { [oldId: string]: string | null } = {};
@@ -930,7 +935,7 @@ export async function importDatabaseBackup(backupData: {
           processedRow.storage_box_id = storageBoxIdMapping[tid(processedRow.storage_box_id)] ?? null;
         }
 
-        // Map miniature_id for tables that reference miniatures (trimmed lookup)
+        // Map miniature_id: use mapping when present, else keep normalized original (miniatures inserted with backup id)
         if (
           tableName === "miniature_photos" ||
           tableName === "miniature_status" ||
@@ -939,29 +944,29 @@ export async function importDatabaseBackup(backupData: {
           tableName === "shared_miniatures"
         ) {
           const mid = tid(processedRow.miniature_id);
-          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? (mid || null);
         }
         if (tableName === "miniature_tags") {
           const tagId = tid(processedRow.tag_id);
-          processedRow.tag_id = (tagId && tagIdMapping[tagId]) ?? null;
+          processedRow.tag_id = (tagId && tagIdMapping[tagId]) ?? (tagId || null);
         }
         if (tableName === "collection_miniatures") {
           const cid = tid(processedRow.collection_id);
           const mid = tid(processedRow.miniature_id);
-          processedRow.collection_id = (cid && collectionIdMapping[cid]) ?? null;
-          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
+          processedRow.collection_id = (cid && collectionIdMapping[cid]) ?? (cid || null);
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? (mid || null);
         }
         if (tableName === "recipe_steps") {
           const rid = tid(processedRow.recipe_id);
           const pid = tid(processedRow.paint_id);
-          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? null;
-          processedRow.paint_id = (pid && paintMapping[pid]) ?? null;
+          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? (rid || null);
+          processedRow.paint_id = (pid && paintMapping[pid]) ?? (pid || null);
         }
         if (tableName === "miniature_recipes") {
           const mid = tid(processedRow.miniature_id);
           const rid = tid(processedRow.recipe_id);
-          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? null;
-          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? null;
+          processedRow.miniature_id = (mid && miniatureIdMapping[mid]) ?? (mid || null);
+          processedRow.recipe_id = (rid && recipeIdMapping[rid]) ?? (rid || null);
         }
 
         // Map foreign keys for miniature_games (trimmed lookup)
@@ -974,16 +979,16 @@ export async function importDatabaseBackup(backupData: {
           processedRow.expansion_id = (exid && expansionMapping[exid]) ?? null;
         }
 
-        // Map foreign keys for user_paints (paint_id NOT NULL)
+        // Map paint_id for user_paints: use mapping or keep normalized original
         if (tableName === "user_paints") {
           const pid = tid(processedRow.paint_id);
-          processedRow.paint_id = (pid && paintMapping[pid]) ?? null;
+          processedRow.paint_id = (pid && paintMapping[pid]) ?? (pid || null);
         }
 
-        // Map status_id for miniature_status (trimmed lookup)
+        // Map status_id for miniature_status: use mapping or keep normalized original
         if (tableName === "miniature_status") {
           const sid = tid(processedRow.status_id);
-          processedRow.status_id = (sid && statusMapping[sid]) ?? null;
+          processedRow.status_id = (sid && statusMapping[sid]) ?? (sid || null);
         }
 
         return processedRow;
@@ -1023,33 +1028,34 @@ export async function importDatabaseBackup(backupData: {
           throw new Error(`Failed to import ${tableName}: ${error.message}`);
         }
 
-        // Build backup id -> inserted id mapping for parent tables (order matches batch)
-        if (inserted && inserted.length === batch.length) {
+        // Build backup id -> inserted id mapping for parent tables (order matches batch; use min length if response differs)
+        if (inserted && inserted.length > 0) {
+          const len = Math.min(inserted.length, batch.length);
           if (tableName === "tags") {
-            batch.forEach((row, idx) => {
-              const k = tid(row.id);
+            for (let idx = 0; idx < len; idx++) {
+              const k = tid(batch[idx].id);
               if (k) tagIdMapping[k] = inserted[idx].id;
-            });
+            }
           } else if (tableName === "storage_boxes") {
-            batch.forEach((row, idx) => {
-              const k = tid(row.id);
+            for (let idx = 0; idx < len; idx++) {
+              const k = tid(batch[idx].id);
               if (k) storageBoxIdMapping[k] = inserted[idx].id;
-            });
+            }
           } else if (tableName === "miniatures") {
-            batch.forEach((row, idx) => {
-              const k = tid(row.id);
+            for (let idx = 0; idx < len; idx++) {
+              const k = tid(batch[idx].id);
               if (k) miniatureIdMapping[k] = inserted[idx].id;
-            });
+            }
           } else if (tableName === "painting_recipes") {
-            batch.forEach((row, idx) => {
-              const k = tid(row.id);
+            for (let idx = 0; idx < len; idx++) {
+              const k = tid(batch[idx].id);
               if (k) recipeIdMapping[k] = inserted[idx].id;
-            });
+            }
           } else if (tableName === "collections") {
-            batch.forEach((row, idx) => {
-              const k = tid(row.id);
+            for (let idx = 0; idx < len; idx++) {
+              const k = tid(batch[idx].id);
               if (k) collectionIdMapping[k] = inserted[idx].id;
-            });
+            }
           }
         }
 
