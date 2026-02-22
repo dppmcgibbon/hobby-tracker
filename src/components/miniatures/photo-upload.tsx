@@ -21,9 +21,11 @@ import { Upload, X, Loader2 } from "lucide-react";
 interface PhotoUploadProps {
   miniatureId: string;
   onSuccess?: () => void;
+  /** When true, renders a compact dropzone suitable for inline/accordion use */
+  compact?: boolean;
 }
 
-export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
+export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProps) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,22 +126,24 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
       {!preview ? (
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+            compact ? "p-4" : "p-8"
+          } ${
             isDragActive
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-muted-foreground/50"
           }`}
         >
           <input {...getInputProps()} />
-          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            {isDragActive ? "Drop the image here" : "Drag & drop an image here, or click to select"}
+          <Upload className={`mx-auto text-muted-foreground ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
+          <p className={`text-muted-foreground ${compact ? "mt-1 text-xs" : "mt-2 text-sm"}`}>
+            {isDragActive ? "Drop the image here" : compact ? "Drop or click to upload" : "Drag & drop an image here, or click to select"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 12MB)</p>
+          {!compact && <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 12MB)</p>}
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="relative h-64">
+        <div className={compact ? "space-y-2" : "space-y-4"}>
+          <div className={`relative ${compact ? "h-32" : "h-64"}`}>
             <Image
               src={preview}
               alt="Preview"
@@ -159,6 +163,7 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
             </Button>
           </div>
 
+          {!compact && (
           <div className="space-y-2">
             <Label htmlFor="caption">Caption (optional)</Label>
             <Input
@@ -169,7 +174,9 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
               disabled={uploading}
             />
           </div>
+          )}
 
+          {!compact && (
           <div className="space-y-2">
             <Label htmlFor="photo_type">Photo Type</Label>
             <Select value={photoType} onValueChange={setPhotoType} disabled={uploading}>
@@ -183,8 +190,9 @@ export function PhotoUpload({ miniatureId, onSuccess }: PhotoUploadProps) {
               </SelectContent>
             </Select>
           </div>
+          )}
 
-          <Button onClick={handleUpload} disabled={uploading} className="w-full">
+          <Button onClick={handleUpload} disabled={uploading} className="w-full" size={compact ? "sm" : "default"}>
             {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {uploading ? "Uploading..." : "Upload Photo"}
           </Button>

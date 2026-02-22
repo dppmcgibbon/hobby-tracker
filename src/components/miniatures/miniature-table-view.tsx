@@ -12,6 +12,7 @@ import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info, Plus } from "lucide-react";
+import { PhotoUpload } from "./photo-upload";
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import type { MiniatureStatus } from "@/types";
 import { createClient } from "@/lib/supabase/client";
@@ -289,12 +290,12 @@ export function MiniatureTableView({
     }
   };
 
-  const openGallery = useCallback((miniature: MiniatureWithRelations) => {
+  const openGallery = useCallback((miniature: MiniatureWithRelations, photoIndex = 0) => {
     const index = localMiniatures.findIndex((m) => m.id === miniature.id);
     // Use a single state update to batch the changes
     requestAnimationFrame(() => {
       setSelectedMiniatureIndex(index);
-      setSelectedPhotoIndex(0);
+      setSelectedPhotoIndex(photoIndex);
       setDialogOpen(true);
     });
   }, [localMiniatures]);
@@ -493,14 +494,6 @@ export function MiniatureTableView({
                     e.stopPropagation();
                     setExpandedRowId(expandedRowId === miniature.id ? null : miniature.id);
                   }}
-                  disabled={
-                    !miniature.miniature_photos?.length &&
-                    !miniature.bases &&
-                    !miniature.base_shapes &&
-                    !miniature.base_types &&
-                    !miniature.storage_box &&
-                    !(miniature as any).notes
-                  }
                 >
                   <ImageIcon className={`h-4 w-4 ${miniature.miniature_photos?.length ? 'text-primary' : ''}`} />
                 </Button>
@@ -662,11 +655,17 @@ export function MiniatureTableView({
                       </div>
                     </div>
 
-                    {/* Right side - Photo Gallery */}
-                    {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
-                      <div className="flex-1 border border-primary/20 rounded pl-3 pr-5 flex items-center justify-center">
-                        <div className="flex gap-5 justify-center items-center flex-wrap">
-                          {miniature.miniature_photos.slice(0, 3).map((photo) => {
+                    {/* Right side - Photo Upload + Gallery */}
+                    <div className="flex-1 border border-primary/20 rounded p-3 flex flex-col gap-4 min-w-0">
+                      <div>
+                        <p className="text-xs font-bold text-primary mb-2">Upload Photo</p>
+                        <PhotoUpload miniatureId={miniature.id} compact />
+                      </div>
+                      {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-primary mb-2">Photos</p>
+                          <div className="flex gap-5 justify-center items-center flex-wrap">
+                            {miniature.miniature_photos.slice(0, 3).map((photo, index) => {
                             const { data } = supabase.storage
                               .from("miniature-photos")
                               .getPublicUrl(photo.storage_path);
@@ -675,7 +674,7 @@ export function MiniatureTableView({
                               <div
                                 key={photo.id}
                                 className="relative aspect-square rounded overflow-hidden border-2 border-primary/70 cursor-pointer hover:border-primary transition-colors min-h-[160px]"
-                                onClick={() => openGallery(miniature)}
+                                onClick={() => openGallery(miniature, index)}
                               >
                                 <Image
                                   src={data.publicUrl}
@@ -687,9 +686,10 @@ export function MiniatureTableView({
                               </div>
                             );
                           })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>

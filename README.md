@@ -40,3 +40,10 @@ A modern web application for tracking your miniature collection, painting progre
 
 ```bash
 npm install
+```
+
+3. Copy `.env.example` to `.env.local` and add your [Supabase](https://supabase.com) project URL and keys.
+
+### Deployment
+
+- **[Deploy to Raspberry Pi](docs/DEPLOYMENT_RASPBERRY_PI.md)** — Run the app on a Pi with Supabase Cloud as the database (systemd, optional reverse proxy, and Docker).
