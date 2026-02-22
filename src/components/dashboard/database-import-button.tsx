@@ -3,10 +3,8 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
-import {
-  importDatabaseBackupFromStoragePath,
-  BACKUP_IMPORTS_BUCKET,
-} from "@/app/actions/backup";
+import { importDatabaseBackupFromStoragePath } from "@/app/actions/backup";
+import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {

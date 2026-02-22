@@ -3,6 +3,7 @@
 import JSZip from "jszip";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
+import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
 
 // Helper function to convert array of objects to CSV
 function convertToCSV(data: any[], tableName: string): string {
@@ -1311,9 +1312,6 @@ export async function importDatabaseBackupFromFile(formData: FormData): Promise<
     };
   }
 }
-
-/** Bucket used for temporary backup uploads (client uploads here to avoid 413). */
-export const BACKUP_IMPORTS_BUCKET = "backup-imports";
 
 /**
  * Import from a ZIP already uploaded to Supabase Storage.
