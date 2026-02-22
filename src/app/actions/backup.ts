@@ -590,6 +590,104 @@ export async function importDatabaseBackup(backupData: {
       }
     }
 
+    // --- Insert missing reference data: factions, paints, bases, base_shapes, base_types ---
+    if (backupData.factions) {
+      const backupFactions = parseCSV(backupData.factions);
+      const { data: existing } = await supabase.from("factions").select("id, name");
+      const existingByName = new Map((existing || []).map((f) => [f.name, f.id]));
+      for (const row of backupFactions) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const armyType = row.army_type?.trim() || "imperium";
+        const { data: inserted } = await supabase
+          .from("factions")
+          .insert({
+            name: row.name,
+            army_type: armyType,
+            description: row.description ?? null,
+            color_hex: row.color_hex ?? null,
+          })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    if (backupData.paints) {
+      const backupPaints = parseCSV(backupData.paints);
+      const { data: existing } = await supabase.from("paints").select("id, brand, name, type");
+      const existingByKey = new Map(
+        (existing || []).map((p) => [`${p.brand}:${p.name}:${p.type}`, p.id])
+      );
+      for (const row of backupPaints) {
+        const brand = row.brand?.trim();
+        const name = row.name?.trim();
+        const type = row.type?.trim() || "layer";
+        if (!brand || !name) continue;
+        const key = `${brand}:${name}:${type}`;
+        if (existingByKey.has(key)) continue;
+        const { data: inserted } = await supabase
+          .from("paints")
+          .insert({
+            brand: row.brand,
+            name: row.name,
+            type,
+            color_hex: row.color_hex ?? null,
+          })
+          .select("id, brand, name, type")
+          .single();
+        if (inserted) existingByKey.set(`${inserted.brand}:${inserted.name}:${inserted.type}`, inserted.id);
+      }
+    }
+
+    if (backupData.bases) {
+      const backupBases = parseCSV(backupData.bases);
+      const { data: existing } = await supabase.from("bases").select("id, name");
+      const existingByName = new Map((existing || []).map((b) => [b.name, b.id]));
+      for (const row of backupBases) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const { data: inserted } = await supabase
+          .from("bases")
+          .insert({ name: row.name })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    if (backupData.base_shapes) {
+      const backupBaseShapes = parseCSV(backupData.base_shapes);
+      const { data: existing } = await supabase.from("base_shapes").select("id, name");
+      const existingByName = new Map((existing || []).map((bs) => [bs.name, bs.id]));
+      for (const row of backupBaseShapes) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const { data: inserted } = await supabase
+          .from("base_shapes")
+          .insert({ name: row.name })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
+    if (backupData.base_types) {
+      const backupBaseTypes = parseCSV(backupData.base_types);
+      const { data: existing } = await supabase.from("base_types").select("id, name");
+      const existingByName = new Map((existing || []).map((bt) => [bt.name, bt.id]));
+      for (const row of backupBaseTypes) {
+        const name = row.name?.trim();
+        if (!name || existingByName.has(name)) continue;
+        const { data: inserted } = await supabase
+          .from("base_types")
+          .insert({ name: row.name })
+          .select("id, name")
+          .single();
+        if (inserted) existingByName.set(inserted.name, inserted.id);
+      }
+    }
+
     // Define table order for import (respecting foreign key dependencies)
     // NOTE: Reference tables (factions, paints, games, editions, expansions) are either
     // already present or were inserted above; we only map IDs when importing user data.
@@ -639,15 +737,18 @@ export async function importDatabaseBackup(backupData: {
       }
     }
 
-    // Map paints by brand and name
+    // Map paints by brand, name, and type
     if (backupData.paints) {
       const backupPaints = parseCSV(backupData.paints);
-      const { data: currentPaints } = await supabase.from("paints").select("id, brand, name");
+      const { data: currentPaints } = await supabase.from("paints").select("id, brand, name, type");
       
       if (currentPaints) {
-        const paintKeyMap = new Map(currentPaints.map((p) => [`${p.brand}:${p.name}`, p.id]));
+        const paintKeyMap = new Map(
+          currentPaints.map((p) => [`${p.brand}:${p.name}:${p.type}`, p.id])
+        );
         backupPaints.forEach((oldPaint) => {
-          const key = `${oldPaint.brand}:${oldPaint.name}`;
+          const type = oldPaint.type?.trim() || "layer";
+          const key = `${oldPaint.brand}:${oldPaint.name}:${type}`;
           const newId = paintKeyMap.get(key) || null;
           paintMapping[oldPaint.id] = newId;
         });
@@ -768,6 +869,18 @@ export async function importDatabaseBackup(backupData: {
           }
         });
       }
+    }
+
+    // Map miniature_statuses (backup id -> current id by name) for miniature_status.status_id
+    const statusMapping: { [oldId: string]: string | null } = {};
+    if (backupData.miniature_statuses) {
+      const backupStatuses = parseCSV(backupData.miniature_statuses);
+      const { data: currentStatuses } = await supabase.from("miniature_statuses").select("id, name");
+      const statusNameToId = new Map((currentStatuses || []).map((s) => [s.name, s.id]));
+      backupStatuses.forEach((oldStatus) => {
+        const newId = statusNameToId.get(oldStatus.name) ?? null;
+        statusMapping[oldStatus.id] = newId;
+      });
     }
 
     // Insert paint_equivalents with mapped paint IDs (only where both sides exist)
@@ -909,6 +1022,15 @@ export async function importDatabaseBackup(backupData: {
               // If no mapping found, set to null to avoid FK violation
               processedRow.paint_id = null;
             }
+          }
+        }
+
+        // Map foreign keys for miniature_status (status_id -> new miniature_statuses id)
+        if (tableName === "miniature_status" && processedRow.status_id) {
+          if (statusMapping[processedRow.status_id] !== undefined) {
+            processedRow.status_id = statusMapping[processedRow.status_id];
+          } else {
+            processedRow.status_id = null;
           }
         }
 
