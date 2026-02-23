@@ -5,8 +5,20 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { deleteMiniaturePhoto } from "@/app/actions/photos";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MiniaturePhoto {
   id: string;
@@ -25,6 +37,7 @@ interface MiniaturePhotoDialogProps {
   selectedPhotoIndex: number;
   onClose: () => void;
   onNavigate: (miniatureIndex: number, photoIndex: number) => void;
+  onPhotoDeleted?: (miniatureIndex: number, photoIndex: number) => void;
 }
 
 export function MiniaturePhotoDialog({
@@ -33,12 +46,15 @@ export function MiniaturePhotoDialog({
   selectedPhotoIndex,
   onClose,
   onNavigate,
+  onPhotoDeleted,
 }: MiniaturePhotoDialogProps) {
   const [galleryZoomed, setGalleryZoomed] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [photoToDelete, setPhotoToDelete] = useState<MiniaturePhoto | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const supabase = createClient();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
@@ -134,6 +150,23 @@ export function MiniaturePhotoDialog({
     setIsDragging(false);
   };
 
+  const handleDelete = async () => {
+    if (!photoToDelete || selectedMiniatureIndex === null) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path);
+      toast.success("Photo deleted successfully");
+      setPhotoToDelete(null);
+      onPhotoDeleted?.(selectedMiniatureIndex, selectedPhotoIndex);
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete photo");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent
@@ -199,6 +232,21 @@ export function MiniaturePhotoDialog({
                   {galleryZoomed ? "Reduce size" : "Increase size"}
                 </TooltipContent>
               </Tooltip>
+              {onPhotoDeleted && selectedMiniature.miniature_photos.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="bg-background/90 hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => setPhotoToDelete(selectedMiniature.miniature_photos[selectedPhotoIndex])}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete photo</TooltipContent>
+                </Tooltip>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -291,6 +339,28 @@ export function MiniaturePhotoDialog({
           </div>
         </TooltipProvider>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!photoToDelete} onOpenChange={() => setPhotoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this photo? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

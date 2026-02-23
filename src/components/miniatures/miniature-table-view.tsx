@@ -314,6 +314,24 @@ export function MiniatureTableView({
     setSelectedPhotoIndex(photoIndex);
   }, []);
 
+  const handlePhotoDeleted = useCallback((miniatureIndex: number, photoIndex: number) => {
+    setLocalMiniatures((prev) => {
+      const next = prev.map((m, i) => {
+        if (i !== miniatureIndex) return m;
+        const newPhotos = m.miniature_photos.filter((_, j) => j !== photoIndex);
+        return { ...m, miniature_photos: newPhotos };
+      });
+      return next;
+    });
+    const mini = localMiniatures[miniatureIndex];
+    const remainingCount = mini.miniature_photos.length - 1;
+    if (remainingCount === 0) {
+      closeGallery();
+      return;
+    }
+    setSelectedPhotoIndex((prev) => Math.min(prev, remainingCount - 1));
+  }, [localMiniatures, closeGallery]);
+
   return (
     <>
       <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden">
@@ -775,6 +793,7 @@ export function MiniatureTableView({
             selectedPhotoIndex={selectedPhotoIndex}
             onClose={closeGallery}
             onNavigate={handleNavigate}
+            onPhotoDeleted={handlePhotoDeleted}
           />
         </Suspense>
       )}
