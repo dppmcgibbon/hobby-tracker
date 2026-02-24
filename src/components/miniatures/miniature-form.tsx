@@ -19,7 +19,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
+import { STATUS_LABELS, type MiniatureStatusValue } from "@/lib/constants/miniature-status";
+
+const STATUS_OPTIONS: { value: MiniatureStatusValue; label: string }[] = [
+  "unknown", "missing", "needs_stripped", "backlog", "built", "primed",
+  "painting_started", "needs_repair", "sub_assembled", "missing_arm", "missing_leg",
+  "missing_head", "complete",
+].map((value) => ({ value, label: STATUS_LABELS[value] ?? value }));
 import { RecipeSelector } from "@/components/recipes/recipe-selector";
 import type { Faction, Miniature } from "@/types";
 import { toast } from "sonner";
@@ -102,11 +110,17 @@ export function MiniatureForm({
           year: miniature.year || undefined,
           notes: miniature.notes || undefined,
           storage_box_id: (miniature as any).storage_box_id || undefined,
+          status: (miniature as any).status?.status ?? "backlog",
+          magnetised: (miniature as any).status?.magnetised ?? false,
+          based: (miniature as any).status?.based ?? false,
         }
       : {
           quantity: 1,
           sculptor: "Unknown",
           year: 1900,
+          status: "backlog",
+          magnetised: false,
+          based: false,
         },
   });
 
@@ -120,6 +134,9 @@ export function MiniatureForm({
   const baseShapeId = watch("base_shape_id");
   // eslint-disable-next-line react-hooks/incompatible-library
   const baseTypeId = watch("base_type_id");
+  const status = watch("status");
+  const magnetised = watch("magnetised");
+  const based = watch("based");
 
   const onSubmit = async (data: MiniatureInput) => {
     setIsLoading(true);
@@ -135,6 +152,7 @@ export function MiniatureForm({
         const result = await createMiniature(data);
         miniatureId = result.miniature.id;
       }
+      // Status fields are persisted inside createMiniature/updateMiniature
 
       // Handle recipe linking for new miniatures or changed recipes for existing ones
       if (miniature) {
@@ -402,6 +420,46 @@ export function MiniatureForm({
           disabled={isLoading}
         />
         {errors.notes && <p className="text-sm text-destructive">{errors.notes.message}</p>}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={status || "backlog"}
+            onValueChange={(value) => setValue("status", value as MiniatureInput["status"])}
+            disabled={isLoading}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center space-x-2 pt-8">
+          <Switch
+            id="magnetised"
+            checked={magnetised ?? false}
+            onCheckedChange={(checked) => setValue("magnetised", !!checked)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="magnetised">Magnetised</Label>
+        </div>
+        <div className="flex items-center space-x-2 pt-8">
+          <Switch
+            id="based"
+            checked={based ?? false}
+            onCheckedChange={(checked) => setValue("based", !!checked)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="based">Based</Label>
+        </div>
       </div>
 
       {recipes.length > 0 && (

@@ -11,9 +11,9 @@ import { PhotoUpload } from "@/components/miniatures/photo-upload";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { DeleteMiniatureButton } from "@/components/miniatures/delete-miniature-button";
 import { DuplicateMiniatureButton } from "@/components/miniatures/duplicate-miniature-button";
-import { StatusBadge } from "@/components/miniatures/status-badge";
 import { TagManager } from "@/components/miniatures/tag-manager";
-import { ArrowLeft, Edit, Calendar } from "lucide-react";
+import { STATUS_LABELS } from "@/lib/constants/miniature-status";
+import { ArrowLeft, Edit, Calendar, Check } from "lucide-react";
 import { getRecipes } from "@/lib/queries/recipes";
 import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
 import { unlinkRecipeFromMiniature } from "@/app/actions/recipes";
@@ -110,7 +110,9 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div>
                 <h4 className="text-sm font-medium mb-2">Status</h4>
-                <StatusBadge miniatureId={id} status={miniature.status} />
+                <p className="font-medium">
+                  {STATUS_LABELS[miniature.status?.status ?? ""] ?? miniature.status?.status ?? "—"}
+                </p>
               </div>
 
               <Separator />
@@ -207,8 +209,24 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                   <span className="text-muted-foreground">Added</span>
                   <span>{new Date(miniature.created_at).toLocaleDateString()}</span>
                 </div>
-                {miniature.status?.magnetised && <Badge variant="outline">Magnetised</Badge>}
-                {miniature.status?.based && <Badge variant="outline">Based</Badge>}
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    {miniature.status?.magnetised ? (
+                      <Check className="h-4 w-4 text-primary" />
+                    ) : (
+                      <span className="w-4" />
+                    )}
+                    Magnetised
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    {miniature.status?.based ? (
+                      <Check className="h-4 w-4 text-primary" />
+                    ) : (
+                      <span className="w-4" />
+                    )}
+                    Based
+                  </span>
+                </div>
               </div>
 
               {miniature.notes && (

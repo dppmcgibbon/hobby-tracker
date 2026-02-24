@@ -6,15 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
-import { StatusBadge } from "./status-badge";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, ArrowUpDown, Info, Plus } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, Check, Plus } from "lucide-react";
 import { PhotoUpload } from "./photo-upload";
-import { updateMiniatureStatus } from "@/app/actions/miniatures";
-import type { MiniatureStatus } from "@/types";
+import { STATUS_LABELS } from "@/lib/constants/miniature-status";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 
@@ -78,7 +75,6 @@ export function MiniatureTableView({
 }: MiniatureTableViewProps) {
   const router = useRouter();
   const supabase = createClient();
-  const [updatingStates, setUpdatingStates] = useState<Record<string, boolean>>({});
   const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [localMiniatures, setLocalMiniatures] = useState(miniatures);
@@ -250,45 +246,6 @@ export function MiniatureTableView({
   }, [currentPage, itemsPerPage]);
 
   const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
-
-  const handleToggle = async (
-    miniatureId: string,
-    field: "magnetised" | "based",
-    value: boolean,
-    currentStatus: { status?: string; magnetised?: boolean | null; based?: boolean | null } | null
-  ) => {
-    setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: true }));
-    
-    // Optimistically update local state
-    setLocalMiniatures((prev) => 
-      prev.map((m) => 
-        m.id === miniatureId
-          ? {
-              ...m,
-              miniature_status: {
-                ...m.miniature_status,
-                status: (currentStatus?.status as any) || "backlog",
-                [field]: value,
-              } as any,
-            }
-          : m
-      )
-    );
-    
-    try {
-      await updateMiniatureStatus(miniatureId, {
-        status: (currentStatus?.status as any) || "backlog",
-        magnetised: field === "magnetised" ? value : currentStatus?.magnetised ?? false,
-        based: field === "based" ? value : currentStatus?.based ?? false,
-      });
-    } catch (error) {
-      console.error(`Failed to update ${field}:`, error);
-      // Revert optimistic update on error
-      setLocalMiniatures(miniatures);
-    } finally {
-      setUpdatingStates((prev) => ({ ...prev, [`${miniatureId}-${field}`]: false }));
-    }
-  };
 
   const openGallery = useCallback((miniature: MiniatureWithRelations, photoIndex = 0) => {
     const index = localMiniatures.findIndex((m) => m.id === miniature.id);
@@ -475,33 +432,22 @@ export function MiniatureTableView({
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
               </TableCell>
-              <TableCell>
-                <div className="flex justify-center">
-                  <StatusBadge
-                    miniatureId={miniature.id}
-                    status={miniature.miniature_status as MiniatureStatus | null}
-                  />
-                </div>
+              <TableCell className="text-center text-muted-foreground">
+                {STATUS_LABELS[miniature.miniature_status?.status ?? ""] ?? miniature.miniature_status?.status ?? "—"}
               </TableCell>
               <TableCell className="text-center">
-                <Switch
-                  checked={miniature.miniature_status?.magnetised ?? false}
-                  onCheckedChange={(checked) =>
-                    handleToggle(miniature.id, "magnetised", checked, miniature.miniature_status)
-                  }
-                  disabled={updatingStates[`${miniature.id}-magnetised`]}
-                  onClick={(e) => e.stopPropagation()}
-                />
+                {miniature.miniature_status?.magnetised ? (
+                  <Check className="h-4 w-4 mx-auto text-primary" />
+                ) : (
+                  ""
+                )}
               </TableCell>
               <TableCell className="text-center">
-                <Switch
-                  checked={miniature.miniature_status?.based ?? false}
-                  onCheckedChange={(checked) =>
-                    handleToggle(miniature.id, "based", checked, miniature.miniature_status)
-                  }
-                  disabled={updatingStates[`${miniature.id}-based`]}
-                  onClick={(e) => e.stopPropagation()}
-                />
+                {miniature.miniature_status?.based ? (
+                  <Check className="h-4 w-4 mx-auto text-primary" />
+                ) : (
+                  ""
+                )}
               </TableCell>
               <TableCell className="text-center">
                 <Button

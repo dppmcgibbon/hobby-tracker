@@ -65,13 +65,6 @@ export async function getMiniatureById(id: string, userId: string) {
     throw new Error(error.message);
   }
 
-  console.log("getMiniatureById - status data:", {
-    id,
-    status: data.status,
-    statusType: typeof data.status,
-    statusIsArray: Array.isArray(data.status),
-  });
-
   // Ensure status is a single object, not an array
   if (Array.isArray(data.status)) {
     data.status = data.status[0] || null;

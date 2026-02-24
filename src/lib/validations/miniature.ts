@@ -20,6 +20,24 @@ export const miniatureSchema = z.object({
     .nullable(),
   notes: z.string().max(1000).optional().nullable(),
   storage_box_id: z.string().uuid("Invalid storage box").optional().nullable(),
+  // Status fields (edit/add pages; stored in miniature_status)
+  status: z.enum([
+    "unknown",
+    "missing",
+    "needs_stripped",
+    "backlog",
+    "built",
+    "primed",
+    "painting_started",
+    "needs_repair",
+    "sub_assembled",
+    "missing_arm",
+    "missing_leg",
+    "missing_head",
+    "complete",
+  ]).optional(),
+  magnetised: z.boolean().optional(),
+  based: z.boolean().optional(),
 });
 
 export const miniatureStatusSchema = z.object({

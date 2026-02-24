@@ -12,12 +12,13 @@ export async function createMiniature(data: MiniatureInput) {
 
   // Validate input
   const validated = miniatureSchema.parse(data);
+  const { status: statusVal, magnetised: magnetisedVal, based: basedVal, ...miniatureData } = validated;
 
-  // Insert miniature
+  // Insert miniature (omit status fields; they go to miniature_status)
   const { data: miniature, error: miniatureError } = await supabase
     .from("miniatures")
     .insert({
-      ...validated,
+      ...miniatureData,
       user_id: user.id,
     })
     .select()
@@ -27,13 +28,13 @@ export async function createMiniature(data: MiniatureInput) {
     throw new Error(miniatureError.message);
   }
 
-  // Create default status
+  // Create status row (use form values when provided)
   const { error: statusError } = await supabase.from("miniature_status").insert({
     miniature_id: miniature.id,
     user_id: user.id,
-    status: "backlog",
-    magnetised: false,
-    based: false,
+    status: statusVal ?? "backlog",
+    magnetised: magnetisedVal ?? false,
+    based: basedVal ?? false,
   });
 
   if (statusError) {
@@ -51,11 +52,12 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
 
   // Validate input
   const validated = miniatureSchema.parse(data);
+  const { status: statusVal, magnetised: magnetisedVal, based: basedVal, ...miniatureData } = validated;
 
-  // Update miniature
+  // Update miniature (omit status fields)
   const { data: miniature, error } = await supabase
     .from("miniatures")
-    .update(validated)
+    .update(miniatureData)
     .eq("id", id)
     .eq("user_id", user.id)
     .select()
@@ -63,6 +65,22 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  // Update status row when status fields are provided
+  if (statusVal !== undefined || magnetisedVal !== undefined || basedVal !== undefined) {
+    const statusUpdate = {
+      ...(statusVal !== undefined && { status: statusVal }),
+      ...(magnetisedVal !== undefined && { magnetised: magnetisedVal }),
+      ...(basedVal !== undefined && { based: basedVal }),
+    };
+    if (Object.keys(statusUpdate).length > 0) {
+      await supabase
+        .from("miniature_status")
+        .update(statusUpdate)
+        .eq("miniature_id", id)
+        .eq("user_id", user.id);
+    }
   }
 
   revalidatePath("/dashboard/miniatures");
