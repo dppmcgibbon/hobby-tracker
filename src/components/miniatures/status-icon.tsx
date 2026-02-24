@@ -14,7 +14,6 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants/miniature-status";
-import type { MiniatureStatus } from "@/types";
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +22,8 @@ import {
 } from "@/components/ui/tooltip";
 
 interface StatusIconProps {
-  status: MiniatureStatus | null;
+  /** Status object with at least a `status` field (e.g. from miniature_status relation). */
+  status: { status?: string | null } | null;
 }
 
 const STATUS_ICONS = {

@@ -11,7 +11,7 @@ import Link from "next/link";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, Check, Plus } from "lucide-react";
 import { PhotoUpload } from "./photo-upload";
-import { STATUS_LABELS } from "@/lib/constants/miniature-status";
+import { StatusIcon } from "./status-icon";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 
@@ -432,8 +432,10 @@ export function MiniatureTableView({
               <TableCell className="text-center font-bold text-primary">
                 {miniature.quantity}
               </TableCell>
-              <TableCell className="text-center text-muted-foreground">
-                {STATUS_LABELS[miniature.miniature_status?.status ?? ""] ?? miniature.miniature_status?.status ?? "—"}
+              <TableCell className="text-center">
+                <div className="flex justify-center">
+                  <StatusIcon status={miniature.miniature_status} />
+                </div>
               </TableCell>
               <TableCell className="text-center">
                 {miniature.miniature_status?.magnetised ? (

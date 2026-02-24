@@ -23,11 +23,13 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { STATUS_LABELS, type MiniatureStatusValue } from "@/lib/constants/miniature-status";
 
-const STATUS_OPTIONS: { value: MiniatureStatusValue; label: string }[] = [
-  "unknown", "missing", "needs_stripped", "backlog", "built", "primed",
-  "painting_started", "needs_repair", "sub_assembled", "missing_arm", "missing_leg",
-  "missing_head", "complete",
-].map((value) => ({ value, label: STATUS_LABELS[value] ?? value }));
+const STATUS_OPTIONS: { value: MiniatureStatusValue; label: string }[] = (
+  [
+    "unknown", "missing", "needs_stripped", "backlog", "built", "primed",
+    "painting_started", "needs_repair", "sub_assembled", "missing_arm", "missing_leg",
+    "missing_head", "complete",
+  ] as MiniatureStatusValue[]
+).map((value) => ({ value, label: STATUS_LABELS[value] ?? value }));
 import { RecipeSelector } from "@/components/recipes/recipe-selector";
 import type { Faction, Miniature } from "@/types";
 import { toast } from "sonner";

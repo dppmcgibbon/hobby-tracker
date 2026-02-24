@@ -9,7 +9,6 @@ import Image from "next/image";
 import { StatusIcon } from "./status-icon";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { createClient } from "@/lib/supabase/client";
-import type { MiniatureStatus } from "@/types";
 import { Copy } from "lucide-react";
 
 interface MiniatureCardProps {
@@ -144,7 +143,7 @@ export function MiniatureCard({
         <CardContent className="pt-3 pb-4">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <StatusIcon status={miniature.miniature_status as MiniatureStatus | null} />
+              <StatusIcon status={miniature.miniature_status} />
               {miniature.miniature_status?.magnetised && (
                 <Badge variant="outline" className="text-xs">
                   🧲
