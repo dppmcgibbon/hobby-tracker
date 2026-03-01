@@ -18,7 +18,7 @@ export async function getBackgroundRemovalConfig(): Promise<{
     available,
     hint: available
       ? undefined
-      : "Add REMOVE_BG_API_KEY to .env.local (get a key at remove.bg/api) to enable background removal.",
+      : "Background removal is off: set REMOVE_BG_API_KEY in your environment (local: .env.local; production: Vercel → Project Settings → Environment Variables). Get a key at remove.bg/api.",
   };
 }
 
@@ -175,7 +175,7 @@ async function processRemoveBackgroundForPhoto(
   const mimeType = data.type || "image/jpeg";
   const pngBuffer = await removeBackgroundFromBuffer(buffer, mimeType);
   if (!pngBuffer) {
-    throw new Error("Background removal is not configured (REMOVE_BG_API_KEY missing).");
+    throw new Error(BG_REMOVAL_NOT_CONFIGURED);
   }
 
   const { error: uploadError } = await supabase.storage
@@ -190,10 +190,17 @@ async function processRemoveBackgroundForPhoto(
   }
 }
 
+const BG_REMOVAL_NOT_CONFIGURED =
+  "Background removal is not configured. Set REMOVE_BG_API_KEY in your environment (e.g. Vercel → Project Settings → Environment Variables).";
+
 export async function removeBackgroundFromPhoto(
   photoId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
+    if (!isBackgroundRemovalAvailable()) {
+      return { success: false, error: BG_REMOVAL_NOT_CONFIGURED };
+    }
+
     const user = await requireAuth();
     const supabase = await createClient();
 
@@ -230,6 +237,10 @@ export async function removeBackgroundsForMiniature(
   | { success: false; error: string; processed?: number }
 > {
   try {
+    if (!isBackgroundRemovalAvailable()) {
+      return { success: false, error: BG_REMOVAL_NOT_CONFIGURED };
+    }
+
     const user = await requireAuth();
     const supabase = await createClient();
 
@@ -272,6 +283,59 @@ export async function removeBackgroundsForMiniature(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Background removal failed";
     console.error("[removeBackgroundsForMiniature]", message, err);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Replaces a photo's image with an uploaded file (e.g. after client-side background removal).
+ * FormData must contain a single "file" (Blob/File).
+ */
+export async function replacePhotoWithImage(
+  photoId: string,
+  formData: FormData
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const user = await requireAuth();
+    const supabase = await createClient();
+
+    const file = formData.get("file") as File;
+    if (!file) {
+      return { success: false, error: "No file provided" };
+    }
+
+    const { data: photo, error: fetchError } = await supabase
+      .from("miniature_photos")
+      .select("storage_path, miniature_id")
+      .eq("id", photoId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchError || !photo) {
+      return { success: false, error: "Photo not found" };
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from("miniature-photos")
+      .upload(photo.storage_path, file, {
+        contentType: file.type || "image/png",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return { success: false, error: uploadError.message };
+    }
+
+    await supabase
+      .from("miniature_photos")
+      .update({ image_updated_at: new Date().toISOString() })
+      .eq("id", photoId)
+      .eq("user_id", user.id);
+
+    revalidatePath(`/dashboard/miniatures/${photo.miniature_id}`);
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to replace photo";
     return { success: false, error: message };
   }
 }

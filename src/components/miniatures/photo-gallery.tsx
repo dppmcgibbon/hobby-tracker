@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import {
-  deleteMiniaturePhoto,
-  removeBackgroundFromPhoto,
-  removeBackgroundsForMiniature,
-  getBackgroundRemovalConfig,
-} from "@/app/actions/photos";
+import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
+import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -55,12 +51,6 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const supabase = createClient();
   const router = useRouter();
-  const [bgRemovalHint, setBgRemovalHint] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!miniatureId) return;
-    getBackgroundRemovalConfig().then(({ hint }) => setBgRemovalHint(hint ?? null));
-  }, [miniatureId]);
 
   const openLightbox = (index: number) => {
     setSelectedIndex(index);
@@ -144,10 +134,19 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
     }
   };
 
-  const handleRemoveBackground = async (photoId: string) => {
+  const handleRemoveBackground = async (photoId: string, storagePath: string) => {
     setIsRemovingBg(true);
     try {
-      const result = await removeBackgroundFromPhoto(photoId);
+      const publicUrl = supabase.storage
+        .from("miniature-photos")
+        .getPublicUrl(storagePath).data.publicUrl;
+      const res = await fetch(publicUrl);
+      if (!res.ok) throw new Error("Failed to load image");
+      const blob = await res.blob();
+      const resultBlob = await removeBackgroundInBrowser(blob);
+      const formData = new FormData();
+      formData.append("file", resultBlob, "image.png");
+      const result = await replacePhotoWithImage(photoId, formData);
       if (result.success) {
         toast.success("Background removed");
         router.refresh();
@@ -164,18 +163,32 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const handleRemoveAllBackgrounds = async () => {
     if (!miniatureId) return;
     setIsRemovingAllBg(true);
+    let processed = 0;
     try {
-      const result = await removeBackgroundsForMiniature(miniatureId);
-      if (result.success) {
-        toast.success(
-          result.processed
-            ? `Background removed from ${result.processed} photo(s)`
-            : "No photos to process"
-        );
-        router.refresh();
-      } else {
-        toast.error(result.error);
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          const publicUrl = supabase.storage
+            .from("miniature-photos")
+            .getPublicUrl(photo.storage_path).data.publicUrl;
+          const res = await fetch(publicUrl);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const resultBlob = await removeBackgroundInBrowser(blob);
+          const formData = new FormData();
+          formData.append("file", resultBlob, "image.png");
+          const result = await replacePhotoWithImage(photo.id, formData);
+          if (result.success) processed++;
+        } catch {
+          // skip failed photo
+        }
       }
+      toast.success(
+        processed
+          ? `Background removed from ${processed} photo(s)`
+          : "Could not process any photos"
+      );
+      router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove backgrounds");
     } finally {
@@ -194,7 +207,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   return (
     <>
       {miniatureId && photos.length > 0 && (
-        <div className="flex flex-col items-end gap-1 mb-2">
+        <div className="flex justify-end mb-2">
           <Button
             variant="outline"
             size="sm"
@@ -204,9 +217,6 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
             {isRemovingAllBg && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isRemovingAllBg ? "Removing backgrounds..." : "Remove backgrounds from all photos"}
           </Button>
-          {bgRemovalHint && (
-            <p className="text-xs text-muted-foreground max-w-sm text-right">{bgRemovalHint}</p>
-          )}
         </div>
       )}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -309,7 +319,12 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                         variant="ghost"
                         size="icon"
                         className="bg-background/80 backdrop-blur"
-                        onClick={() => handleRemoveBackground(photos[selectedIndex].id)}
+                        onClick={() =>
+                    handleRemoveBackground(
+                      photos[selectedIndex].id,
+                      photos[selectedIndex].storage_path
+                    )
+                  }
                         disabled={isRemovingBg}
                       >
                         {isRemovingBg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}

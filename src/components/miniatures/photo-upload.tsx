@@ -17,6 +17,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadMiniaturePhoto } from "@/app/actions/photos";
+import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { Upload, X, Loader2 } from "lucide-react";
 
 interface PhotoUploadProps {
@@ -87,11 +88,18 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
     setError(null);
 
     try {
+      let fileToUpload: File = file;
+      if (removeBackground) {
+        const resultBlob = await removeBackgroundInBrowser(file);
+        fileToUpload = new File([resultBlob], file.name.replace(/\.[^.]+$/, ".png") || "image.png", {
+          type: "image/png",
+        });
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       formData.append("caption", caption);
       formData.append("photo_type", photoType);
-      if (removeBackground) formData.append("remove_background", "true");
 
       await uploadMiniaturePhoto(miniatureId, formData);
 
@@ -204,7 +212,7 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
               disabled={uploading}
             />
             <Label htmlFor="remove_background" className="text-sm font-normal cursor-pointer">
-              Remove background (uses remove.bg; free tier limited)
+              Remove background (runs in browser, no API key)
             </Label>
           </div>
           )}

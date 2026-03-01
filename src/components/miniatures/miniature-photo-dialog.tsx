@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { deleteMiniaturePhoto, removeBackgroundFromPhoto } from "@/app/actions/photos";
+import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
+import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -177,7 +178,16 @@ export function MiniaturePhotoDialog({
     if (!photo) return;
     setIsRemovingBg(true);
     try {
-      const result = await removeBackgroundFromPhoto(photo.id);
+      const publicUrl = supabase.storage
+        .from("miniature-photos")
+        .getPublicUrl(photo.storage_path).data.publicUrl;
+      const res = await fetch(publicUrl);
+      if (!res.ok) throw new Error("Failed to load image");
+      const blob = await res.blob();
+      const resultBlob = await removeBackgroundInBrowser(blob);
+      const formData = new FormData();
+      formData.append("file", resultBlob, "image.png");
+      const result = await replacePhotoWithImage(photo.id, formData);
       if (result.success) {
         toast.success("Background removed");
         router.refresh();
