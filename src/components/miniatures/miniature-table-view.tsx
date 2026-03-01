@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, Check, Plus } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Plus } from "lucide-react";
 import { PhotoUpload } from "./photo-upload";
 import { StatusIcon } from "./status-icon";
 import { createClient } from "@/lib/supabase/client";
@@ -320,27 +320,17 @@ export function MiniatureTableView({
               Name
             </TableHead>
             <TableHead 
-              className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20" 
+              className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20 w-[50px]" 
               title="Quantity"
               onClick={() => handleSort("quantity")}
-            >
-              <Hash className="h-4 w-4 mx-auto" />
-            </TableHead>
+            />
             <TableHead 
-              className="font-bold uppercase text-xs tracking-wide text-primary cursor-pointer hover:bg-muted/20" 
+              className="font-bold uppercase text-xs tracking-wide text-primary text-center cursor-pointer hover:bg-muted/20 w-[50px]" 
               title="Status"
               onClick={() => handleSort("status")}
-            >
-              <div className="flex justify-center items-center">
-                <Activity className="h-4 w-4" />
-              </div>
-            </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Magnetised">
-              <Magnet className="h-4 w-4 mx-auto" />
-            </TableHead>
-            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center" title="Based">
-              <Sprout className="h-4 w-4 mx-auto" />
-            </TableHead>
+            />
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Magnetised" />
+            <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Based" />
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]" title="Photos & Info">
             </TableHead>
             <TableHead className="font-bold uppercase text-xs tracking-wide text-primary text-center w-[50px]">
@@ -440,16 +430,16 @@ export function MiniatureTableView({
               </TableCell>
               <TableCell className="text-center">
                 {miniature.miniature_status?.magnetised ? (
-                  <Check className="h-4 w-4 mx-auto text-primary" />
+                  <Magnet className="h-4 w-4 mx-auto text-primary" />
                 ) : (
-                  ""
+                  <Magnet className="h-4 w-4 mx-auto text-muted-foreground opacity-60" />
                 )}
               </TableCell>
               <TableCell className="text-center">
                 {miniature.miniature_status?.based ? (
-                  <Check className="h-4 w-4 mx-auto text-primary" />
+                  <Sprout className="h-4 w-4 mx-auto text-primary" />
                 ) : (
-                  ""
+                  <Sprout className="h-4 w-4 mx-auto text-muted-foreground opacity-60" />
                 )}
               </TableCell>
               <TableCell className="text-center">
