@@ -6,6 +6,8 @@ import { DatabaseImportButton } from "@/components/dashboard/database-import-but
 import { ImportPhotosOnlyButton } from "@/components/dashboard/import-photos-only-button";
 
 export const dynamic = "force-dynamic";
+/** Allow backup server action to run up to 5 minutes (avoids production timeout). */
+export const maxDuration = 300;
 
 export default async function DatabaseManagementPage() {
   await requireAuth();

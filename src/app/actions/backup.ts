@@ -303,24 +303,32 @@ export async function createDatabaseBackup() {
       });
 
       if (table === "miniature_photos" && data && data.length > 0) {
-        for (const photo of data) {
-          if (photo.storage_path) {
-            try {
-              const { data: fileData, error: downloadError } = await supabase.storage
-                .from("miniature-photos")
-                .download(photo.storage_path);
-
-              if (!downloadError && fileData) {
-                photoFiles.push({
-                  path: photo.storage_path,
-                  blob: fileData,
-                });
-              } else {
-                console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
+        const photosWithPath = data.filter((p: { storage_path?: string }) => p.storage_path) as Array<{
+          storage_path: string;
+        }>;
+        const PHOTO_BATCH_SIZE = 10;
+        for (let i = 0; i < photosWithPath.length; i += PHOTO_BATCH_SIZE) {
+          const batch = photosWithPath.slice(i, i + PHOTO_BATCH_SIZE);
+          const results = await Promise.all(
+            batch.map(async (photo) => {
+              try {
+                const { data: fileData, error: downloadError } = await supabase.storage
+                  .from("miniature-photos")
+                  .download(photo.storage_path);
+                if (!downloadError && fileData) {
+                  return { path: photo.storage_path, blob: fileData };
+                }
+                if (downloadError) {
+                  console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
+                }
+              } catch (downloadError) {
+                console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
               }
-            } catch (downloadError) {
-              console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
-            }
+              return null;
+            })
+          );
+          for (const r of results) {
+            if (r) photoFiles.push(r);
           }
         }
       }
