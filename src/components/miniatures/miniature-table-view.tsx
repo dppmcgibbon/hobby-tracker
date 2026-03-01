@@ -13,6 +13,7 @@ import { Edit, Image as ImageIcon, Magnet, Sprout, Activity, Hash, Check, Plus }
 import { PhotoUpload } from "./photo-upload";
 import { StatusIcon } from "./status-icon";
 import { createClient } from "@/lib/supabase/client";
+import { getPhotoImageUrl } from "@/lib/photos";
 import Image from "next/image";
 
 // Lazy load the photo dialog to reduce initial bundle size
@@ -39,7 +40,7 @@ interface MiniatureWithRelations {
     based?: boolean | null;
     magnetised?: boolean | null;
   } | null;
-  miniature_photos: { id: string; storage_path: string }[];
+  miniature_photos: { id: string; storage_path: string; image_updated_at?: string | null }[];
   storage_box?: { id: string; name: string; location?: string | null } | null;
   bases?: { id: string; name: string } | null;
   base_shapes?: { id: string; name: string } | null;
@@ -632,10 +633,10 @@ export function MiniatureTableView({
                           <p className="text-xs font-bold text-primary mb-2">Photos</p>
                           <div className="flex gap-5 justify-center items-center flex-wrap">
                             {miniature.miniature_photos.slice(0, 3).map((photo, index) => {
-                            const { data } = supabase.storage
+                            const publicUrl = supabase.storage
                               .from("miniature-photos")
-                              .getPublicUrl(photo.storage_path);
-                            
+                              .getPublicUrl(photo.storage_path).data.publicUrl;
+                            const imageUrl = getPhotoImageUrl(publicUrl, photo.image_updated_at);
                             return (
                               <div
                                 key={photo.id}
@@ -643,7 +644,7 @@ export function MiniatureTableView({
                                 onClick={() => openGallery(miniature, index)}
                               >
                                 <Image
-                                  src={data.publicUrl}
+                                  src={imageUrl}
                                   alt={miniature.name}
                                   fill
                                   className="object-cover"

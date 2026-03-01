@@ -5,10 +5,11 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { deleteMiniaturePhoto } from "@/app/actions/photos";
+import { deleteMiniaturePhoto, removeBackgroundFromPhoto } from "@/app/actions/photos";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,10 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getPhotoImageUrl } from "@/lib/photos";
 
 interface MiniaturePhoto {
   id: string;
   storage_path: string;
+  image_updated_at?: string | null;
 }
 
 interface Miniature {
@@ -55,7 +58,9 @@ export function MiniaturePhotoDialog({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [photoToDelete, setPhotoToDelete] = useState<MiniaturePhoto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const supabase = createClient();
+  const router = useRouter();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
 
@@ -167,6 +172,25 @@ export function MiniaturePhotoDialog({
     }
   };
 
+  const handleRemoveBackground = async () => {
+    const photo = selectedMiniature.miniature_photos[selectedPhotoIndex];
+    if (!photo) return;
+    setIsRemovingBg(true);
+    try {
+      const result = await removeBackgroundFromPhoto(photo.id);
+      if (result.success) {
+        toast.success("Background removed");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove background");
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent
@@ -232,6 +256,22 @@ export function MiniaturePhotoDialog({
                   {galleryZoomed ? "Reduce size" : "Increase size"}
                 </TooltipContent>
               </Tooltip>
+              {selectedMiniature.miniature_photos.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="bg-background/90"
+                      onClick={handleRemoveBackground}
+                      disabled={isRemovingBg}
+                    >
+                      {isRemovingBg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Remove background</TooltipContent>
+                </Tooltip>
+              )}
               {onPhotoDeleted && selectedMiniature.miniature_photos.length > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -282,13 +322,14 @@ export function MiniaturePhotoDialog({
                     }}
                   >
                     <Image
-                      src={
+                      src={getPhotoImageUrl(
                         supabase.storage
                           .from("miniature-photos")
                           .getPublicUrl(
                             selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
-                          ).data.publicUrl
-                      }
+                          ).data.publicUrl,
+                        selectedMiniature.miniature_photos[selectedPhotoIndex].image_updated_at
+                      )}
                       alt={`${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`}
                       fill
                       sizes="(max-width: 1024px) 100vw, 896px"

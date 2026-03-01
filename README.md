@@ -42,7 +42,7 @@ A modern web application for tracking your miniature collection, painting progre
 npm install
 ```
 
-3. Copy `.env.example` to `.env.local` and add your [Supabase](https://supabase.com) project URL and keys.
+3. Copy `.env.example` to `.env.local` and add your [Supabase](https://supabase.com) project URL and keys. Optional: set `REMOVE_BG_API_KEY` for [remove.bg](https://www.remove.bg/api) to enable background removal on miniature photos (free tier: 50 images/month).
 
 ### Deployment
 

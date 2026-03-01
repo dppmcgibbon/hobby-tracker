@@ -9,6 +9,7 @@ import Image from "next/image";
 import { StatusIcon } from "./status-icon";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { createClient } from "@/lib/supabase/client";
+import { getPhotoImageUrl } from "@/lib/photos";
 import { Copy } from "lucide-react";
 
 interface MiniatureCardProps {
@@ -25,7 +26,7 @@ interface MiniatureCardProps {
       based?: boolean | null;
       magnetised?: boolean | null;
     } | null;
-    miniature_photos: { storage_path: string }[];
+    miniature_photos: { storage_path: string; image_updated_at?: string | null }[];
     storage_box?: { id: string; name: string; location?: string | null } | null;
   };
   selectable?: boolean;
@@ -56,10 +57,10 @@ export function MiniatureCard({
   let imageUrl = "/placeholder-miniature.png";
   let isLocalSupabase = false;
   if (firstPhoto && firstPhoto.storage_path) {
-    const { data } = supabase.storage
+    const publicUrl = supabase.storage
       .from("miniature-photos")
-      .getPublicUrl(firstPhoto.storage_path);
-    imageUrl = data.publicUrl;
+      .getPublicUrl(firstPhoto.storage_path).data.publicUrl;
+    imageUrl = getPhotoImageUrl(publicUrl, firstPhoto.image_updated_at);
     isLocalSupabase = imageUrl.includes("127.0.0.1") || imageUrl.includes("localhost");
     console.log("Generated image URL:", imageUrl);
   }

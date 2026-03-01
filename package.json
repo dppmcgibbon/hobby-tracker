@@ -26,7 +26,8 @@
     "supabase:push": "supabase db push",
     "supabase:push-data": "./scripts/push-local-to-remote.sh",
     "supabase:sync-storage": "tsx scripts/sync-storage-to-remote.ts",
-    "supabase:reset": "supabase db reset"
+    "supabase:reset": "supabase db reset",
+    "remove-backgrounds": "tsx scripts/remove-backgrounds.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

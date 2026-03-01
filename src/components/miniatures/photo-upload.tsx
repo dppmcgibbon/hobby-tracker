@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { uploadMiniaturePhoto } from "@/app/actions/photos";
 import { Upload, X, Loader2 } from "lucide-react";
 
@@ -33,6 +34,7 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [photoType, setPhotoType] = useState<string>("wip");
+  const [removeBackground, setRemoveBackground] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -89,6 +91,7 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
       formData.append("file", file);
       formData.append("caption", caption);
       formData.append("photo_type", photoType);
+      if (removeBackground) formData.append("remove_background", "true");
 
       await uploadMiniaturePhoto(miniatureId, formData);
 
@@ -189,6 +192,20 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
                 <SelectItem value="detail">Detail Shot</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          )}
+
+          {!compact && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remove_background"
+              checked={removeBackground}
+              onCheckedChange={(v) => setRemoveBackground(v === true)}
+              disabled={uploading}
+            />
+            <Label htmlFor="remove_background" className="text-sm font-normal cursor-pointer">
+              Remove background (uses remove.bg; free tier limited)
+            </Label>
           </div>
           )}
 

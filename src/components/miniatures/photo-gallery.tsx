@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { deleteMiniaturePhoto } from "@/app/actions/photos";
+import {
+  deleteMiniaturePhoto,
+  removeBackgroundFromPhoto,
+  removeBackgroundsForMiniature,
+  getBackgroundRemovalConfig,
+} from "@/app/actions/photos";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -20,23 +25,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getPhotoImageUrl } from "@/lib/photos";
 
 interface Photo {
   id: string;
   storage_path: string;
   caption?: string;
   uploaded_at?: string;
+  image_updated_at?: string | null;
 }
 
 interface PhotoGalleryProps {
   photos: Photo[];
   miniatureName: string;
+  /** When set (e.g. on dashboard detail page), enables "Remove background" actions */
+  miniatureId?: string;
 }
 
-export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
+export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<Photo | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isRemovingAllBg, setIsRemovingAllBg] = useState(false);
   const [lightboxZoomed, setLightboxZoomed] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
@@ -44,6 +55,12 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const supabase = createClient();
   const router = useRouter();
+  const [bgRemovalHint, setBgRemovalHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!miniatureId) return;
+    getBackgroundRemovalConfig().then(({ hint }) => setBgRemovalHint(hint ?? null));
+  }, [miniatureId]);
 
   const openLightbox = (index: number) => {
     setSelectedIndex(index);
@@ -127,6 +144,45 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
     }
   };
 
+  const handleRemoveBackground = async (photoId: string) => {
+    setIsRemovingBg(true);
+    try {
+      const result = await removeBackgroundFromPhoto(photoId);
+      if (result.success) {
+        toast.success("Background removed");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove background");
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
+  const handleRemoveAllBackgrounds = async () => {
+    if (!miniatureId) return;
+    setIsRemovingAllBg(true);
+    try {
+      const result = await removeBackgroundsForMiniature(miniatureId);
+      if (result.success) {
+        toast.success(
+          result.processed
+            ? `Background removed from ${result.processed} photo(s)`
+            : "No photos to process"
+        );
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove backgrounds");
+    } finally {
+      setIsRemovingAllBg(false);
+    }
+  };
+
   if (photos.length === 0) {
     return (
       <div className="text-center py-12 bg-muted rounded-lg">
@@ -137,14 +193,30 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
 
   return (
     <>
+      {miniatureId && photos.length > 0 && (
+        <div className="flex flex-col items-end gap-1 mb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRemoveAllBackgrounds}
+            disabled={isRemovingAllBg}
+          >
+            {isRemovingAllBg && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isRemovingAllBg ? "Removing backgrounds..." : "Remove backgrounds from all photos"}
+          </Button>
+          {bgRemovalHint && (
+            <p className="text-xs text-muted-foreground max-w-sm text-right">{bgRemovalHint}</p>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {photos.map((photo, index) => {
-          const { data } = supabase.storage
+          const publicUrl = supabase.storage
             .from("miniature-photos")
-            .getPublicUrl(photo.storage_path);
-
+            .getPublicUrl(photo.storage_path).data.publicUrl;
+          const imageUrl = getPhotoImageUrl(publicUrl, photo.image_updated_at);
           const isLocalSupabase =
-            data.publicUrl.includes("127.0.0.1") || data.publicUrl.includes("localhost");
+            publicUrl.includes("127.0.0.1") || publicUrl.includes("localhost");
 
           return (
             <button
@@ -153,7 +225,7 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
               className="relative aspect-square rounded-lg overflow-hidden border hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <Image
-                src={data.publicUrl}
+                src={imageUrl}
                 alt={photo.caption || `${miniatureName} photo ${index + 1}`}
                 fill
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -230,6 +302,22 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
                       {lightboxZoomed ? "Reduce size" : "Increase size"}
                     </TooltipContent>
                   </Tooltip>
+                {miniatureId && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur"
+                        onClick={() => handleRemoveBackground(photos[selectedIndex].id)}
+                        disabled={isRemovingBg}
+                      >
+                        {isRemovingBg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Remove background</TooltipContent>
+                  </Tooltip>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -266,11 +354,12 @@ export function PhotoGallery({ photos, miniatureName }: PhotoGalleryProps) {
                   }}
                 >
                   <Image
-                    src={
+                    src={getPhotoImageUrl(
                       supabase.storage
                         .from("miniature-photos")
-                        .getPublicUrl(photos[selectedIndex].storage_path).data.publicUrl
-                    }
+                        .getPublicUrl(photos[selectedIndex].storage_path).data.publicUrl,
+                      photos[selectedIndex].image_updated_at
+                    )}
                     alt={
                       photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`
                     }

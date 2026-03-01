@@ -59,7 +59,7 @@ export default async function CollectionDetailPage({ params }: Props) {
         created_at,
         factions (name),
         miniature_status (status, completed_at, based, magnetised),
-        miniature_photos (id, storage_path)
+        miniature_photos (id, storage_path, image_updated_at)
       )
     `
     )

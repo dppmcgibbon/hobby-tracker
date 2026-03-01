@@ -11,8 +11,18 @@ CREATE TABLE IF NOT EXISTS public.saved_filters (
   CONSTRAINT unique_user_filter_name UNIQUE(user_id, name)
 );
 
--- Add logo_url if table already existed without it
-ALTER TABLE public.saved_filters ADD COLUMN IF NOT EXISTS logo_url TEXT;
+-- Add logo_url if table already existed without it (skip if we don't own the table)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'saved_filters' AND column_name = 'logo_url'
+  ) THEN
+    ALTER TABLE public.saved_filters ADD COLUMN logo_url TEXT;
+  END IF;
+EXCEPTION
+  WHEN insufficient_privilege THEN NULL;
+END $$;
 
 -- Enable RLS
 ALTER TABLE public.saved_filters ENABLE ROW LEVEL SECURITY;

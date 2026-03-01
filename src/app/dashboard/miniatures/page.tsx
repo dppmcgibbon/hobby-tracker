@@ -108,7 +108,7 @@ export default async function MiniaturesPage({
       year,
       factions (id, name),
       miniature_status (status, completed_at, magnetised, based),
-      miniature_photos (id, storage_path),
+      miniature_photos (id, storage_path, image_updated_at),
       bases (id, name),
       base_shapes (id, name),
       base_types (id, name),
