@@ -246,17 +246,18 @@ export function MiniatureTableView({
     }
   }, [currentPage, itemsPerPage]);
 
-  const selectedMiniature = selectedMiniatureIndex !== null ? localMiniatures[selectedMiniatureIndex] : null;
+  const selectedMiniature = selectedMiniatureIndex !== null ? sortedMiniatures[selectedMiniatureIndex] : null;
 
   const openGallery = useCallback((miniature: MiniatureWithRelations, photoIndex = 0) => {
-    const index = localMiniatures.findIndex((m) => m.id === miniature.id);
+    const index = sortedMiniatures.findIndex((m) => m.id === miniature.id);
+    if (index === -1) return;
     // Use a single state update to batch the changes
     requestAnimationFrame(() => {
       setSelectedMiniatureIndex(index);
       setSelectedPhotoIndex(photoIndex);
       setDialogOpen(true);
     });
-  }, [localMiniatures]);
+  }, [sortedMiniatures]);
 
   const closeGallery = useCallback(() => {
     setDialogOpen(false);
@@ -273,22 +274,23 @@ export function MiniatureTableView({
   }, []);
 
   const handlePhotoDeleted = useCallback((miniatureIndex: number, photoIndex: number) => {
-    setLocalMiniatures((prev) => {
-      const next = prev.map((m, i) => {
-        if (i !== miniatureIndex) return m;
+    const miniatureId = sortedMiniatures[miniatureIndex]?.id;
+    if (!miniatureId) return;
+    setLocalMiniatures((prev) =>
+      prev.map((m) => {
+        if (m.id !== miniatureId) return m;
         const newPhotos = m.miniature_photos.filter((_, j) => j !== photoIndex);
         return { ...m, miniature_photos: newPhotos };
-      });
-      return next;
-    });
-    const mini = localMiniatures[miniatureIndex];
+      })
+    );
+    const mini = sortedMiniatures[miniatureIndex];
     const remainingCount = mini.miniature_photos.length - 1;
     if (remainingCount === 0) {
       closeGallery();
       return;
     }
     setSelectedPhotoIndex((prev) => Math.min(prev, remainingCount - 1));
-  }, [localMiniatures, closeGallery]);
+  }, [sortedMiniatures, closeGallery]);
 
   return (
     <>
@@ -727,7 +729,7 @@ export function MiniatureTableView({
       {dialogOpen && selectedMiniatureIndex !== null && (
         <Suspense fallback={null}>
           <MiniaturePhotoDialog
-            miniatures={localMiniatures}
+            miniatures={sortedMiniatures}
             selectedMiniatureIndex={selectedMiniatureIndex}
             selectedPhotoIndex={selectedPhotoIndex}
             onClose={closeGallery}
