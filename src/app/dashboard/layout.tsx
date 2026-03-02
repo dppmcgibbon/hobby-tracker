@@ -25,6 +25,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         .toUpperCase()
     : user.email?.substring(0, 2).toUpperCase() || "U";
 
+  const isDaithi =
+    (profile?.display_name?.toLowerCase().includes("daithi") ||
+      user.email?.toLowerCase().includes("daithi")) ??
+    false;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header - Warhammer Gothic Style */}
@@ -67,13 +72,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Package className="h-4 w-4 inline-block mr-1.5" />
               Shortcuts
             </Link>
-            <Link
-              href="/dashboard/collections"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <FolderOpen className="h-4 w-4 inline-block mr-1.5" />
-              Collections
-            </Link>
+            {isDaithi && (
+              <Link
+                href="/dashboard/collections"
+                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              >
+                <FolderOpen className="h-4 w-4 inline-block mr-1.5" />
+                Collections
+              </Link>
+            )}
             <Link
               href="/dashboard/paints"
               className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
@@ -81,27 +88,33 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Palette className="h-4 w-4 inline-block mr-1.5" />
               Paints
             </Link>
-            <Link
-              href="/dashboard/collect-apps"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Layers className="h-4 w-4 inline-block mr-1.5" />
-              Collect
-            </Link>
-            <Link
-              href="/dashboard/game-progress"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Trophy className="h-4 w-4 inline-block mr-1.5" />
-              Game progress
-            </Link>
-            <Link
-              href="/dashboard/admin"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Settings className="h-4 w-4 inline-block mr-1.5" />
-              Admin
-            </Link>
+            {isDaithi && (
+              <Link
+                href="/dashboard/collect-apps"
+                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              >
+                <Layers className="h-4 w-4 inline-block mr-1.5" />
+                Collect
+              </Link>
+            )}
+            {isDaithi && (
+              <Link
+                href="/dashboard/game-progress"
+                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              >
+                <Trophy className="h-4 w-4 inline-block mr-1.5" />
+                Game progress
+              </Link>
+            )}
+            {isDaithi && (
+              <Link
+                href="/dashboard/admin"
+                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              >
+                <Settings className="h-4 w-4 inline-block mr-1.5" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           <DropdownMenu>
