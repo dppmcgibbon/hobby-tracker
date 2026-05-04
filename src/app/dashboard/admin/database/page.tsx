@@ -1,9 +1,11 @@
 import { requireAuth } from "@/lib/auth/server";
+import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
-import { Database, ImagePlus } from "lucide-react";
+import { Database, Globe, ImagePlus } from "lucide-react";
 import { DatabaseBackupButton } from "@/components/dashboard/database-backup-button";
 import { DatabaseImportButton } from "@/components/dashboard/database-import-button";
 import { ImportPhotosOnlyButton } from "@/components/dashboard/import-photos-only-button";
+import { UniverseBackupSection } from "@/components/dashboard/universe-backup-section";
 
 export const dynamic = "force-dynamic";
 /** Allow backup server action to run up to 5 minutes (avoids production timeout). */
@@ -11,6 +13,8 @@ export const maxDuration = 300;
 
 export default async function DatabaseManagementPage() {
   await requireAuth();
+  const supabase = await createClient();
+  const { data: universes } = await supabase.from("universes").select("id, name").order("name");
 
   return (
     <div className="container mx-auto py-8">
@@ -29,9 +33,23 @@ export default async function DatabaseManagementPage() {
               <div className="flex-1">
                 <p className="font-semibold text-sm uppercase tracking-wide mb-1">Backup Database</p>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Download a complete backup of your collection data including miniatures, recipes, and all metadata
+                  Download CSV exports for all backed-up tables (including miniature_photos metadata such as storage
+                  paths). Image files in storage are not included—use Universe photos or Import photos only for those.
                 </p>
                 <DatabaseBackupButton />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-sm border border-primary/20">
+              <Globe className="h-5 w-5 mt-0.5 text-sky-500" />
+              <div className="flex-1">
+                <p className="font-semibold text-sm uppercase tracking-wide mb-1">Universe photos</p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Download images from storage for miniatures linked to games in that universe (via game
+                  assignments). No database tables are included. Files are placed under photos/ using the same path as
+                  in the miniature-photos bucket.
+                </p>
+                <UniverseBackupSection universes={universes ?? []} />
               </div>
             </div>
 

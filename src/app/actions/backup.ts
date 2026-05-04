@@ -142,7 +142,6 @@ export async function createDatabaseBackup() {
     ];
 
     const backups: Array<{ tableName: string; csv: string; rowCount: number }> = [];
-    const photoFiles: Array<{ path: string; blob: Blob }> = [];
 
     // Fetch data for each table
     for (const table of tables) {
@@ -301,49 +300,133 @@ export async function createDatabaseBackup() {
         csv,
         rowCount: data?.length ?? 0,
       });
-
-      if (table === "miniature_photos" && data && data.length > 0) {
-        const photosWithPath = data.filter((p: { storage_path?: string }) => p.storage_path) as Array<{
-          storage_path: string;
-        }>;
-        const PHOTO_BATCH_SIZE = 10;
-        for (let i = 0; i < photosWithPath.length; i += PHOTO_BATCH_SIZE) {
-          const batch = photosWithPath.slice(i, i + PHOTO_BATCH_SIZE);
-          const results = await Promise.all(
-            batch.map(async (photo) => {
-              try {
-                const { data: fileData, error: downloadError } = await supabase.storage
-                  .from("miniature-photos")
-                  .download(photo.storage_path);
-                if (!downloadError && fileData) {
-                  return { path: photo.storage_path, blob: fileData };
-                }
-                if (downloadError) {
-                  console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
-                }
-              } catch (downloadError) {
-                console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
-              }
-              return null;
-            })
-          );
-          for (const r of results) {
-            if (r) photoFiles.push(r);
-          }
-        }
-      }
     }
 
     return {
       success: true,
       backups,
-      photoFiles,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
     console.error("Database backup error:", error);
     throw error;
   }
+}
+
+/**
+ * Miniature-photos from storage for the current user's models linked to games in the given universe
+ * (at least one miniature_games row for a game with this universe_id). No CSV / database export.
+ */
+export async function createUniversePhotosBackup(universeId: string) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+  const BATCH = 100;
+
+  if (!universeId || typeof universeId !== "string") {
+    throw new Error("Universe is required");
+  }
+
+  const { data: universeRow, error: universeErr } = await supabase
+    .from("universes")
+    .select("id, name")
+    .eq("id", universeId)
+    .maybeSingle();
+
+  if (universeErr || !universeRow) {
+    throw new Error("Universe not found");
+  }
+
+  const { data: gamesInUniverse, error: gamesErr } = await supabase
+    .from("games")
+    .select("id")
+    .eq("universe_id", universeId);
+
+  if (gamesErr) {
+    throw new Error(`Failed to fetch games: ${gamesErr.message}`);
+  }
+
+  const universeGameIds = [...new Set((gamesInUniverse ?? []).map((g: { id: string }) => g.id))];
+
+  const linkedMiniatureIds = new Set<string>();
+  if (universeGameIds.length > 0) {
+    for (let i = 0; i < universeGameIds.length; i += BATCH) {
+      const gameBatch = universeGameIds.slice(i, i + BATCH);
+      const { data: mgRows, error: mgErr } = await supabase
+        .from("miniature_games")
+        .select("miniature_id")
+        .in("game_id", gameBatch);
+      if (mgErr) throw new Error(`Failed to fetch miniature_games: ${mgErr.message}`);
+      for (const row of mgRows ?? []) linkedMiniatureIds.add((row as { miniature_id: string }).miniature_id);
+    }
+  }
+
+  const candidateIds = [...linkedMiniatureIds];
+  const miniatureIds: string[] = [];
+  if (candidateIds.length > 0) {
+    for (let i = 0; i < candidateIds.length; i += BATCH) {
+      const batch = candidateIds.slice(i, i + BATCH);
+      const { data: owned, error: mErr } = await supabase
+        .from("miniatures")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("id", batch);
+      if (mErr) throw new Error(`Failed to fetch miniatures: ${mErr.message}`);
+      for (const row of owned ?? []) miniatureIds.push((row as { id: string }).id);
+    }
+  }
+
+  const photoPaths: { storage_path: string }[] = [];
+  if (miniatureIds.length > 0) {
+    for (let i = 0; i < miniatureIds.length; i += BATCH) {
+      const batch = miniatureIds.slice(i, i + BATCH);
+      const { data, error } = await supabase
+        .from("miniature_photos")
+        .select("storage_path")
+        .eq("user_id", user.id)
+        .in("miniature_id", batch);
+      if (error) throw new Error(`Failed to fetch miniature_photos: ${error.message}`);
+      if (data) photoPaths.push(...(data as { storage_path: string }[]));
+    }
+  }
+
+  const photoFiles: Array<{ path: string; blob: Blob }> = [];
+  const photosWithPath = photoPaths.filter((p) => p.storage_path);
+  const PHOTO_BATCH_SIZE = 10;
+  for (let i = 0; i < photosWithPath.length; i += PHOTO_BATCH_SIZE) {
+    const batch = photosWithPath.slice(i, i + PHOTO_BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (photo) => {
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from("miniature-photos")
+            .download(photo.storage_path);
+          if (!downloadError && fileData) {
+            return { path: photo.storage_path, blob: fileData };
+          }
+          if (downloadError) {
+            console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
+          }
+        } catch (downloadError) {
+          console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
+        }
+        return null;
+      })
+    );
+    for (const r of results) {
+      if (r) photoFiles.push(r);
+    }
+  }
+
+  return {
+    success: true,
+    photoFiles,
+    timestamp: new Date().toISOString(),
+    universeId: universeRow.id as string,
+    universeName: universeRow.name as string,
+    miniatureCount: miniatureIds.length,
+    universeGameCount: universeGameIds.length,
+    photoRowCount: photosWithPath.length,
+  };
 }
 
 /** Normalize storage path for consistent matching (ZIP paths may use \\ or extra slashes). */

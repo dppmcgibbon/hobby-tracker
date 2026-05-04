@@ -23,27 +23,20 @@ export function DatabaseBackupButton() {
       const zip = new JSZip();
 
       // Add each table's CSV to the zip
-      result.backups.forEach(({ tableName, csv, rowCount }) => {
+      result.backups.forEach(({ tableName, csv }) => {
         zip.file(`data/${tableName}.csv`, csv);
       });
-
-      // Add photo files to the zip
-      if (result.photoFiles && result.photoFiles.length > 0) {
-        for (const { path, blob } of result.photoFiles) {
-          zip.file(`photos/${path}`, blob);
-        }
-      }
 
       // Add a metadata file
       const metadata = {
         backupDate: result.timestamp,
+        dataOnlyBackup: true,
         tables: result.backups.map(({ tableName, rowCount }) => ({
           table: tableName,
           rows: rowCount,
         })),
         totalTables: result.backups.length,
         totalRows: result.backups.reduce((sum, b) => sum + b.rowCount, 0),
-        photoCount: result.photoFiles?.length || 0,
       };
 
       zip.file("backup_metadata.json", JSON.stringify(metadata, null, 2));
@@ -68,9 +61,8 @@ export function DatabaseBackupButton() {
       // Clean up
       URL.revokeObjectURL(url);
 
-      const photoMessage = metadata.photoCount > 0 ? `, ${metadata.photoCount} photos` : "";
       toast.success(
-        `Database backup complete! ${metadata.totalTables} tables backed up (${metadata.totalRows} total rows${photoMessage})`
+        `Backup complete: ${metadata.totalTables} tables, ${metadata.totalRows} rows (CSV only; no image files).`
       );
     } catch (error) {
       console.error("Backup error:", error);
