@@ -1,6 +1,14 @@
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth/server";
-import { getMiniatureById, getFactions, getStorageBoxes, getBases, getBaseShapes, getBaseTypes } from "@/lib/queries/miniatures";
+import {
+  getMiniatureById,
+  getFactions,
+  getStorageBoxes,
+  getBases,
+  getBaseShapes,
+  getBaseTypes,
+  getMiniatureStatuses,
+} from "@/lib/queries/miniatures";
 import { getRecipes } from "@/lib/queries/recipes";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,14 +29,16 @@ export default async function EditMiniaturePage({ params }: PageProps) {
     notFound();
   }
 
-  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes] = await Promise.all([
-    getFactions(),
-    getStorageBoxes(user.id),
-    getRecipes(user.id),
-    getBases(),
-    getBaseShapes(),
-    getBaseTypes(),
-  ]);
+  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows] =
+    await Promise.all([
+      getFactions(),
+      getStorageBoxes(user.id),
+      getRecipes(user.id),
+      getBases(),
+      getBaseShapes(),
+      getBaseTypes(),
+      getMiniatureStatuses(),
+    ]);
 
   // Get existing recipe links
   const supabase = await createClient();
@@ -54,6 +64,7 @@ export default async function EditMiniaturePage({ params }: PageProps) {
         <CardContent>
           <MiniatureForm
             factions={factions}
+            statusRows={statusRows.map((r) => ({ name: r.name, display_order: r.display_order }))}
             storageBoxes={storageBoxes}
             recipes={recipes}
             bases={bases}

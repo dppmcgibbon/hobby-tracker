@@ -1,19 +1,28 @@
 import { requireAuth } from "@/lib/auth/server";
-import { getFactions, getStorageBoxes, getBases, getBaseShapes, getBaseTypes } from "@/lib/queries/miniatures";
+import {
+  getFactions,
+  getStorageBoxes,
+  getBases,
+  getBaseShapes,
+  getBaseTypes,
+  getMiniatureStatuses,
+} from "@/lib/queries/miniatures";
 import { getRecipes } from "@/lib/queries/recipes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniatureForm } from "@/components/miniatures/miniature-form";
 
 export default async function AddMiniaturePage() {
   const user = await requireAuth();
-  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes] = await Promise.all([
-    getFactions(),
-    getStorageBoxes(user.id),
-    getRecipes(user.id),
-    getBases(),
-    getBaseShapes(),
-    getBaseTypes(),
-  ]);
+  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows] =
+    await Promise.all([
+      getFactions(),
+      getStorageBoxes(user.id),
+      getRecipes(user.id),
+      getBases(),
+      getBaseShapes(),
+      getBaseTypes(),
+      getMiniatureStatuses(),
+    ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -30,9 +39,10 @@ export default async function AddMiniaturePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <MiniatureForm 
-            factions={factions} 
-            storageBoxes={storageBoxes} 
+          <MiniatureForm
+            factions={factions}
+            statusRows={statusRows.map((r) => ({ name: r.name, display_order: r.display_order }))}
+            storageBoxes={storageBoxes}
             recipes={recipes}
             bases={bases}
             baseShapes={baseShapes}

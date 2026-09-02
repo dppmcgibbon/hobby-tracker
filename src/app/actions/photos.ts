@@ -7,6 +7,12 @@ import {
   removeBackgroundFromBuffer,
   isBackgroundRemovalAvailable,
 } from "@/lib/background-removal";
+import {
+  generatePresignedUploadUrl,
+  deleteR2Object,
+  uploadR2Object,
+  downloadR2Object,
+} from "@/lib/r2";
 
 /** Call from client to see if REMOVE_BG_API_KEY is set (so we can show a hint). */
 export async function getBackgroundRemovalConfig(): Promise<{
@@ -22,88 +28,136 @@ export async function getBackgroundRemovalConfig(): Promise<{
   };
 }
 
+/**
+ * Server Action to generate a secure presigned upload URL for direct client-to-R2 upload.
+ */
+export async function getPresignedUploadUrl(
+  miniatureId: string,
+  filename: string,
+  contentType: string
+): Promise<{
+  success: true;
+  presignedUrl: string;
+  key: string;
+  publicUrl: string;
+}> {
+  const user = await requireAuth();
+
+  const validTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "application/zip",
+    "application/x-zip-compressed",
+  ];
+  if (!validTypes.includes(contentType)) {
+    throw new Error("Invalid file type.");
+  }
+
+  const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const key = `${user.id}/${miniatureId}/${timestamp}-${cleanFilename}`;
+
+  const result = await generatePresignedUploadUrl(key, contentType);
+  return { success: true, ...result };
+}
+
+/**
+ * Server Action to save a photo record in PostgreSQL after successful R2 upload.
+ */
+export async function savePhotoRecord(
+  miniatureId: string,
+  storagePath: string,
+  caption?: string | null,
+  photoType?: string | null
+) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const { data: photo, error: dbError } = await supabase
+    .from("miniature_photos")
+    .insert({
+      miniature_id: miniatureId,
+      user_id: user.id,
+      storage_path: storagePath,
+      caption: caption || null,
+      photo_type: photoType || "wip",
+    })
+    .select()
+    .single();
+
+  if (dbError) {
+    // Attempt to clean up R2 object if DB insertion fails
+    try {
+      await deleteR2Object(storagePath);
+    } catch (cleanupErr) {
+      console.error("Failed to cleanup R2 object after DB error:", cleanupErr);
+    }
+    throw new Error(dbError.message);
+  }
+
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
+  return { success: true, photo };
+}
+
+/**
+ * Server upload action (fallback / server-processed uploads).
+ */
 export async function uploadMiniaturePhoto(miniatureId: string, formData: FormData) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Get the file from FormData
   const file = formData.get("file") as File;
   if (!file) {
     throw new Error("No file provided");
   }
 
-  // Validate file type
   const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   if (!validTypes.includes(file.type)) {
     throw new Error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
   }
 
-  // Validate file size (max 12MB)
   const maxSize = 12 * 1024 * 1024;
   if (file.size > maxSize) {
     throw new Error("File too large. Maximum size is 12MB.");
   }
 
   const removeBackground = formData.get("remove_background") === "true";
-  let uploadPayload: { body: Buffer | File; contentType: string; path: string };
   const timestamp = Date.now();
   const basePath = `${user.id}/${miniatureId}/${timestamp}`;
+  let uploadBuffer: Buffer;
+  let contentType = file.type;
+  let finalPath: string;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const fileBuffer = Buffer.from(arrayBuffer);
 
   if (removeBackground) {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
     try {
-      const pngBuffer = await removeBackgroundFromBuffer(buffer, file.type);
+      const pngBuffer = await removeBackgroundFromBuffer(fileBuffer, file.type);
       if (pngBuffer) {
-        uploadPayload = {
-          body: pngBuffer,
-          contentType: "image/png",
-          path: `${basePath}.png`,
-        };
+        uploadBuffer = pngBuffer;
+        contentType = "image/png";
+        finalPath = `${basePath}.png`;
       } else {
         const fileExt = file.name.split(".").pop();
-        uploadPayload = {
-          body: file,
-          contentType: file.type,
-          path: `${basePath}.${fileExt}`,
-        };
+        uploadBuffer = fileBuffer;
+        finalPath = `${basePath}.${fileExt}`;
       }
     } catch {
-      // API failed; upload original
       const fileExt = file.name.split(".").pop();
-      uploadPayload = {
-        body: file,
-        contentType: file.type,
-        path: `${basePath}.${fileExt}`,
-      };
+      uploadBuffer = fileBuffer;
+      finalPath = `${basePath}.${fileExt}`;
     }
   } else {
     const fileExt = file.name.split(".").pop();
-    uploadPayload = {
-      body: file,
-      contentType: file.type,
-      path: `${basePath}.${fileExt}`,
-    };
+    uploadBuffer = fileBuffer;
+    finalPath = `${basePath}.${fileExt}`;
   }
 
-  // Upload to Supabase Storage
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from("miniature-photos")
-    .upload(uploadPayload.path, uploadPayload.body, {
-      contentType: uploadPayload.contentType,
-      upsert: false,
-    });
+  const { key } = await uploadR2Object(finalPath, uploadBuffer, contentType);
 
-  if (uploadError) {
-    console.error("Storage upload error:", uploadError);
-    throw new Error(`Failed to upload photo: ${uploadError.message || "Unknown storage error"}`);
-  }
-
-  if (!uploadData || !uploadData.path) {
-    throw new Error("Upload succeeded but no path was returned");
-  }
-
-  // Save photo record to database
   const caption = formData.get("caption") as string | null;
   const photoType = formData.get("photo_type") as string | null;
 
@@ -112,7 +166,7 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     .insert({
       miniature_id: miniatureId,
       user_id: user.id,
-      storage_path: uploadData.path,
+      storage_path: key,
       caption: caption || null,
       photo_type: photoType || "wip",
     })
@@ -120,8 +174,7 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     .single();
 
   if (dbError) {
-    // Clean up uploaded file if database insert fails
-    await supabase.storage.from("miniature-photos").remove([uploadData.path]);
+    await deleteR2Object(key);
     throw new Error(dbError.message);
   }
 
@@ -129,6 +182,9 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
   return { success: true, photo };
 }
 
+/**
+ * Server action to delete a photo from PostgreSQL database and Cloudflare R2 storage.
+ */
 export async function deleteMiniaturePhoto(photoId: string, storagePath: string) {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -144,50 +200,32 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
     throw new Error(dbError.message);
   }
 
-  // Delete from storage
-  const { error: storageError } = await supabase.storage
-    .from("miniature-photos")
-    .remove([storagePath]);
-
-  if (storageError) {
-    console.error("Failed to delete from storage:", storageError);
-    // Don't throw error here as the database record is already deleted
+  // Delete from R2 storage
+  try {
+    await deleteR2Object(storagePath);
+  } catch (storageError) {
+    console.error("Failed to delete from R2 storage:", storageError);
   }
 
   revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
 
-/** Process one photo: download, remove background, re-upload (same path, upsert). */
+/** Process one photo: download from R2, remove background, re-upload to R2. */
 async function processRemoveBackgroundForPhoto(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   storagePath: string
 ): Promise<void> {
-  const { data, error: downloadError } = await supabase.storage
-    .from("miniature-photos")
-    .download(storagePath);
+  const buffer = await downloadR2Object(storagePath);
+  // Estimate mime type from extension or default to jpeg
+  const ext = storagePath.split(".").pop()?.toLowerCase();
+  const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 
-  if (downloadError || !data) {
-    throw new Error(downloadError?.message ?? "Failed to download photo");
-  }
-
-  const buffer = Buffer.from(await data.arrayBuffer());
-  const mimeType = data.type || "image/jpeg";
   const pngBuffer = await removeBackgroundFromBuffer(buffer, mimeType);
   if (!pngBuffer) {
     throw new Error(BG_REMOVAL_NOT_CONFIGURED);
   }
 
-  const { error: uploadError } = await supabase.storage
-    .from("miniature-photos")
-    .upload(storagePath, pngBuffer, {
-      contentType: "image/png",
-      upsert: true,
-    });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
+  await uploadR2Object(storagePath, pngBuffer, "image/png");
 }
 
 const BG_REMOVAL_NOT_CONFIGURED =
@@ -215,7 +253,7 @@ export async function removeBackgroundFromPhoto(
       return { success: false, error: "Photo not found" };
     }
 
-    await processRemoveBackgroundForPhoto(supabase, photo.storage_path);
+    await processRemoveBackgroundForPhoto(photo.storage_path);
     await supabase
       .from("miniature_photos")
       .update({ image_updated_at: new Date().toISOString() })
@@ -260,7 +298,7 @@ export async function removeBackgroundsForMiniature(
     let processed = 0;
     for (const photo of photos) {
       try {
-        await processRemoveBackgroundForPhoto(supabase, photo.storage_path);
+        await processRemoveBackgroundForPhoto(photo.storage_path);
         await supabase
           .from("miniature_photos")
           .update({ image_updated_at: new Date().toISOString() })
@@ -288,8 +326,7 @@ export async function removeBackgroundsForMiniature(
 }
 
 /**
- * Replaces a photo's image with an uploaded file (e.g. after client-side background removal).
- * FormData must contain a single "file" (Blob/File).
+ * Replaces a photo's image in R2 with an uploaded file (e.g. after client-side background removal).
  */
 export async function replacePhotoWithImage(
   photoId: string,
@@ -315,16 +352,10 @@ export async function replacePhotoWithImage(
       return { success: false, error: "Photo not found" };
     }
 
-    const { error: uploadError } = await supabase.storage
-      .from("miniature-photos")
-      .upload(photo.storage_path, file, {
-        contentType: file.type || "image/png",
-        upsert: true,
-      });
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    if (uploadError) {
-      return { success: false, error: uploadError.message };
-    }
+    await uploadR2Object(photo.storage_path, buffer, file.type || "image/png");
 
     await supabase
       .from("miniature_photos")

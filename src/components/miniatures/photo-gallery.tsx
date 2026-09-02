@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { toast } from "sonner";
@@ -49,7 +49,6 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const supabase = createClient();
   const router = useRouter();
 
   const openLightbox = (index: number) => {
@@ -137,9 +136,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const handleRemoveBackground = async (photoId: string, storagePath: string) => {
     setIsRemovingBg(true);
     try {
-      const publicUrl = supabase.storage
-        .from("miniature-photos")
-        .getPublicUrl(storagePath).data.publicUrl;
+      const publicUrl = getR2PublicUrl(storagePath);
       const res = await fetch(publicUrl);
       if (!res.ok) throw new Error("Failed to load image");
       const blob = await res.blob();
@@ -168,9 +165,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         try {
-          const publicUrl = supabase.storage
-            .from("miniature-photos")
-            .getPublicUrl(photo.storage_path).data.publicUrl;
+          const publicUrl = getR2PublicUrl(photo.storage_path);
           const res = await fetch(publicUrl);
           if (!res.ok) continue;
           const blob = await res.blob();
@@ -221,9 +216,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
       )}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {photos.map((photo, index) => {
-          const publicUrl = supabase.storage
-            .from("miniature-photos")
-            .getPublicUrl(photo.storage_path).data.publicUrl;
+          const publicUrl = getR2PublicUrl(photo.storage_path);
           const imageUrl = getPhotoImageUrl(publicUrl, photo.image_updated_at);
           const isLocalSupabase =
             publicUrl.includes("127.0.0.1") || publicUrl.includes("localhost");
@@ -370,9 +363,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                 >
                   <Image
                     src={getPhotoImageUrl(
-                      supabase.storage
-                        .from("miniature-photos")
-                        .getPublicUrl(photos[selectedIndex].storage_path).data.publicUrl,
+                      getR2PublicUrl(photos[selectedIndex].storage_path),
                       photos[selectedIndex].image_updated_at
                     )}
                     alt={

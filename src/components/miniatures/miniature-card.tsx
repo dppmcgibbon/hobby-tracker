@@ -8,7 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { StatusIcon } from "./status-icon";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { createClient } from "@/lib/supabase/client";
+import { getR2PublicUrl } from "@/lib/r2";
 import { getPhotoImageUrl } from "@/lib/photos";
 import { Copy } from "lucide-react";
 
@@ -40,7 +40,6 @@ export function MiniatureCard({
   selected,
   onSelectChange,
 }: MiniatureCardProps) {
-  const supabase = createClient();
   const photos = miniature.miniature_photos || [];
   const firstPhoto = photos[0];
 
@@ -57,13 +56,11 @@ export function MiniatureCard({
   let imageUrl = "/placeholder-miniature.png";
   let isLocalSupabase = false;
   if (firstPhoto && firstPhoto.storage_path) {
-    const publicUrl = supabase.storage
-      .from("miniature-photos")
-      .getPublicUrl(firstPhoto.storage_path).data.publicUrl;
+    const publicUrl = getR2PublicUrl(firstPhoto.storage_path);
     imageUrl = getPhotoImageUrl(publicUrl, firstPhoto.image_updated_at);
     isLocalSupabase = imageUrl.includes("127.0.0.1") || imageUrl.includes("localhost");
-    console.log("Generated image URL:", imageUrl);
   }
+
 
   return (
     <Card className="warhammer-card border-primary/30 hover:border-primary/50 transition-all hover:shadow-gold overflow-hidden relative group">

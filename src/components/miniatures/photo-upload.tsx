@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { uploadMiniaturePhoto } from "@/app/actions/photos";
+import { getPresignedUploadUrl, savePhotoRecord } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { Upload, X, Loader2 } from "lucide-react";
 
@@ -96,12 +96,32 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
         });
       }
 
-      const formData = new FormData();
-      formData.append("file", fileToUpload);
-      formData.append("caption", caption);
-      formData.append("photo_type", photoType);
+      // Step 1: Request presigned upload URL from Server Action
+      const presignedRes = await getPresignedUploadUrl(
+        miniatureId,
+        fileToUpload.name,
+        fileToUpload.type || "image/jpeg"
+      );
 
-      await uploadMiniaturePhoto(miniatureId, formData);
+      if (!presignedRes.success || !presignedRes.presignedUrl) {
+        throw new Error("Failed to generate upload URL");
+      }
+
+      // Step 2: Directly upload file to Cloudflare R2 via HTTP PUT
+      const uploadRes = await fetch(presignedRes.presignedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": fileToUpload.type || "image/jpeg",
+        },
+        body: fileToUpload,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`R2 upload failed with status ${uploadRes.status}`);
+      }
+
+      // Step 3: Save photo record to PostgreSQL database
+      await savePhotoRecord(miniatureId, presignedRes.key, caption, photoType);
 
       // Reset form
       setFile(null);

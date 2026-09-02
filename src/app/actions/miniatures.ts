@@ -6,6 +6,25 @@ import { requireAuth } from "@/lib/auth/server";
 import { miniatureSchema, miniatureStatusSchema } from "@/lib/validations/miniature";
 import type { MiniatureInput, MiniatureStatusInput } from "@/lib/validations/miniature";
 
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
+async function assertMiniatureStatusNameValid(supabase: ServerSupabase, status: string) {
+  const { data, error } = await supabase
+    .from("miniature_statuses")
+    .select("name")
+    .eq("name", status)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error(
+      `Invalid status "${status}". Add it to miniature_statuses or pick an existing status.`
+    );
+  }
+}
+
 export async function createMiniature(data: MiniatureInput) {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -28,11 +47,14 @@ export async function createMiniature(data: MiniatureInput) {
     throw new Error(miniatureError.message);
   }
 
+  const resolvedStatus = statusVal ?? "backlog";
+  await assertMiniatureStatusNameValid(supabase, resolvedStatus);
+
   // Create status row (use form values when provided)
   const { error: statusError } = await supabase.from("miniature_status").insert({
     miniature_id: miniature.id,
     user_id: user.id,
-    status: statusVal ?? "backlog",
+    status: resolvedStatus,
     magnetised: magnetisedVal ?? false,
     based: basedVal ?? false,
   });
@@ -69,6 +91,9 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
 
   // Update status row when status fields are provided
   if (statusVal !== undefined || magnetisedVal !== undefined || basedVal !== undefined) {
+    if (statusVal !== undefined) {
+      await assertMiniatureStatusNameValid(supabase, statusVal);
+    }
     const statusUpdate = {
       ...(statusVal !== undefined && { status: statusVal }),
       ...(magnetisedVal !== undefined && { magnetised: magnetisedVal }),
@@ -109,6 +134,7 @@ export async function updateMiniatureStatus(miniatureId: string, data: Miniature
 
   // Validate input
   const validated = miniatureStatusSchema.parse(data);
+  await assertMiniatureStatusNameValid(supabase, validated.status);
 
   // Update status
   const { data: status, error } = await supabase
@@ -132,6 +158,8 @@ export async function updateMiniatureStatus(miniatureId: string, data: Miniature
 export async function bulkUpdateStatus(miniatureIds: string[], status: string) {
   const user = await requireAuth();
   const supabase = await createClient();
+
+  await assertMiniatureStatusNameValid(supabase, status);
 
   // Verify all miniatures belong to user
   const { data: miniatures } = await supabase

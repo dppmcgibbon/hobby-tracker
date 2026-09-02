@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { createClient } from "@/lib/supabase/client";
 import { RecipeSelector } from "@/components/recipes/recipe-selector";
+import { getMiniatureStatusDisplayLabel } from "@/lib/constants/miniature-status";
 
 interface Tag {
   id: string;
@@ -93,9 +94,15 @@ interface Faction {
   name: string;
 }
 
+/** `miniature_statuses.name` values in display order (from server). */
+interface MiniatureStatusRow {
+  name: string;
+}
+
 interface BatchOperationsBarProps {
   selectedIds: string[];
   onClearSelection: () => void;
+  statusRows: MiniatureStatusRow[];
   tags: Tag[];
   collections: Collection[];
   storageBoxes?: StorageBox[];
@@ -112,6 +119,7 @@ interface BatchOperationsBarProps {
 export function BatchOperationsBar({
   selectedIds,
   onClearSelection,
+  statusRows,
   tags,
   collections,
   storageBoxes = [],
@@ -388,19 +396,11 @@ export function BatchOperationsBar({
                 <SelectValue placeholder="Update status..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unknown">Unknown</SelectItem>
-                <SelectItem value="missing">Missing</SelectItem>
-                <SelectItem value="needs_stripped">Needs Stripped</SelectItem>
-                <SelectItem value="backlog">Backlog</SelectItem>
-                <SelectItem value="built">Built</SelectItem>
-                <SelectItem value="primed">Primed</SelectItem>
-                <SelectItem value="painting_started">Painting Started</SelectItem>
-                <SelectItem value="needs_repair">Needs Repair</SelectItem>
-                <SelectItem value="sub_assembled">Sub-Assembled</SelectItem>
-                <SelectItem value="missing_arm">Missing Arm</SelectItem>
-                <SelectItem value="missing_leg">Missing Leg</SelectItem>
-                <SelectItem value="missing_head">Missing Head</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
+                {statusRows.map((row) => (
+                  <SelectItem key={row.name} value={row.name}>
+                    {getMiniatureStatusDisplayLabel(row.name)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button size="sm" onClick={handleUpdateStatus} disabled={!selectedStatus || isPending}>

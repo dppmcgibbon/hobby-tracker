@@ -6,6 +6,7 @@ export const STATUS_LABELS: Record<string, string> = {
   missing: "Missing",
   needs_stripped: "Needs Stripped",
   backlog: "Backlog",
+  on_sprue: "On Sprue",
   built: "Built",
   primed: "Primed",
   painting_started: "Painting Started",
@@ -27,6 +28,7 @@ export const STATUS_COLORS: Record<string, string> = {
   missing: "hsl(0, 70%, 50%)", // Red
   needs_stripped: "hsl(30, 70%, 50%)", // Orange
   backlog: "hsl(0, 0%, 45%)", // Steel gray
+  on_sprue: "hsl(210, 35%, 52%)", // Sprue / steel blue
   built: "hsl(43, 96%, 56%)", // Imperial gold
   primed: "hsl(30, 50%, 45%)", // Bronze
   painting_started: "hsl(200, 70%, 50%)", // Blue
@@ -48,6 +50,7 @@ export type MiniatureStatusValue =
   | "missing"
   | "needs_stripped"
   | "backlog"
+  | "on_sprue"
   | "built"
   | "primed"
   | "painting_started"
@@ -58,6 +61,16 @@ export type MiniatureStatusValue =
   | "missing_head"
   | "complete";
 
+/** Label for a `miniature_statuses.name` / `miniature_status.status` value (DB-driven statuses). */
+export function getMiniatureStatusDisplayLabel(name: string): string {
+  if (STATUS_LABELS[name]) return STATUS_LABELS[name];
+  return name
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /** Status groups used for filtering (e.g. "In Progress" = multiple statuses). */
 export const STATUS_GROUP_IN_PROGRESS = new Set<MiniatureStatusValue>([
   "sub_assembled",
@@ -67,6 +80,7 @@ export const STATUS_GROUP_IN_PROGRESS = new Set<MiniatureStatusValue>([
 ]);
 export const STATUS_GROUP_BACKLOG = new Set<MiniatureStatusValue>([
   "backlog",
+  "on_sprue",
   "unknown",
   "missing",
   "needs_stripped",

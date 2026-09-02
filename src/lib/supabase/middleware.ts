@@ -16,6 +16,9 @@ export async function updateSession(request: NextRequest) {
 
   try {
     const supabase = createServerClient(url, anonKey, {
+      cookieOptions: {
+        name: "sb-auth-token",
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();

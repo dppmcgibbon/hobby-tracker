@@ -46,8 +46,14 @@ interface Recipe {
   faction?: { name: string } | null;
 }
 
+interface MiniatureStatusRow {
+  name: string;
+  display_order?: number | null;
+}
+
 interface CollectionClientProps {
   miniatures: MiniatureWithRelations[];
+  miniatureStatusRows: MiniatureStatusRow[];
   factions: { id: string; name: string }[];
   tags: Tag[];
   collections: Collection[];
@@ -73,6 +79,7 @@ interface CollectionClientProps {
 
 export function CollectionClient({
   miniatures,
+  miniatureStatusRows,
   factions,
   tags,
   collections,
@@ -237,6 +244,7 @@ export function CollectionClient({
         unitTypes={unitTypes}
         bases={bases}
         miniatures={miniatures}
+        miniatureStatusRows={miniatureStatusRows}
         savedFilters={savedFilters}
         onFiltersChange={() => {}} // URL-based filtering, no need for callback
         initialFilters={initialFilters}
@@ -280,6 +288,7 @@ export function CollectionClient({
       <BatchOperationsBar
         selectedIds={selectedIds}
         onClearSelection={handleClearSelection}
+        statusRows={miniatureStatusRows.map((r) => ({ name: r.name }))}
         tags={tags}
         collections={collections}
         storageBoxes={storageBoxes}

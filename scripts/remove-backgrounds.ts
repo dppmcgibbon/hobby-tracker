@@ -1,6 +1,6 @@
 /**
- * Batch script: remove background from all (or filtered) miniature photos in Supabase.
- * Requires REMOVE_BG_API_KEY and Supabase credentials in .env.local.
+ * Batch script: remove background from all (or filtered) miniature photos using Cloudflare R2.
+ * Requires REMOVE_BG_API_KEY, Supabase credentials, and R2 credentials in .env.local.
  *
  * Usage:
  *   npx tsx scripts/remove-backgrounds.ts           # all photos
@@ -10,6 +10,7 @@
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { removeBackgroundFromBuffer } from "../src/lib/background-removal";
+import { downloadR2Object, uploadR2Object } from "../src/lib/r2";
 
 dotenv.config({ path: ".env.local" });
 
@@ -28,7 +29,6 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const BUCKET = "miniature-photos";
 
 function parseArgs(): { limit?: number; miniatureId?: string } {
   const args = process.argv.slice(2);
@@ -78,18 +78,10 @@ async function main() {
     const row = rows[i];
     const path = row.storage_path as string;
     try {
-      const { data: blob, error: downloadError } = await supabase.storage
-        .from(BUCKET)
-        .download(path);
+      const buffer = await downloadR2Object(path);
+      const ext = path.split(".").pop()?.toLowerCase();
+      const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 
-      if (downloadError || !blob) {
-        console.error(`[${i + 1}/${rows.length}] Skip ${path}: ${downloadError?.message ?? "download failed"}`);
-        failed++;
-        continue;
-      }
-
-      const buffer = Buffer.from(await blob.arrayBuffer());
-      const mimeType = blob.type || "image/jpeg";
       const pngBuffer = await removeBackgroundFromBuffer(buffer, mimeType);
 
       if (!pngBuffer) {
@@ -98,15 +90,7 @@ async function main() {
         continue;
       }
 
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, pngBuffer, { contentType: "image/png", upsert: true });
-
-      if (uploadError) {
-        console.error(`[${i + 1}/${rows.length}] Skip ${path}: ${uploadError.message}`);
-        failed++;
-        continue;
-      }
+      await uploadR2Object(path, pngBuffer, "image/png");
 
       processed++;
       console.log(`[${i + 1}/${rows.length}] OK ${path}`);

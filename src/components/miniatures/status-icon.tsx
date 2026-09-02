@@ -1,19 +1,20 @@
 "use client";
 
-import { 
-  HelpCircle, 
-  XCircle, 
-  Scissors, 
-  Package, 
-  Hammer, 
-  SprayCan, 
-  Paintbrush, 
-  Wrench, 
+import {
+  HelpCircle,
+  XCircle,
+  Scissors,
+  Package,
+  Hammer,
+  SprayCan,
+  Paintbrush,
+  Wrench,
   Settings,
   Hand,
   Footprints,
   CircleUser,
-  CheckCircle2
+  CheckCircle2,
+  ToyBrick,
 } from "lucide-react";
 import { STATUS_LABELS } from "@/lib/constants/miniature-status";
 import {
@@ -33,6 +34,7 @@ const STATUS_ICONS = {
   missing: XCircle,
   needs_stripped: Scissors,
   backlog: Package,
+  on_sprue: ToyBrick,
   built: Hammer,
   primed: SprayCan,
   painting_started: Paintbrush,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -21,15 +21,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
-import { STATUS_LABELS, type MiniatureStatusValue } from "@/lib/constants/miniature-status";
-
-const STATUS_OPTIONS: { value: MiniatureStatusValue; label: string }[] = (
-  [
-    "unknown", "missing", "needs_stripped", "backlog", "built", "primed",
-    "painting_started", "needs_repair", "sub_assembled", "missing_arm", "missing_leg",
-    "missing_head", "complete",
-  ] as MiniatureStatusValue[]
-).map((value) => ({ value, label: STATUS_LABELS[value] ?? value }));
+import { getMiniatureStatusDisplayLabel } from "@/lib/constants/miniature-status";
 import { RecipeSelector } from "@/components/recipes/recipe-selector";
 import type { Faction, Miniature } from "@/types";
 import { toast } from "sonner";
@@ -61,8 +53,15 @@ interface BaseType {
   name: string;
 }
 
+/** Rows from `miniature_statuses` (ordered by `display_order` on the server). */
+export interface MiniatureStatusRow {
+  name: string;
+  display_order?: number | null;
+}
+
 interface MiniatureFormProps {
   factions: Faction[];
+  statusRows: MiniatureStatusRow[];
   storageBoxes?: StorageBox[];
   recipes?: Recipe[];
   bases?: Base[];
@@ -75,6 +74,7 @@ interface MiniatureFormProps {
 
 export function MiniatureForm({
   factions,
+  statusRows,
   storageBoxes = [],
   recipes = [],
   bases = [],
@@ -139,6 +139,21 @@ export function MiniatureForm({
   const status = watch("status");
   const magnetised = watch("magnetised");
   const based = watch("based");
+
+  const statusSelectOptions = useMemo(() => {
+    const rows = [...statusRows];
+    const currentName = (miniature as { status?: { status?: string | null } | null } | undefined)
+      ?.status?.status;
+    if (currentName && !rows.some((r) => r.name === currentName)) {
+      rows.push({ name: currentName, display_order: 999_999 });
+    }
+    return [...rows]
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+      .map((row) => ({
+        value: row.name,
+        label: getMiniatureStatusDisplayLabel(row.name),
+      }));
+  }, [statusRows, miniature]);
 
   const onSubmit = async (data: MiniatureInput) => {
     setIsLoading(true);
@@ -429,14 +444,14 @@ export function MiniatureForm({
           <Label htmlFor="status">Status</Label>
           <Select
             value={status || "backlog"}
-            onValueChange={(value) => setValue("status", value as MiniatureInput["status"])}
+            onValueChange={(value) => setValue("status", value)}
             disabled={isLoading}
           >
             <SelectTrigger id="status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              {STATUS_OPTIONS.map(({ value, label }) => (
+              {statusSelectOptions.map(({ value, label }) => (
                 <SelectItem key={value} value={value}>
                   {label}
                 </SelectItem>

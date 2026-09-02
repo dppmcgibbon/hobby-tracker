@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { toast } from "sonner";
@@ -60,7 +60,6 @@ export function MiniaturePhotoDialog({
   const [photoToDelete, setPhotoToDelete] = useState<MiniaturePhoto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
-  const supabase = createClient();
   const router = useRouter();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
@@ -178,9 +177,7 @@ export function MiniaturePhotoDialog({
     if (!photo) return;
     setIsRemovingBg(true);
     try {
-      const publicUrl = supabase.storage
-        .from("miniature-photos")
-        .getPublicUrl(photo.storage_path).data.publicUrl;
+      const publicUrl = getR2PublicUrl(photo.storage_path);
       const res = await fetch(publicUrl);
       if (!res.ok) throw new Error("Failed to load image");
       const blob = await res.blob();
@@ -333,11 +330,9 @@ export function MiniaturePhotoDialog({
                   >
                     <Image
                       src={getPhotoImageUrl(
-                        supabase.storage
-                          .from("miniature-photos")
-                          .getPublicUrl(
-                            selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
-                          ).data.publicUrl,
+                        getR2PublicUrl(
+                          selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+                        ),
                         selectedMiniature.miniature_photos[selectedPhotoIndex].image_updated_at
                       )}
                       alt={`${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`}
