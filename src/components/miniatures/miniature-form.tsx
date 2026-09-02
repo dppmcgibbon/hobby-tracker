@@ -102,7 +102,7 @@ export function MiniatureForm({
           name: miniature.name,
           faction_id: miniature.faction_id || undefined,
           unit_type: miniature.unit_type || undefined,
-          quantity: miniature.quantity,
+          quantity: miniature.quantity ?? 1,
           material: miniature.material || undefined,
           base_size: miniature.base_size || undefined,
           base_id: (miniature as any).base_id || undefined,

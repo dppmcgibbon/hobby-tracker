@@ -10,11 +10,10 @@ export default async function StoragePage() {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Fetch storage boxes for the user
+  // Fetch storage boxes
   const { data: storageBoxes } = await supabase
     .from("storage_boxes")
     .select("*")
-    .eq("user_id", user.id)
     .order("name");
 
   // Fetch miniature counts via RPC (avoids 1000-row limit, aggregates in DB)
@@ -24,7 +23,6 @@ export default async function StoragePage() {
   if (storageBoxIds.length > 0) {
     const { data: counts } = await supabase.rpc("get_storage_box_miniature_counts", {
       p_box_ids: storageBoxIds,
-      p_user_id: user.id,
     });
 
     miniatureCounts = (counts || []).reduce(

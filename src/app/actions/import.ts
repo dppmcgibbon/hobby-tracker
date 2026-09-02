@@ -78,7 +78,6 @@ export async function importMiniaturesFromCSV(csvContent: string) {
             base_size: row.base_size || null,
             sculptor: row.sculptor || "Unknown",
             year: year,
-            user_id: user.id,
           })
           .select()
           .single();
@@ -93,7 +92,6 @@ export async function importMiniaturesFromCSV(csvContent: string) {
         if (miniature && defaultStatusId) {
           await supabase.from("miniature_status").insert({
             miniature_id: miniature.id,
-            user_id: user.id,
             status_id: defaultStatusId,
           });
         }

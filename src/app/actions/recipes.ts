@@ -15,10 +15,7 @@ export async function createRecipe(data: CreateRecipeWithStepsInput) {
   // Create recipe
   const { data: recipe, error: recipeError } = await supabase
     .from("painting_recipes")
-    .insert({
-      ...validated.recipe,
-      user_id: user.id,
-    })
+    .insert(validated.recipe)
     .select()
     .single();
 
@@ -57,7 +54,6 @@ export async function updateRecipe(id: string, data: RecipeInput) {
     .from("painting_recipes")
     .update(validated)
     .eq("id", id)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -77,8 +73,7 @@ export async function deleteRecipe(id: string) {
   const { error } = await supabase
     .from("painting_recipes")
     .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("id", id);
 
   if (error) {
     throw new Error(error.message);
@@ -95,16 +90,15 @@ export async function addRecipeStep(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify ownership
+  // Verify recipe exists
   const { data: recipe } = await supabase
     .from("painting_recipes")
     .select("id")
     .eq("id", recipeId)
-    .eq("user_id", user.id)
     .single();
 
   if (!recipe) {
-    throw new Error("Recipe not found or access denied");
+    throw new Error("Recipe not found");
   }
 
   // Get max step order
@@ -139,24 +133,15 @@ export async function deleteRecipeStep(stepId: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Get step to verify ownership
+  // Get step to find recipe_id
   const { data: step } = await supabase
     .from("recipe_steps")
-    .select("recipe_id, painting_recipes!inner(user_id)")
+    .select("recipe_id")
     .eq("id", stepId)
     .single();
 
-  // Type guard to handle the array type from Supabase
-  const paintingRecipes = step?.painting_recipes as
-    | { user_id: string }
-    | { user_id: string }[]
-    | undefined;
-  const recipeUserId = Array.isArray(paintingRecipes)
-    ? paintingRecipes[0]?.user_id
-    : paintingRecipes?.user_id;
-
-  if (!step || recipeUserId !== user.id) {
-    throw new Error("Step not found or access denied");
+  if (!step) {
+    throw new Error("Step not found");
   }
 
   const { error } = await supabase.from("recipe_steps").delete().eq("id", stepId);
@@ -173,16 +158,15 @@ export async function linkRecipeToMiniature(miniatureId: string, recipeId: strin
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify miniature ownership
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
-    throw new Error("Miniature not found or access denied");
+    throw new Error("Miniature not found");
   }
 
   const { error } = await supabase.from("miniature_recipes").insert({
@@ -203,16 +187,15 @@ export async function unlinkRecipeFromMiniature(miniatureId: string, recipeId: s
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify miniature ownership
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
-    throw new Error("Miniature not found or access denied");
+    throw new Error("Miniature not found");
   }
 
   const { error } = await supabase
@@ -233,17 +216,6 @@ export async function unlinkRecipeFromMiniature(miniatureId: string, recipeId: s
 export async function bulkLinkRecipes(miniatureIds: string[], recipeIds: string[]) {
   const user = await requireAuth();
   const supabase = await createClient();
-
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
 
   // Create all the miniature_recipe links
   const links = [];

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export async function getMiniatures(userId: string) {
+export async function getMiniatures(userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -13,7 +13,6 @@ export async function getMiniatures(userId: string) {
       photos:miniature_photos(*)
     `
     )
-    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -32,7 +31,7 @@ export async function getMiniatures(userId: string) {
   return data;
 }
 
-export async function getMiniatureById(id: string, userId: string) {
+export async function getMiniatureById(id: string, userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -58,7 +57,6 @@ export async function getMiniatureById(id: string, userId: string) {
     `
     )
     .eq("id", id)
-    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -101,13 +99,12 @@ export async function getFactions() {
   return data;
 }
 
-export async function getStorageBoxes(userId: string) {
+export async function getStorageBoxes(userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("storage_boxes")
     .select("*")
-    .eq("user_id", userId)
     .order("name", { ascending: true });
 
   if (error) {

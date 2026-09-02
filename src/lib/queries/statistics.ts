@@ -15,7 +15,6 @@ async function fetchAllMiniaturesForStats(supabase: Awaited<ReturnType<typeof cr
     const { data, error } = await supabase
       .from("miniatures")
       .select(select)
-      .eq("user_id", userId)
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (error) throw new Error(error.message);
@@ -207,7 +206,6 @@ export async function getRecentActivity(userId: string) {
   const { data: recentMiniatures } = await supabase
     .from("miniatures")
     .select("id, name, created_at, factions(name)")
-    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -223,7 +221,6 @@ export async function getRecentActivity(userId: string) {
       miniatures(name)
     `
     )
-    .eq("user_id", userId)
     .eq("status", "completed")
     .order("completed_at", { ascending: false })
     .limit(5);
@@ -239,7 +236,6 @@ export async function getRecentActivity(userId: string) {
       miniatures(id, name)
     `
     )
-    .eq("user_id", userId)
     .order("uploaded_at", { ascending: false })
     .limit(5);
 
@@ -250,14 +246,13 @@ export async function getRecentActivity(userId: string) {
   };
 }
 
-export async function getPaintStatistics(userId: string) {
+export async function getPaintStatistics(userId?: string) {
   const supabase = await createClient();
 
   // User paint inventory count
   const { count: paintCount } = await supabase
     .from("user_paints")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .select("*", { count: "exact", head: true });
 
   // Most used paints (from recipe steps)
   const { data: recipePaints } = await supabase
@@ -265,11 +260,9 @@ export async function getPaintStatistics(userId: string) {
     .select(
       `
       paint_id,
-      paints(name, brand, type, color_hex),
-      painting_recipes!inner(user_id)
+      paints(name, brand, type, color_hex)
     `
-    )
-    .eq("painting_recipes.user_id", userId);
+    );
 
   interface PaintUsage {
     name: string;
@@ -333,11 +326,10 @@ export async function getGameStatistics(userId: string) {
     `
     );
 
-  // Get all user's miniatures to count quantities
+  // Get all miniatures to count quantities
   const { data: miniatures } = await supabase
     .from("miniatures")
-    .select("id, quantity")
-    .eq("user_id", userId);
+    .select("id, quantity");
 
   if (!miniatureGames || !miniatures) {
     return {

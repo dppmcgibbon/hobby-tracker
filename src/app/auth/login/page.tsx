@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { signIn } from "@/lib/auth/client";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -106,14 +104,6 @@ export default function LoginPage() {
           </Button>
         </form>
       </CardContent>
-      <CardFooter className="flex flex-col space-y-2 border-t border-primary/20 pt-6">
-        <div className="text-sm text-muted-foreground text-center">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary hover:text-primary/80 font-bold uppercase tracking-wide">
-            Sign up
-          </Link>
-        </div>
-      </CardFooter>
     </Card>
   );
 }
