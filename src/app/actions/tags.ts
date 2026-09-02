@@ -14,7 +14,6 @@ export async function createTag(data: TagInput) {
   const { data: tag, error } = await supabase
     .from("tags")
     .insert({
-      user_id: user.id,
       name: validated.name,
       color: validated.color,
     })
@@ -33,7 +32,7 @@ export async function deleteTag(tagId: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("tags").delete().eq("id", tagId).eq("user_id", user.id);
+  const { error } = await supabase.from("tags").delete().eq("id", tagId);
 
   if (error) {
     throw new Error(error.message);
@@ -47,12 +46,11 @@ export async function addTagToMiniature(miniatureId: string, tagId: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify ownership
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -92,12 +90,11 @@ export async function removeTagFromMiniature(miniatureId: string, tagId: string)
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify ownership
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -122,17 +119,6 @@ export async function removeTagFromMiniature(miniatureId: string, tagId: string)
 export async function bulkAddTags(miniatureIds: string[], tagId: string) {
   const user = await requireAuth();
   const supabase = await createClient();
-
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
 
   // Get existing tag assignments to avoid duplicates
   const { data: existingTags } = await supabase

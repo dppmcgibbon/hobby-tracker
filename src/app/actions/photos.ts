@@ -79,7 +79,6 @@ export async function savePhotoRecord(
     .from("miniature_photos")
     .insert({
       miniature_id: miniatureId,
-      user_id: user.id,
       storage_path: storagePath,
       caption: caption || null,
       photo_type: photoType || "wip",
@@ -165,7 +164,6 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
     .from("miniature_photos")
     .insert({
       miniature_id: miniatureId,
-      user_id: user.id,
       storage_path: key,
       caption: caption || null,
       photo_type: photoType || "wip",
@@ -193,8 +191,7 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
   const { error: dbError } = await supabase
     .from("miniature_photos")
     .delete()
-    .eq("id", photoId)
-    .eq("user_id", user.id);
+    .eq("id", photoId);
 
   if (dbError) {
     throw new Error(dbError.message);
@@ -246,7 +243,6 @@ export async function removeBackgroundFromPhoto(
       .from("miniature_photos")
       .select("storage_path, miniature_id")
       .eq("id", photoId)
-      .eq("user_id", user.id)
       .single();
 
     if (fetchError || !photo) {
@@ -257,8 +253,7 @@ export async function removeBackgroundFromPhoto(
     await supabase
       .from("miniature_photos")
       .update({ image_updated_at: new Date().toISOString() })
-      .eq("id", photoId)
-      .eq("user_id", user.id);
+      .eq("id", photoId);
     revalidatePath(`/dashboard/miniatures/${photo.miniature_id}`);
     return { success: true };
   } catch (err) {
@@ -285,8 +280,7 @@ export async function removeBackgroundsForMiniature(
     const { data: photos, error: fetchError } = await supabase
       .from("miniature_photos")
       .select("id, storage_path")
-      .eq("miniature_id", miniatureId)
-      .eq("user_id", user.id);
+      .eq("miniature_id", miniatureId);
 
     if (fetchError) {
       return { success: false, error: fetchError.message };
@@ -302,8 +296,7 @@ export async function removeBackgroundsForMiniature(
         await supabase
           .from("miniature_photos")
           .update({ image_updated_at: new Date().toISOString() })
-          .eq("id", photo.id)
-          .eq("user_id", user.id);
+          .eq("id", photo.id);
         processed++;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Background removal failed";
@@ -345,7 +338,6 @@ export async function replacePhotoWithImage(
       .from("miniature_photos")
       .select("storage_path, miniature_id")
       .eq("id", photoId)
-      .eq("user_id", user.id)
       .single();
 
     if (fetchError || !photo) {
@@ -360,8 +352,7 @@ export async function replacePhotoWithImage(
     await supabase
       .from("miniature_photos")
       .update({ image_updated_at: new Date().toISOString() })
-      .eq("id", photoId)
-      .eq("user_id", user.id);
+      .eq("id", photoId);
 
     revalidatePath(`/dashboard/miniatures/${photo.miniature_id}`);
     return { success: true };

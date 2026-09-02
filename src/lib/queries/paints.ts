@@ -16,7 +16,7 @@ export async function getAllPaints() {
   return data;
 }
 
-export async function getUserPaints(userId: string) {
+export async function getUserPaints(userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -27,7 +27,6 @@ export async function getUserPaints(userId: string) {
       paint:paints(*)
     `
     )
-    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {

@@ -23,10 +23,7 @@ export async function createStorageBox(data: StorageBoxInput) {
   // Insert storage box
   const { data: storageBox, error } = await supabase
     .from("storage_boxes")
-    .insert({
-      ...validated,
-      user_id: user.id,
-    })
+    .insert(validated)
     .select()
     .single();
 
@@ -50,7 +47,6 @@ export async function updateStorageBox(id: string, data: StorageBoxInput) {
     .from("storage_boxes")
     .update(validated)
     .eq("id", id)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -70,8 +66,7 @@ export async function deleteStorageBox(id: string) {
   const { error } = await supabase
     .from("storage_boxes")
     .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("id", id);
 
   if (error) {
     throw new Error(error.message);
@@ -88,8 +83,7 @@ export async function toggleStorageBoxComplete(id: string, completed: boolean) {
   const { error } = await supabase
     .from("storage_boxes")
     .update({ completed })
-    .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("id", id);
 
   if (error) {
     throw new Error(error.message);

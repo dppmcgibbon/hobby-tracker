@@ -14,7 +14,6 @@ export async function createCollection(data: CollectionInput) {
   const { data: collection, error } = await supabase
     .from("collections")
     .insert({
-      user_id: user.id,
       name: validated.name,
       description: validated.description,
       color: validated.color,
@@ -40,7 +39,6 @@ export async function updateCollection(id: string, data: CollectionInput) {
     .from("collections")
     .update(validated)
     .eq("id", id)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -57,7 +55,7 @@ export async function deleteCollection(id: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("collections").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("collections").delete().eq("id", id);
 
   if (error) {
     throw new Error(error.message);
@@ -71,12 +69,11 @@ export async function addMiniaturesToCollection(collectionId: string, miniatureI
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify collection ownership
+  // Verify collection exists
   const { data: collection } = await supabase
     .from("collections")
     .select("id")
     .eq("id", collectionId)
-    .eq("user_id", user.id)
     .single();
 
   if (!collection) {
@@ -103,12 +100,11 @@ export async function removeMiniatureFromCollection(collectionId: string, miniat
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify ownership
+  // Verify collection exists
   const { data: collection } = await supabase
     .from("collections")
     .select("id")
     .eq("id", collectionId)
-    .eq("user_id", user.id)
     .single();
 
   if (!collection) {

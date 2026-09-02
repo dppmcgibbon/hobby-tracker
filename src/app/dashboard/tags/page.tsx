@@ -16,7 +16,6 @@ async function TagsList() {
   const { data: tags, error } = await supabase
     .from("tags")
     .select("*")
-    .eq("user_id", user.id)
     .order("name", { ascending: true });
 
   if (error) {
@@ -120,7 +119,6 @@ export default async function TagsPage() {
   const { data: tags } = await supabase
     .from("tags")
     .select("id, name, color")
-    .eq("user_id", user.id)
     .order("name");
 
   return (

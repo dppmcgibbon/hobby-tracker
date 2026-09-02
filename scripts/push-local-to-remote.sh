@@ -23,7 +23,7 @@ usage() {
   echo "Options:"
   echo "  --replace    Truncate all tables in remote public schema before loading (exact copy of local)"
   echo "  --schema     Run 'supabase db push' first to sync migrations to remote"
-  echo "  --with-auth  Sync auth.users from local to remote (required for user-scoped data: profiles, storage_boxes, miniatures, etc.)"
+  echo "  --with-auth  (Optional) Sync auth.users from local to remote (no longer required since public tables are decoupled)"
   echo "  -h, --help   Show this help"
   exit 0
 }
@@ -130,20 +130,6 @@ END \$\$;
     # Use CTAS so temp table has no generated columns (remote auth.users may have e.g. confirmed_at as GENERATED)
     psql "$REMOTE_DB_URL" -v ON_ERROR_STOP=1 -c "DROP TABLE IF EXISTS public._auth_users_import; CREATE TABLE public._auth_users_import AS SELECT * FROM auth.users LIMIT 0;"
     sed 's/COPY auth\.users/COPY public._auth_users_import/' "$AUTH_DUMP_FILE" | psql "$REMOTE_DB_URL" -v ON_ERROR_STOP=1 -q
-    # Where same email exists on remote, rewrite public dump so local user_id -> remote user_id (avoids duplicate email and satisfies FK)
-    psql "$REMOTE_DB_URL" -t -A -F ' ' -c "SELECT i.id, u.id FROM public._auth_users_import i JOIN auth.users u ON u.email = i.email AND i.email IS NOT NULL" -o "$USER_ID_MAPPING_FILE" 2>/dev/null || true
-    if [[ -s "$USER_ID_MAPPING_FILE" ]]; then
-      echo "→ Rewriting public dump to use existing remote user ids where email matches..."
-      tmp_dump="${DUMP_FILE}.rewrite"
-      cp "$DUMP_FILE" "$tmp_dump"
-      while read -r local_id remote_id; do
-        if [[ -n "$local_id" && -n "$remote_id" ]]; then
-          sed "s/$local_id/$remote_id/g" "$tmp_dump" > "${tmp_dump}.n" && mv "${tmp_dump}.n" "$tmp_dump"
-        fi
-      done < "$USER_ID_MAPPING_FILE"
-      mv "$tmp_dump" "$DUMP_FILE"
-      rm -f "$USER_ID_MAPPING_FILE"
-    fi
     # Insert only non-generated columns; skip rows that already exist by id or email
     psql "$REMOTE_DB_URL" -v ON_ERROR_STOP=1 -c "
 DO \$\$

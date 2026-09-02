@@ -11,7 +11,6 @@ export async function saveFilter(name: string, filters: Record<string, string>, 
   const { data, error } = await supabase
     .from("saved_filters")
     .insert({
-      user_id: user.id,
       name,
       filters,
       logo_url: logoUrl || null,
@@ -36,8 +35,7 @@ export async function toggleStarFilter(filterId: string, isStarred: boolean) {
   const { error } = await supabase
     .from("saved_filters")
     .update({ is_starred: isStarred })
-    .eq("id", filterId)
-    .eq("user_id", user.id);
+    .eq("id", filterId);
 
   if (error) {
     throw new Error(error.message);
@@ -54,8 +52,7 @@ export async function deleteFilter(filterId: string) {
   const { error } = await supabase
     .from("saved_filters")
     .delete()
-    .eq("id", filterId)
-    .eq("user_id", user.id);
+    .eq("id", filterId);
 
   if (error) {
     throw new Error(error.message);
@@ -73,8 +70,7 @@ export async function updateFilterLogo(filterId: string, logoUrl: string) {
   const { error } = await supabase
     .from("saved_filters")
     .update({ logo_url: logoUrl })
-    .eq("id", filterId)
-    .eq("user_id", user.id);
+    .eq("id", filterId);
 
   if (error) {
     throw new Error(error.message);
@@ -91,7 +87,6 @@ export async function getSavedFilters() {
   const { data, error } = await supabase
     .from("saved_filters")
     .select("*")
-    .eq("user_id", user.id)
     .order("name");
 
   if (error) {
@@ -108,7 +103,6 @@ export async function getStarredFilters() {
   const { data, error } = await supabase
     .from("saved_filters")
     .select("*")
-    .eq("user_id", user.id)
     .eq("is_starred", true)
     .order("name");
 

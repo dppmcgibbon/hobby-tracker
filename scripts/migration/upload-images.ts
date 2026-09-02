@@ -25,7 +25,6 @@ async function uploadImage(
     .from("miniature_photos")
     .insert({
       miniature_id: miniatureId,
-      user_id: userId,
       storage_path: key,
       caption: caption || null,
       photo_type: "progress",

@@ -8,12 +8,11 @@ export async function createShare(miniatureId: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify ownership
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -28,7 +27,6 @@ export async function createShare(miniatureId: string) {
     .from("shared_miniatures")
     .insert({
       miniature_id: miniatureId,
-      user_id: user.id,
       share_token: shareToken,
       is_public: true,
     })
@@ -50,8 +48,7 @@ export async function deleteShare(miniatureId: string) {
   const { error } = await supabase
     .from("shared_miniatures")
     .delete()
-    .eq("miniature_id", miniatureId)
-    .eq("user_id", user.id);
+    .eq("miniature_id", miniatureId);
 
   if (error) {
     throw new Error(error.message);

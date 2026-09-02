@@ -22,7 +22,6 @@ export default async function StorageBoxDetailPage({ params }: PageProps) {
     .from("storage_boxes")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
     .single();
 
   if (boxError || !storageBox) {
@@ -42,7 +41,6 @@ export default async function StorageBoxDetailPage({ params }: PageProps) {
     `
     )
     .eq("storage_box_id", id)
-    .eq("user_id", user.id)
     .order("name");
 
   const miniatureCount = miniatures?.length || 0;

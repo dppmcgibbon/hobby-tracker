@@ -202,12 +202,11 @@ export async function linkMiniatureToGame(data: MiniatureGameInput) {
 
   const validated = miniatureGameSchema.parse(data);
 
-  // Verify user owns the miniature
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", validated.miniature_id)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -231,12 +230,11 @@ export async function unlinkMiniatureFromGame(miniatureId: string, gameId: strin
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify user owns the miniature
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -265,12 +263,11 @@ export async function updateMiniatureGame(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify user owns the miniature
+  // Verify miniature exists
   const { data: miniature } = await supabase
     .from("miniatures")
     .select("id")
     .eq("id", miniatureId)
-    .eq("user_id", user.id)
     .single();
 
   if (!miniature) {
@@ -299,17 +296,6 @@ export async function bulkLinkMinaturesToGame(
 ) {
   const user = await requireAuth();
   const supabase = await createClient();
-
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
 
   // Create game links for all miniatures
   const gameLinks = miniatureIds.map((miniatureId) => ({

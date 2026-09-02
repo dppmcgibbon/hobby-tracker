@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ExternalLink, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
@@ -220,22 +218,6 @@ export default async function SharedMiniaturePage({ params }: Props) {
             </Card>
           )}
         </div>
-
-        {/* CTA */}
-        <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-          <CardContent className="text-center py-8">
-            <h3 className="text-2xl font-bold mb-2">Want to track your own miniatures?</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your collection, track your progress, and share with the community
-            </p>
-            <Link href="/auth/signup">
-              <Button size="lg">
-                Get Started Free
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

@@ -33,20 +33,18 @@ export default async function MiniaturesPage({
     { data: miniatureStatusRows },
   ] = await Promise.all([
     supabase.from("factions").select("id, name").order("name"),
-    supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
-    supabase.from("collections").select("id, name").eq("user_id", user.id).order("name"),
+    supabase.from("tags").select("id, name, color").order("name"),
+    supabase.from("collections").select("id, name").order("name"),
     supabase.from("universes").select("id, name").order("name"),
     supabase.from("games").select("id, name, universe_id").order("name"),
-    supabase.from("storage_boxes").select("id, name, location").eq("user_id", user.id).order("name"),
+    supabase.from("storage_boxes").select("id, name, location").order("name"),
     supabase
       .from("painting_recipes")
       .select("id, name, faction:factions(name)")
-      .eq("user_id", user.id)
       .order("name"),
     supabase
       .from("miniatures")
       .select("unit_type")
-      .eq("user_id", user.id)
       .not("unit_type", "is", null),
     supabase.from("bases").select("id, name").order("name"),
     supabase.from("base_shapes").select("id, name").order("name"),
@@ -127,8 +125,7 @@ export default async function MiniaturesPage({
         expansion:expansions (id, name)
       )
     `
-    )
-    .eq("user_id", user.id);
+    );
 
   // Apply server-side filters
   if (params.search) query = query.ilike("name", `%${params.search}%`);

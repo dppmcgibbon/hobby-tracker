@@ -24,7 +24,6 @@ async function importMiniatures(csvPath: string, userId: string) {
   const factionMap = new Map(factions?.map((f) => [f.name, f.id]) || []);
 
   const miniatures: Array<{
-    user_id: string;
     name: string;
     faction_id?: string | null;
     unit_type?: string | null;
@@ -57,7 +56,6 @@ async function importMiniatures(csvPath: string, userId: string) {
         }
 
         miniatures.push({
-          user_id: userId,
           name: row.name.trim(),
           faction_id: factionId || null,
           unit_type: row.unit_type?.trim() || null,
@@ -108,7 +106,6 @@ async function importMiniatures(csvPath: string, userId: string) {
 
           const statusRecords = insertedIds.map((id) => ({
             miniature_id: id,
-            user_id: userId,
             status: "backlog",
             magnetised: false,
             based: false,

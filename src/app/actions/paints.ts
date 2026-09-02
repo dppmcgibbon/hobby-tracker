@@ -16,7 +16,6 @@ export async function addPaintToInventory(data: AddPaintToInventoryInput) {
   const { data: userPaint, error } = await supabase
     .from("user_paints")
     .insert({
-      user_id: user.id,
       paint_id: validated.paint_id,
       quantity: validated.quantity,
       notes: validated.notes,
@@ -42,7 +41,6 @@ export async function updatePaintInventory(id: string, data: UpdatePaintInventor
     .from("user_paints")
     .update(validated)
     .eq("id", id)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -58,7 +56,7 @@ export async function removePaintFromInventory(id: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("user_paints").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("user_paints").delete().eq("id", id);
 
   if (error) {
     throw new Error(error.message);

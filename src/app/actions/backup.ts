@@ -222,36 +222,13 @@ export async function createDatabaseBackup() {
     for (const table of tables) {
       let query = supabase.from(table).select("*", { count: "exact" });
 
-      // Filter by user_id for user-specific tables
-      const userTables = [
-        "miniatures",
-        "miniature_status",
-        "miniature_photos",
-        "collections",
-        "painting_recipes",
-        "user_paints",
-        "tags",
-        "shared_miniatures",
-        "storage_boxes",
-        "saved_filters",
-      ];
-
-      if (userTables.includes(table)) {
-        query = query.eq("user_id", user.id);
-      }
-
-      if (table === "profiles") {
-        query = query.eq("id", user.id);
-      }
-
-      // For junction tables without user_id, filter by user's parent records
+      // For junction tables without user_id, fetch all parent records
       if (table === "miniature_tags" || table === "miniature_recipes" || table === "miniature_games") {
-        // Fetch user's miniature IDs first (paginated to handle >1000 items)
+        // Fetch miniature IDs first (paginated to handle >1000 items)
         const userMiniatures = await fetchAllRowsForQuery(
           supabase
             .from("miniatures")
             .select("id", { count: "exact" })
-            .eq("user_id", user.id)
             .order("id", { ascending: true })
         );
 
@@ -291,12 +268,11 @@ export async function createDatabaseBackup() {
       }
 
       if (table === "collection_miniatures") {
-        // Fetch user's collection IDs first (paginated to handle >1000 items)
+        // Fetch collection IDs first (paginated to handle >1000 items)
         const userCollections = await fetchAllRowsForQuery(
           supabase
             .from("collections")
             .select("id", { count: "exact" })
-            .eq("user_id", user.id)
             .order("id", { ascending: true })
         );
 
@@ -332,12 +308,11 @@ export async function createDatabaseBackup() {
       }
 
       if (table === "recipe_steps") {
-        // Fetch user's recipe IDs first (paginated to handle >1000 items)
+        // Fetch recipe IDs first (paginated to handle >1000 items)
         const userRecipes = await fetchAllRowsForQuery(
           supabase
             .from("painting_recipes")
             .select("id", { count: "exact" })
-            .eq("user_id", user.id)
             .order("id", { ascending: true })
         );
 
@@ -460,7 +435,6 @@ export async function createUniversePhotosBackup(universeId: string) {
         supabase
           .from("miniatures")
           .select("id", { count: "exact" })
-          .eq("user_id", user.id)
           .in("id", batch)
           .order("id", { ascending: true })
       );
@@ -476,7 +450,6 @@ export async function createUniversePhotosBackup(universeId: string) {
         supabase
           .from("miniature_photos")
           .select("storage_path", { count: "exact" })
-          .eq("user_id", user.id)
           .in("miniature_id", batch)
           .order("id", { ascending: true })
       );
@@ -540,7 +513,6 @@ export async function updatePhotoPathsAfterImport(pathMapping: Record<string, st
     supabase
       .from("miniature_photos")
       .select("id, storage_path", { count: "exact" })
-      .eq("user_id", user.id)
       .order("id", { ascending: true })
   );
 
@@ -627,16 +599,16 @@ export async function importDatabaseBackup(
       }
     }
 
-    // User-owned tables: delete current user's rows.
-    // Fetch user's miniature, collection, and recipe IDs (paginated) to delete junction records in safe URL batches.
+    // User-owned tables: delete existing rows.
+    // Fetch miniature, collection, and recipe IDs (paginated) to delete junction records in safe URL batches.
     const myMiniatures = await fetchAllRowsForQuery(
-      supabase.from("miniatures").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+      supabase.from("miniatures").select("id", { count: "exact" }).order("id", { ascending: true })
     );
     const myCollections = await fetchAllRowsForQuery(
-      supabase.from("collections").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+      supabase.from("collections").select("id", { count: "exact" }).order("id", { ascending: true })
     );
     const myRecipes = await fetchAllRowsForQuery(
-      supabase.from("painting_recipes").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+      supabase.from("painting_recipes").select("id", { count: "exact" }).order("id", { ascending: true })
     );
 
     const miniatureIds = myMiniatures.map((m) => m.id);
@@ -667,13 +639,13 @@ export async function importDatabaseBackup(
       }
     }
 
-    const USER_TABLES_WITH_USER_ID = [
+    const DATA_TABLES_TO_CLEAR = [
       "shared_miniatures", "saved_filters", "user_paints", "collections", "painting_recipes",
       "miniature_photos", "miniature_status", "miniatures", "storage_boxes", "tags",
     ];
-    for (const tableName of USER_TABLES_WITH_USER_ID) {
-      const { error } = await supabase.from(tableName).delete().eq("user_id", user.id);
-      if (error) console.error(`Error deleting user data from ${tableName}:`, error);
+    for (const tableName of DATA_TABLES_TO_CLEAR) {
+      const { error } = await supabase.from(tableName).delete().not("id", "is", null);
+      if (error) console.error(`Error deleting data from ${tableName}:`, error);
     }
 
     const USER_INSERT_ORDER = [
@@ -718,14 +690,15 @@ export async function importDatabaseBackup(
     const validRecipeIds = new Set<string>();
     const validCollectionIds = new Set<string>();
 
-    const USER_TABLES_WITH_USER_ID_SET = new Set(USER_TABLES_WITH_USER_ID);
     for (const tableName of USER_INSERT_ORDER) {
       if (!backupData[tableName]) continue;
       const rows = parseCSV(backupData[tableName]);
       if (rows.length === 0) continue;
-      let toInsert = USER_TABLES_WITH_USER_ID_SET.has(tableName)
-        ? rows.map((row) => ({ ...row, user_id: user.id }))
-        : rows;
+      // Strip any legacy user_id column from backup CSVs before inserting
+      let toInsert = rows.map((row) => {
+        const { user_id, ...rest } = row;
+        return rest;
+      });
 
       // Sanitize foreign keys before inserting to avoid constraint violations and track IDs
       if (tableName === "tags") {

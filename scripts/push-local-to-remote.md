@@ -14,9 +14,6 @@ npm run supabase:push-data -- --schema
 
 # Replace remote data entirely (truncate then load)
 npm run supabase:push-data -- --replace
-
-# Include auth.users so user-scoped data (profiles, storage_boxes, miniatures, etc.) works
-npm run supabase:push-data -- --replace --with-auth
 ```
 
 **After pushing data, sync storage (images) so photos work on remote:**

@@ -43,7 +43,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
     { data: miniatureGames },
   ] = await Promise.all([
     supabase.from("miniature_recipes").select("recipe_id").eq("miniature_id", id),
-    supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
+    supabase.from("tags").select("id, name, color").order("name"),
     supabase.from("miniature_tags").select("tag_id, tags(id, name, color)").eq("miniature_id", id),
     supabase
       .from("miniature_games")

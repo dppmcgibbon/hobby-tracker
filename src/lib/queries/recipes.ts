@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export async function getRecipes(userId: string) {
+export async function getRecipes(userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -15,7 +15,6 @@ export async function getRecipes(userId: string) {
       )
     `
     )
-    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -25,7 +24,7 @@ export async function getRecipes(userId: string) {
   return data;
 }
 
-export async function getRecipeById(id: string, userId: string) {
+export async function getRecipeById(id: string, userId?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -41,7 +40,6 @@ export async function getRecipeById(id: string, userId: string) {
     `
     )
     .eq("id", id)
-    .or(`user_id.eq.${userId},is_public.eq.true`)
     .single();
 
   if (error) {

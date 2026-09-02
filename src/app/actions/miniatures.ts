@@ -36,10 +36,7 @@ export async function createMiniature(data: MiniatureInput) {
   // Insert miniature (omit status fields; they go to miniature_status)
   const { data: miniature, error: miniatureError } = await supabase
     .from("miniatures")
-    .insert({
-      ...miniatureData,
-      user_id: user.id,
-    })
+    .insert(miniatureData)
     .select()
     .single();
 
@@ -53,7 +50,6 @@ export async function createMiniature(data: MiniatureInput) {
   // Create status row (use form values when provided)
   const { error: statusError } = await supabase.from("miniature_status").insert({
     miniature_id: miniature.id,
-    user_id: user.id,
     status: resolvedStatus,
     magnetised: magnetisedVal ?? false,
     based: basedVal ?? false,
@@ -81,7 +77,6 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
     .from("miniatures")
     .update(miniatureData)
     .eq("id", id)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -103,8 +98,7 @@ export async function updateMiniature(id: string, data: MiniatureInput) {
       await supabase
         .from("miniature_status")
         .update(statusUpdate)
-        .eq("miniature_id", id)
-        .eq("user_id", user.id);
+        .eq("miniature_id", id);
     }
   }
 
@@ -118,7 +112,7 @@ export async function deleteMiniature(id: string) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("miniatures").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("miniatures").delete().eq("id", id);
 
   if (error) {
     throw new Error(error.message);
@@ -141,7 +135,6 @@ export async function updateMiniatureStatus(miniatureId: string, data: Miniature
     .from("miniature_status")
     .update(validated)
     .eq("miniature_id", miniatureId)
-    .eq("user_id", user.id)
     .select()
     .single();
 
@@ -161,23 +154,11 @@ export async function bulkUpdateStatus(miniatureIds: string[], status: string) {
 
   await assertMiniatureStatusNameValid(supabase, status);
 
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
-
   // Update status in miniature_status table
   const { error } = await supabase
     .from("miniature_status")
     .update({ status })
-    .in("miniature_id", miniatureIds)
-    .eq("user_id", user.id);
+    .in("miniature_id", miniatureIds);
 
   if (error) {
     throw new Error(error.message);
@@ -192,28 +173,16 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
-
-  // If storageBoxId is provided, verify it belongs to user
+  // If storageBoxId is provided, verify it exists
   if (storageBoxId) {
     const { data: storageBox } = await supabase
       .from("storage_boxes")
       .select("id")
       .eq("id", storageBoxId)
-      .eq("user_id", user.id)
       .single();
 
     if (!storageBox) {
-      throw new Error("Storage box not found or access denied");
+      throw new Error("Storage box not found");
     }
   }
 
@@ -221,8 +190,7 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
   const { error } = await supabase
     .from("miniatures")
     .update({ storage_box_id: storageBoxId })
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
+    .in("id", miniatureIds);
 
   if (error) {
     throw new Error(error.message);
@@ -236,17 +204,6 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
 export async function bulkUpdateFaction(miniatureIds: string[], factionId: string | null) {
   const user = await requireAuth();
   const supabase = await createClient();
-
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
 
   // If factionId is provided, verify it exists
   if (factionId) {
@@ -265,8 +222,7 @@ export async function bulkUpdateFaction(miniatureIds: string[], factionId: strin
   const { error } = await supabase
     .from("miniatures")
     .update({ faction_id: factionId })
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
+    .in("id", miniatureIds);
 
   if (error) {
     throw new Error(error.message);
@@ -286,17 +242,6 @@ export async function bulkUpdateBases(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
-
   // Update base fields in miniatures table
   const { error } = await supabase
     .from("miniatures")
@@ -305,8 +250,7 @@ export async function bulkUpdateBases(
       base_shape_id: baseShapeId,
       base_type_id: baseTypeId,
     })
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
+    .in("id", miniatureIds);
 
   if (error) {
     throw new Error(error.message);
@@ -326,17 +270,6 @@ export async function bulkUpdateMetadata(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
-
   // Build update object with only provided fields
   const updateData: Record<string, number | string | null> = {};
   if (year !== undefined) updateData.year = year;
@@ -347,8 +280,7 @@ export async function bulkUpdateMetadata(
   const { error } = await supabase
     .from("miniatures")
     .update(updateData)
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
+    .in("id", miniatureIds);
 
   if (error) {
     throw new Error(error.message);
@@ -362,17 +294,6 @@ export async function bulkUpdateMetadata(
 export async function bulkDelete(miniatureIds: string[]) {
   const user = await requireAuth();
   const supabase = await createClient();
-
-  // Verify all miniatures belong to user
-  const { data: miniatures } = await supabase
-    .from("miniatures")
-    .select("id")
-    .in("id", miniatureIds)
-    .eq("user_id", user.id);
-
-  if (!miniatures || miniatures.length !== miniatureIds.length) {
-    throw new Error("Some miniatures not found or access denied");
-  }
 
   const { error } = await supabase.from("miniatures").delete().in("id", miniatureIds);
 
@@ -399,7 +320,6 @@ export async function getMiniaturesExcludingCollection(collectionId: string) {
       factions!inner (name)
     `
     )
-    .eq("user_id", user.id)
     .order("name", { ascending: true });
 
   if (error) {
@@ -435,7 +355,6 @@ export async function duplicateMiniature(id: string) {
     .from("miniatures")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
     .single();
 
   if (fetchError || !original) {
@@ -447,7 +366,6 @@ export async function duplicateMiniature(id: string) {
     .from("miniature_status")
     .select("*")
     .eq("miniature_id", id)
-    .eq("user_id", user.id)
     .single();
 
   // Get the original game links
@@ -463,14 +381,13 @@ export async function duplicateMiniature(id: string) {
     .eq("miniature_id", id);
 
   // Create duplicate with modified name
-  const { id: _, user_id: __, created_at: ___, updated_at: ____, ...miniatureData } = original;
+  const { id: _, created_at: __, updated_at: ___, ...miniatureData } = original as any;
   
   const { data: duplicate, error: createError } = await supabase
     .from("miniatures")
     .insert({
       ...miniatureData,
       name: `${original.name} (Copy)`,
-      user_id: user.id,
     })
     .select()
     .single();
@@ -482,7 +399,6 @@ export async function duplicateMiniature(id: string) {
   // Create status for duplicate (copy status but reset completion date)
   const { error: statusError } = await supabase.from("miniature_status").insert({
     miniature_id: duplicate.id,
-    user_id: user.id,
     status: originalStatus?.status || "backlog",
     magnetised: originalStatus?.magnetised || false,
     based: originalStatus?.based || false,
