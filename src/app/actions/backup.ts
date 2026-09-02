@@ -835,15 +835,15 @@ export async function importPhotosOnlyFromStoragePath(storagePath: string): Prom
  * Parses the ZIP on the server to avoid payload size limits that drop tables.
  */
 export async function importDatabaseBackupFromFile(formData: FormData): Promise<ImportFromZipResult> {
-  const user = await requireAuth();
-  const supabase = createServiceRoleClient();
-
-  const file = formData.get("file");
-  if (!file || !(file instanceof File)) {
-    return { ...IMPORT_RESULT_FAIL, photoErrors: ["No file provided"] };
-  }
-
   try {
+    const user = await requireAuth();
+    const supabase = createServiceRoleClient();
+
+    const file = formData.get("file");
+    if (!file || !(file instanceof File)) {
+      return { ...IMPORT_RESULT_FAIL, error: "No file provided", photoErrors: ["No file provided"] };
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     return await importFromZipBuffer(arrayBuffer, user.id, supabase);
   } catch (error) {
@@ -861,19 +861,19 @@ export async function importDatabaseBackupFromFile(formData: FormData): Promise<
  * Use this when the client uploads the file to storage first so the server action request stays small.
  */
 export async function importDatabaseBackupFromStoragePath(storagePath: string): Promise<ImportFromZipResult> {
-  const user = await requireAuth();
-  const supabase = createServiceRoleClient();
-
-  if (!storagePath || typeof storagePath !== "string") {
-    return { ...IMPORT_RESULT_FAIL, photoErrors: ["No storage path provided"] };
-  }
-
-  const normalized = storagePath.replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!normalized.startsWith(`${user.id}/`)) {
-    return { ...IMPORT_RESULT_FAIL, photoErrors: ["Invalid path: must be under your user folder"] };
-  }
-
   try {
+    const user = await requireAuth();
+    const supabase = createServiceRoleClient();
+
+    if (!storagePath || typeof storagePath !== "string") {
+      return { ...IMPORT_RESULT_FAIL, error: "No storage path provided", photoErrors: ["No storage path provided"] };
+    }
+
+    const normalized = storagePath.replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!normalized.startsWith(`${user.id}/`)) {
+      return { ...IMPORT_RESULT_FAIL, error: "Invalid path: must be under your user folder", photoErrors: ["Invalid path: must be under your user folder"] };
+    }
+
     let arrayBuffer: ArrayBuffer;
     try {
       const buffer = await downloadR2Object(normalized);
