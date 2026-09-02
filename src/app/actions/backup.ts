@@ -42,54 +42,86 @@ function convertToCSV(data: any[], tableName: string): string {
   return [csvHeaders, ...csvRows].join("\n");
 }
 
-// Helper function to parse CSV back to array of objects
+// Helper function to parse CSV back to array of objects with full RFC 4180 multi-line quote support
 function parseCSV(csv: string): any[] {
   if (!csv || typeof csv !== "string") return [];
-  // Strip BOM and normalize line endings so split("\n") works
-  csv = csv.replace(/\uFEFF/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  // Strip BOM
+  csv = csv.replace(/^\uFEFF/, "");
   if (csv.trim().length === 0) return [];
 
-  const lines = csv.split("\n").filter((line) => line.trim().length > 0);
-  if (lines.length === 0) return [];
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = "";
+  let inQuotes = false;
 
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/\uFEFF/g, ""));
-  const data: any[] = [];
+  for (let i = 0; i < csv.length; i++) {
+    const char = csv[i];
+    const nextChar = csv[i + 1];
 
-  for (let i = 1; i < lines.length; i++) {
-    const values: string[] = [];
-    let currentValue = "";
-    let insideQuotes = false;
-
-    // Parse CSV line handling quoted values
-    for (let j = 0; j < lines[i].length; j++) {
-      const char = lines[i][j];
-
+    if (inQuotes) {
       if (char === '"') {
-        if (insideQuotes && lines[i][j + 1] === '"') {
-          // Escaped quote
-          currentValue += '"';
-          j++;
+        if (nextChar === '"') {
+          // Escaped quote ("") -> add single quote
+          currentField += '"';
+          i++;
         } else {
-          // Toggle quote state
-          insideQuotes = !insideQuotes;
+          // Closing quote
+          inQuotes = false;
         }
-      } else if (char === "," && !insideQuotes) {
-        values.push(currentValue.trim());
-        currentValue = "";
       } else {
-        currentValue += char;
+        currentField += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ",") {
+        currentRow.push(currentField.trim());
+        currentField = "";
+      } else if (char === "\r") {
+        if (nextChar === "\n") {
+          i++; // Skip \n in \r\n
+        }
+        currentRow.push(currentField.trim());
+        if (currentRow.some((val) => val.length > 0)) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentField = "";
+      } else if (char === "\n") {
+        currentRow.push(currentField.trim());
+        if (currentRow.some((val) => val.length > 0)) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentField = "";
+      } else {
+        currentField += char;
       }
     }
-    values.push(currentValue.trim());
+  }
 
-    // Create object from values
+  // Push last field and row if any
+  currentRow.push(currentField.trim());
+  if (currentRow.some((val) => val.length > 0)) {
+    rows.push(currentRow);
+  }
+
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map((h) => h.replace(/^["']|["']$/g, "").trim());
+  const data: any[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
     const row: any = {};
     headers.forEach((header, index) => {
-      const value = values[index] || "";
-      // Convert empty strings to null
-      row[header] = value === "" ? null : value;
+      const val = values[index];
+      // Convert empty strings, "null", and "undefined" to null
+      row[header] =
+        val === undefined || val === "" || val.toLowerCase() === "null"
+          ? null
+          : val;
     });
-
     data.push(row);
   }
 
