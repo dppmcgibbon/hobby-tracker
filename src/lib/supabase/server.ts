@@ -35,9 +35,24 @@ export async function createClient() {
  * Requires SUPABASE_SERVICE_ROLE_KEY in env.
  */
 export function createServiceRoleClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = (
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL
+  )?.trim();
+
+  const key = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  )?.trim();
+
   if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is required");
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for backup import");
+  if (!key) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required for backup import. Please check your Vercel Environment Variables."
+    );
+  }
   return createSupabaseClient(url, key, { auth: { persistSession: false } });
 }
