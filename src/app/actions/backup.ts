@@ -594,12 +594,109 @@ export async function importDatabaseBackup(
       if (!backupData[tableName]) continue;
       const rows = parseCSV(backupData[tableName]);
       if (rows.length === 0) continue;
-      const toInsert = USER_TABLES_WITH_USER_ID_SET.has(tableName)
+      let toInsert = USER_TABLES_WITH_USER_ID_SET.has(tableName)
         ? rows.map((row) => ({ ...row, user_id: user.id }))
         : rows;
+
+      // Sanitize foreign keys before inserting to avoid constraint violations
+      if (tableName === "miniatures") {
+        const { data: dbBoxes } = await supabase.from("storage_boxes").select("id").eq("user_id", user.id);
+        const validBoxIds = new Set((dbBoxes ?? []).map((b) => b.id));
+        toInsert = toInsert.map((row) => ({
+          ...row,
+          storage_box_id: row.storage_box_id && validBoxIds.has(row.storage_box_id) ? row.storage_box_id : null,
+        }));
+      } else if (tableName === "miniature_status") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        const seen = new Set<string>();
+        toInsert = toInsert.filter((row) => {
+          if (!row.miniature_id || !validMiniatureIds.has(row.miniature_id)) {
+            console.warn(`Skipping orphaned miniature_status for miniature_id: ${row.miniature_id}`);
+            return false;
+          }
+          if (seen.has(row.miniature_id)) return false;
+          seen.add(row.miniature_id);
+          return true;
+        });
+      } else if (tableName === "miniature_photos") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        toInsert = toInsert.filter((row) => row.miniature_id && validMiniatureIds.has(row.miniature_id));
+      } else if (tableName === "miniature_tags") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        const { data: dbTags } = await supabase.from("tags").select("id").eq("user_id", user.id);
+        const validTagIds = new Set((dbTags ?? []).map((t) => t.id));
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.tag_id &&
+            validTagIds.has(row.tag_id)
+        );
+      } else if (tableName === "miniature_recipes") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        const { data: dbRecipes } = await supabase.from("painting_recipes").select("id").eq("user_id", user.id);
+        const validRecipeIds = new Set((dbRecipes ?? []).map((r) => r.id));
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.recipe_id &&
+            validRecipeIds.has(row.recipe_id)
+        );
+      } else if (tableName === "miniature_games") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        toInsert = toInsert.filter((row) => row.miniature_id && validMiniatureIds.has(row.miniature_id));
+      } else if (tableName === "recipe_steps") {
+        const { data: dbRecipes } = await supabase.from("painting_recipes").select("id").eq("user_id", user.id);
+        const validRecipeIds = new Set((dbRecipes ?? []).map((r) => r.id));
+        toInsert = toInsert.filter((row) => row.recipe_id && validRecipeIds.has(row.recipe_id));
+      } else if (tableName === "collection_miniatures") {
+        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
+        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
+        const { data: dbCollections } = await supabase.from("collections").select("id").eq("user_id", user.id);
+        const validCollectionIds = new Set((dbCollections ?? []).map((c) => c.id));
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.collection_id &&
+            validCollectionIds.has(row.collection_id)
+        );
+      }
+
+      if (toInsert.length === 0) continue;
+
       for (let i = 0; i < toInsert.length; i += BATCH) {
         const batch = toInsert.slice(i, i + BATCH);
-        const { error } = await supabase.from(tableName).insert(batch);
+        let error;
+        if (tableName === "miniature_status") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "miniature_id" });
+          error = res.error;
+        } else if (tableName === "miniature_tags") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "miniature_id,tag_id" });
+          error = res.error;
+        } else if (tableName === "miniature_recipes") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "miniature_id,recipe_id" });
+          error = res.error;
+        } else if (tableName === "miniature_games") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "miniature_id,game_id" });
+          error = res.error;
+        } else if (tableName === "collection_miniatures") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "collection_id,miniature_id" });
+          error = res.error;
+        } else if (batch[0] && "id" in batch[0]) {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "id" });
+          error = res.error;
+        } else {
+          const res = await supabase.from(tableName).insert(batch);
+          error = res.error;
+        }
+
         if (error) {
           console.error(`Error importing ${tableName}:`, error);
           throw new Error(`Failed to import ${tableName}: ${error.message}`);
