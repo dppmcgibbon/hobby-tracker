@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Hobby Tracker - Miniature Collection Manager",
@@ -41,7 +42,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="warhammer-bg">{children}</body>
+      <body className="warhammer-bg">
+        {children}
+        <Toaster richColors position="top-right" />
+      </body>
     </html>
   );
 }

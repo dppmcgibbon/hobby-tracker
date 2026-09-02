@@ -1,6 +1,7 @@
 "use server";
 
 import JSZip from "jszip";
+import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
@@ -589,6 +590,8 @@ export async function importDatabaseBackup(
           .eq("id", user.id);
       }
     }
+
+    revalidatePath("/dashboard", "layout");
 
     return {
       success: true,
