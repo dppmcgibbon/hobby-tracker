@@ -12,7 +12,7 @@ import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { Edit, Image as ImageIcon, Magnet, Sprout, Plus } from "lucide-react";
 import { PhotoUpload } from "./photo-upload";
 import { StatusIcon } from "./status-icon";
-import { createClient } from "@/lib/supabase/client";
+import { getR2PublicUrl } from "@/lib/r2";
 import { getPhotoImageUrl } from "@/lib/photos";
 import Image from "next/image";
 
@@ -75,7 +75,6 @@ export function MiniatureTableView({
   onMiniaturesUpdate,
 }: MiniatureTableViewProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [selectedMiniatureIndex, setSelectedMiniatureIndex] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [localMiniatures, setLocalMiniatures] = useState(miniatures);
@@ -625,9 +624,7 @@ export function MiniatureTableView({
                           <p className="text-xs font-bold text-primary mb-2">Photos</p>
                           <div className="flex gap-5 justify-center items-center flex-wrap">
                             {miniature.miniature_photos.slice(0, 3).map((photo, index) => {
-                            const publicUrl = supabase.storage
-                              .from("miniature-photos")
-                              .getPublicUrl(photo.storage_path).data.publicUrl;
+                            const publicUrl = getR2PublicUrl(photo.storage_path);
                             const imageUrl = getPhotoImageUrl(publicUrl, photo.image_updated_at);
                             return (
                               <div

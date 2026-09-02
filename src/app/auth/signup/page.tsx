@@ -54,8 +54,7 @@ export default function SignupPage() {
     if (authData.user) {
       setSuccess(true);
       setTimeout(() => {
-        router.push("/dashboard");
-        router.refresh();
+        window.location.href = "/dashboard";
       }, 2000);
     }
   };

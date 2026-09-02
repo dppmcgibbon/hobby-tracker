@@ -46,8 +46,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    // Full page redirect ensures newly set auth cookies are sent in HTTP headers to server
+    window.location.href = "/dashboard";
   };
 
   return (

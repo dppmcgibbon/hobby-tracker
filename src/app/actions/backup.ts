@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
+import { uploadR2Object, downloadR2Object, deleteR2Object } from "@/lib/r2";
 
 // Helper function to convert array of objects to CSV
 function convertToCSV(data: any[], tableName: string): string {
@@ -397,17 +398,11 @@ export async function createUniversePhotosBackup(universeId: string) {
     const results = await Promise.all(
       batch.map(async (photo) => {
         try {
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from("miniature-photos")
-            .download(photo.storage_path);
-          if (!downloadError && fileData) {
-            return { path: photo.storage_path, blob: fileData };
-          }
-          if (downloadError) {
-            console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
-          }
+          const buffer = await downloadR2Object(photo.storage_path);
+          const blob = new Blob([new Uint8Array(buffer)]);
+          return { path: photo.storage_path, blob };
         } catch (downloadError) {
-          console.warn(`Error downloading photo: ${photo.storage_path}`, downloadError);
+          console.warn(`Failed to download photo: ${photo.storage_path}`, downloadError);
         }
         return null;
       })
@@ -708,17 +703,12 @@ async function importFromZipBuffer(
     const newPath = `${userId}/${miniatureId}/${filename}`;
     pathMapping[path] = newPath;
 
-    const { error: uploadError } = await supabase.storage
-      .from("miniature-photos")
-      .upload(newPath, buffer, {
-        upsert: true,
-        contentType: "image/jpeg",
-      });
-
-    if (uploadError) {
-      photoErrors.push(`${path}: ${uploadError.message}`);
-    } else {
+    try {
+      await uploadR2Object(newPath, Buffer.from(buffer), "image/jpeg");
       uploadedPhotos++;
+    } catch (uploadError) {
+      const msg = uploadError instanceof Error ? uploadError.message : "R2 upload failed";
+      photoErrors.push(`${path}: ${msg}`);
     }
   }
 
@@ -762,21 +752,20 @@ export async function importPhotosOnlyFromStoragePath(storagePath: string): Prom
   }
 
   try {
-    const { data, error: downloadError } = await supabase.storage
-      .from(BACKUP_IMPORTS_BUCKET)
-      .download(normalized);
-
-    if (downloadError || !data) {
+    let arrayBuffer: ArrayBuffer;
+    try {
+      const buffer = await downloadR2Object(normalized);
+      arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+    } catch (downloadError) {
       return {
         success: false,
         uploadedPhotos: 0,
         failedPhotos: 0,
-        photoErrors: [downloadError?.message ?? "Failed to download backup from storage"],
+        photoErrors: [downloadError instanceof Error ? downloadError.message : "Failed to download backup from storage"],
         error: "Failed to download backup",
       };
     }
 
-    const arrayBuffer = await data.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
     const photoEntries: { path: string; buffer: ArrayBuffer }[] = [];
 
@@ -789,7 +778,9 @@ export async function importPhotosOnlyFromStoragePath(storagePath: string): Prom
       }
     }
 
-    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+    try {
+      await deleteR2Object(normalized);
+    } catch {}
 
     if (photoEntries.length === 0) {
       return { success: true, uploadedPhotos: 0, failedPhotos: 0, photoErrors: ["No photos found in ZIP (expected photos/ folder from app export)"] };
@@ -809,14 +800,12 @@ export async function importPhotosOnlyFromStoragePath(storagePath: string): Prom
       const ext = filename.split(".").pop()?.toLowerCase();
       const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 
-      const { error: uploadError } = await supabase.storage
-        .from("miniature-photos")
-        .upload(storagePathForUpload, buffer, { upsert: true, contentType });
-
-      if (uploadError) {
-        photoErrors.push(`${path}: ${uploadError.message}`);
-      } else {
+      try {
+        await uploadR2Object(storagePathForUpload, Buffer.from(buffer), contentType);
         uploadedPhotos++;
+      } catch (uploadError) {
+        const msg = uploadError instanceof Error ? uploadError.message : "Upload failed";
+        photoErrors.push(`${path}: ${msg}`);
       }
     }
 
@@ -882,23 +871,24 @@ export async function importDatabaseBackupFromStoragePath(storagePath: string): 
   }
 
   try {
-    const { data, error: downloadError } = await supabase.storage
-      .from(BACKUP_IMPORTS_BUCKET)
-      .download(normalized);
-
-    if (downloadError || !data) {
+    let arrayBuffer: ArrayBuffer;
+    try {
+      const buffer = await downloadR2Object(normalized);
+      arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+    } catch (downloadError) {
       console.error("Backup download error:", downloadError);
       return {
         ...IMPORT_RESULT_FAIL,
-        photoErrors: [downloadError?.message ?? "Failed to download backup from storage"],
+        photoErrors: [downloadError instanceof Error ? downloadError.message : "Failed to download backup from storage"],
         error: "Failed to download backup",
       };
     }
 
-    const arrayBuffer = await data.arrayBuffer();
     const result = await importFromZipBuffer(arrayBuffer, user.id, supabase);
 
-    await supabase.storage.from(BACKUP_IMPORTS_BUCKET).remove([normalized]);
+    try {
+      await deleteR2Object(normalized);
+    } catch {}
 
     return result;
   } catch (error) {

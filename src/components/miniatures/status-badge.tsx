@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Select,
@@ -12,50 +12,45 @@ import {
 import { updateMiniatureStatus } from "@/app/actions/miniatures";
 import { Loader2 } from "lucide-react";
 import type { MiniatureStatus } from "@/types";
+import { getMiniatureStatusDisplayLabel } from "@/lib/constants/miniature-status";
 
 interface StatusBadgeProps {
   miniatureId: string;
   status: MiniatureStatus | null;
+  /** Rows from `miniature_statuses` (same source as other status dropdowns). */
+  statusRows: { name: string }[];
 }
 
-type StatusType = 
-  | "unknown"
-  | "missing"
-  | "needs_stripped"
-  | "backlog"
-  | "built"
-  | "primed"
-  | "painting_started"
-  | "needs_repair"
-  | "sub_assembled"
-  | "missing_arm"
-  | "missing_leg"
-  | "missing_head"
-  | "complete";
-
-export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
+export function StatusBadge({ miniatureId, status, statusRows }: StatusBadgeProps) {
   const router = useRouter();
   const [updating, setUpdating] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<StatusType>(
-    (status?.status as StatusType) || "backlog"
-  );
+  const [currentStatus, setCurrentStatus] = useState<string>(status?.status || "backlog");
 
   // Sync local state with props when they change (e.g., after bulk update)
   useEffect(() => {
     if (status) {
-      setCurrentStatus((status.status as StatusType) || "backlog");
+      setCurrentStatus(status.status || "backlog");
     }
   }, [status]);
+
+  const rowsForSelect = useMemo(() => {
+    const out = [...statusRows];
+    const s = status?.status;
+    if (s && !out.some((r) => r.name === s)) {
+      out.push({ name: s });
+    }
+    return out;
+  }, [statusRows, status]);
 
   const handleStatusChange = async (newStatus: string) => {
     setUpdating(true);
     try {
       await updateMiniatureStatus(miniatureId, {
-        status: newStatus as StatusType,
+        status: newStatus,
         magnetised: status?.magnetised ?? false,
         based: status?.based ?? false,
       });
-      setCurrentStatus(newStatus as StatusType);
+      setCurrentStatus(newStatus);
       router.refresh();
     } catch (error) {
       console.error("Failed to update status:", error);
@@ -71,19 +66,11 @@ export function StatusBadge({ miniatureId, status }: StatusBadgeProps) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="unknown">Unknown</SelectItem>
-          <SelectItem value="missing">Missing</SelectItem>
-          <SelectItem value="needs_stripped">Needs Stripped</SelectItem>
-          <SelectItem value="backlog">Backlog</SelectItem>
-          <SelectItem value="built">Built</SelectItem>
-          <SelectItem value="primed">Primed</SelectItem>
-          <SelectItem value="painting_started">Painting Started</SelectItem>
-          <SelectItem value="needs_repair">Needs Repair</SelectItem>
-          <SelectItem value="sub_assembled">Sub-Assembled</SelectItem>
-          <SelectItem value="missing_arm">Missing Arm</SelectItem>
-          <SelectItem value="missing_leg">Missing Leg</SelectItem>
-          <SelectItem value="missing_head">Missing Head</SelectItem>
-          <SelectItem value="complete">Complete</SelectItem>
+          {rowsForSelect.map((row) => (
+            <SelectItem key={row.name} value={row.name}>
+              {getMiniatureStatusDisplayLabel(row.name)}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 

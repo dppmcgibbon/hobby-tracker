@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PhotoGallery } from "@/components/miniatures/photo-gallery";
 import { StatusBadge } from "@/components/miniatures/status-badge";
 import type { MiniatureStatus } from "@/types";
+import { getMiniatureStatuses } from "@/lib/queries/miniatures";
 
 interface Props {
   params: { token: string };
@@ -55,6 +56,7 @@ interface MiniatureData {
 
 export default async function SharedMiniaturePage({ params }: Props) {
   const supabase = await createClient();
+  const statusRows = await getMiniatureStatuses();
 
   // Fetch shared miniature
   const { data: share, error } = await supabase
@@ -65,6 +67,7 @@ export default async function SharedMiniaturePage({ params }: Props) {
       miniatures (
         *,
         factions (name),
+        miniature_status (status, magnetised, based, completed_at),
         photos (id, storage_path, caption, photo_type),
         recipes (
           id,
@@ -99,6 +102,11 @@ export default async function SharedMiniaturePage({ params }: Props) {
   const miniature = share.miniatures as MiniatureData;
   const photos = miniature.photos || [];
   const recipes = miniature.recipes || [];
+  const rawMs = (miniature as { miniature_status?: MiniatureStatus | MiniatureStatus[] | null })
+    .miniature_status;
+  const statusForBadge: MiniatureStatus | null = Array.isArray(rawMs)
+    ? rawMs[0] ?? null
+    : rawMs ?? (miniature.status ? ({ status: miniature.status } as MiniatureStatus) : null);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -110,10 +118,11 @@ export default async function SharedMiniaturePage({ params }: Props) {
             <p className="text-xl text-muted-foreground">{miniature.factions.name}</p>
           )}
           <div className="flex items-center justify-center gap-4 mt-4">
-            {miniature.status && (
+            {statusForBadge?.status && (
               <StatusBadge
                 miniatureId={miniature.id}
-                status={{ status: miniature.status } as MiniatureStatus}
+                status={statusForBadge}
+                statusRows={statusRows.map((r) => ({ name: r.name }))}
               />
             )}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

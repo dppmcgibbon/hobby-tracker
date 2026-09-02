@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { getMiniatureStatusDisplayLabel } from "@/lib/constants/miniature-status";
 
 interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
@@ -37,6 +38,7 @@ interface CollectionFiltersProps {
   unitTypes: string[];
   bases: { id: string; name: string }[];
   miniatures: any[]; // The miniatures to determine available options
+  miniatureStatusRows: { name: string; display_order?: number | null }[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
   savedFilters?: Array<{
@@ -65,25 +67,6 @@ export interface FilterState {
   based: string; // "all" | "yes" | "no"
 }
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "All Statuses" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "not_started", label: "Not Started" },
-  { value: "complete", label: "Complete" },
-  { value: "unknown", label: "Unknown" },
-  { value: "missing", label: "Missing" },
-  { value: "needs_stripped", label: "Needs Stripped" },
-  { value: "backlog", label: "Backlog" },
-  { value: "built", label: "Built" },
-  { value: "primed", label: "Primed" },
-  { value: "painting_started", label: "Painting Started" },
-  { value: "needs_repair", label: "Needs Repair" },
-  { value: "sub_assembled", label: "Sub-Assembled" },
-  { value: "missing_arm", label: "Missing Arm" },
-  { value: "missing_leg", label: "Missing Leg" },
-  { value: "missing_head", label: "Missing Head" },
-];
-
 export function CollectionFilters({
   factions,
   tags,
@@ -95,10 +78,24 @@ export function CollectionFilters({
   unitTypes,
   bases,
   miniatures,
+  miniatureStatusRows,
   onFiltersChange,
   initialFilters,
   savedFilters = [],
 }: CollectionFiltersProps) {
+  const statusFilterOptions = useMemo(() => {
+    const head = [
+      { value: "all", label: "All Statuses" },
+      { value: "in_progress", label: "In Progress" },
+      { value: "not_started", label: "Not Started" },
+    ];
+    const tail = miniatureStatusRows.map((row) => ({
+      value: row.name,
+      label: getMiniatureStatusDisplayLabel(row.name),
+    }));
+    return [...head, ...tail];
+  }, [miniatureStatusRows]);
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -330,8 +327,12 @@ export function CollectionFilters({
         .filter((status: any) => status != null)
     );
   } else {
-    // When no filters, show all possible statuses
-    availableStatuses = new Set(STATUS_OPTIONS.map(opt => opt.value).filter(v => v !== "all"));
+    // When no filters, show all statuses from lookup plus grouped filters
+    availableStatuses = new Set([
+      ...miniatureStatusRows.map((r) => r.name),
+      "in_progress",
+      "not_started",
+    ]);
   }
 
   // Always show all storage boxes regardless of filters
@@ -523,7 +524,7 @@ export function CollectionFilters({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.filter(
+                {statusFilterOptions.filter(
                   (option) =>
                     option.value === "all" ||
                     option.value === "in_progress" ||
@@ -893,11 +894,11 @@ export function CollectionFilters({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.filter(
+                      {statusFilterOptions.filter(
                         (option) =>
                           option.value === "all" ||
                           option.value === "in_progress" ||
-                          option.value === "backlog" ||
+                          option.value === "not_started" ||
                           availableStatuses.has(option.value)
                       ).map((option) => (
                         <SelectItem key={option.value} value={option.value}>
@@ -1038,7 +1039,8 @@ export function CollectionFilters({
           )}
           {filters.status !== "all" && (
             <Badge variant="secondary">
-              Status: {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
+              Status:{" "}
+              {statusFilterOptions.find((s) => s.value === filters.status)?.label ?? filters.status}
               <button
                 onClick={() => updateFilter("status", "all")}
                 className="ml-1 hover:text-destructive"

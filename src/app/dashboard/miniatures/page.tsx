@@ -30,6 +30,7 @@ export default async function MiniaturesPage({
     { data: basesData },
     { data: baseShapesData },
     { data: baseTypesData },
+    { data: miniatureStatusRows },
   ] = await Promise.all([
     supabase.from("factions").select("id, name").order("name"),
     supabase.from("tags").select("id, name, color").eq("user_id", user.id).order("name"),
@@ -50,6 +51,7 @@ export default async function MiniaturesPage({
     supabase.from("bases").select("id, name").order("name"),
     supabase.from("base_shapes").select("id, name").order("name"),
     supabase.from("base_types").select("id, name").order("name"),
+    supabase.from("miniature_statuses").select("name, display_order").order("display_order"),
   ]);
 
   // Process recipes and unit types
@@ -286,6 +288,7 @@ export default async function MiniaturesPage({
   return (
     <CollectionClient
       miniatures={filteredMiniatures}
+      miniatureStatusRows={miniatureStatusRows || []}
       factions={factions || []}
       tags={tags || []}
       collections={collections || []}

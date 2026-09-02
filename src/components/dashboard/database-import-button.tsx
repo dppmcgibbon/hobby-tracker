@@ -4,8 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
 import { importDatabaseBackupFromStoragePath } from "@/app/actions/backup";
-import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
-import { createClient } from "@/lib/supabase/client";
+import { getPresignedUploadUrl } from "@/app/actions/photos";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -45,25 +44,23 @@ export function DatabaseImportButton() {
     setIsImporting(true);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("You must be signed in to import");
+      // Upload ZIP to R2 via presigned URL first so the server action only receives a key (avoids 413 on Vercel)
+      const presignedRes = await getPresignedUploadUrl("import", pendingFile.name || "import.zip", "application/zip");
+      if (!presignedRes.success || !presignedRes.presignedUrl) {
+        throw new Error("Failed to generate upload URL");
       }
 
-      // Upload ZIP to storage first so the server action only receives a path (avoids 413 on Vercel)
-      const storagePath = `${user.id}/import-${Date.now()}.zip`;
-      const { error: uploadError } = await supabase.storage
-        .from(BACKUP_IMPORTS_BUCKET)
-        .upload(storagePath, pendingFile, { contentType: "application/zip", upsert: true });
+      const uploadRes = await fetch(presignedRes.presignedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/zip" },
+        body: pendingFile,
+      });
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with status ${uploadRes.status}`);
       }
 
-      const result = await importDatabaseBackupFromStoragePath(storagePath);
+      const result = await importDatabaseBackupFromStoragePath(presignedRes.key);
 
       if (!result.success) {
         throw new Error(result.error ?? result.photoErrors[0] ?? "Import failed");

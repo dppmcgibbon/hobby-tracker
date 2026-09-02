@@ -4,8 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, ImagePlus } from "lucide-react";
 import { importPhotosOnlyFromStoragePath } from "@/app/actions/backup";
-import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
-import { createClient } from "@/lib/supabase/client";
+import { getPresignedUploadUrl } from "@/app/actions/photos";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -45,32 +44,22 @@ export function ImportPhotosOnlyButton() {
     setIsImporting(true);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("You must be signed in to import");
+      const presignedRes = await getPresignedUploadUrl("import", pendingFile.name || "import-photos.zip", "application/zip");
+      if (!presignedRes.success || !presignedRes.presignedUrl) {
+        throw new Error("Failed to generate upload URL");
       }
 
-      const storagePath = `${user.id}/import-photos-${Date.now()}.zip`;
-      const { error: uploadError } = await supabase.storage
-        .from(BACKUP_IMPORTS_BUCKET)
-        .upload(storagePath, pendingFile, {
-          contentType: "application/zip",
-          upsert: true,
-        });
+      const uploadRes = await fetch(presignedRes.presignedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/zip" },
+        body: pendingFile,
+      });
 
-      if (uploadError) {
-        const msg = uploadError.message || "Unknown error";
-        const hint =
-          uploadError.message?.toLowerCase().includes("bucket") || uploadError.message?.toLowerCase().includes("400")
-            ? " Ensure the backup-imports bucket exists: run supabase db push on your project."
-            : "";
-        throw new Error(`Upload failed: ${msg}${hint}`);
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with status ${uploadRes.status}`);
       }
 
-      const result = await importPhotosOnlyFromStoragePath(storagePath);
+      const result = await importPhotosOnlyFromStoragePath(presignedRes.key);
 
       if (!result.success) {
         throw new Error(result.error ?? result.photoErrors[0] ?? "Import failed");

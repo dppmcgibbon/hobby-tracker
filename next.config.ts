@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    "192.168.1.*",
+    "192.168.1.65",
+    "192.168.1.65:3009",
+    "192.168.1.237",
+    "192.168.1.237:3009",
+    "Hawk.local",
+    "Hawk.local:3009",
+    "*.local",
+    "localhost",
+    "localhost:3009",
+    "127.0.0.1",
+    "127.0.0.1:3009",
+  ],
   images: {
     remotePatterns: [
       {
@@ -16,8 +30,20 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "http",
+        hostname: "127.0.0.1",
+        port: "55321",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "http",
         hostname: "localhost",
         port: "54321",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "55321",
         pathname: "/storage/v1/object/public/**",
       },
       {
@@ -25,6 +51,16 @@ const nextConfig: NextConfig = {
         hostname: "192.168.1.65",
         port: "54321",
         pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "http",
+        hostname: "192.168.1.65",
+        port: "55321",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "pub-*.r2.dev", // Matches Cloudflare R2 public dev URLs
       },
     ],
     dangerouslyAllowSVG: true,
