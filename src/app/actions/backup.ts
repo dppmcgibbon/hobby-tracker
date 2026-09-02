@@ -128,6 +128,47 @@ function parseCSV(csv: string): any[] {
   return data;
 }
 
+const TABLES_COMPOSITE_KEYS: Record<string, string[]> = {
+  miniature_tags: ["miniature_id", "tag_id"],
+  miniature_recipes: ["miniature_id", "recipe_id"],
+  miniature_games: ["miniature_id", "game_id"],
+  collection_miniatures: ["collection_id", "miniature_id"],
+  paint_equivalents: ["paint_id", "equivalent_paint_id"],
+};
+
+/** Fetch all rows for a Supabase query using pagination (bypasses PostgREST 1,000 row default limit) */
+async function fetchAllRowsForQuery(query: any): Promise<any[]> {
+  const allRows: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const start = page * pageSize;
+    const end = start + pageSize - 1;
+    const { data, error, count } = await query.range(start, end);
+
+    if (error) {
+      console.error("Error fetching paginated rows:", error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allRows.push(...data);
+      if (typeof count === "number") {
+        hasMore = allRows.length < count;
+      } else {
+        hasMore = data.length === pageSize;
+      }
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allRows;
+}
+
 export async function createDatabaseBackup() {
   const user = await requireAuth();
   const supabase = await createClient();
@@ -179,7 +220,7 @@ export async function createDatabaseBackup() {
 
     // Fetch data for each table
     for (const table of tables) {
-      let query = supabase.from(table).select("*");
+      let query = supabase.from(table).select("*", { count: "exact" });
 
       // Filter by user_id for user-specific tables
       const userTables = [
@@ -203,13 +244,16 @@ export async function createDatabaseBackup() {
         query = query.eq("id", user.id);
       }
 
-      // For junction tables, we need to filter by related records
+      // For junction tables without user_id, filter by user's parent records
       if (table === "miniature_tags" || table === "miniature_recipes" || table === "miniature_games") {
-        // Fetch user's miniature IDs first
-        const { data: userMiniatures } = await supabase
-          .from("miniatures")
-          .select("id")
-          .eq("user_id", user.id);
+        // Fetch user's miniature IDs first (paginated to handle >1000 items)
+        const userMiniatures = await fetchAllRowsForQuery(
+          supabase
+            .from("miniatures")
+            .select("id", { count: "exact" })
+            .eq("user_id", user.id)
+            .order("id", { ascending: true })
+        );
 
         if (userMiniatures && userMiniatures.length > 0) {
           const miniatureIds = userMiniatures.map((m) => m.id);
@@ -220,16 +264,19 @@ export async function createDatabaseBackup() {
           
           for (let i = 0; i < miniatureIds.length; i += batchSize) {
             const batch = miniatureIds.slice(i, i + batchSize);
-            const { data: batchData, error: batchError } = await supabase
+            let bQuery = supabase
               .from(table)
-              .select("*")
+              .select("*", { count: "exact" })
               .in("miniature_id", batch);
             
-            if (batchError) {
-              console.error(`Error fetching ${table} batch:`, batchError);
-              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
+            const compKeys = TABLES_COMPOSITE_KEYS[table];
+            if (compKeys) {
+              for (const k of compKeys) {
+                bQuery = bQuery.order(k, { ascending: true });
+              }
             }
             
+            const batchData = await fetchAllRowsForQuery(bQuery);
             if (batchData) {
               allData.push(...batchData);
             }
@@ -244,11 +291,14 @@ export async function createDatabaseBackup() {
       }
 
       if (table === "collection_miniatures") {
-        // Fetch user's collection IDs first
-        const { data: userCollections } = await supabase
-          .from("collections")
-          .select("id")
-          .eq("user_id", user.id);
+        // Fetch user's collection IDs first (paginated to handle >1000 items)
+        const userCollections = await fetchAllRowsForQuery(
+          supabase
+            .from("collections")
+            .select("id", { count: "exact" })
+            .eq("user_id", user.id)
+            .order("id", { ascending: true })
+        );
 
         if (userCollections && userCollections.length > 0) {
           const collectionIds = userCollections.map((c) => c.id);
@@ -259,15 +309,14 @@ export async function createDatabaseBackup() {
           
           for (let i = 0; i < collectionIds.length; i += batchSize) {
             const batch = collectionIds.slice(i, i + batchSize);
-            const { data: batchData, error: batchError } = await supabase
-              .from(table)
-              .select("*")
-              .in("collection_id", batch);
-            
-            if (batchError) {
-              console.error(`Error fetching ${table} batch:`, batchError);
-              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
-            }
+            const batchData = await fetchAllRowsForQuery(
+              supabase
+                .from(table)
+                .select("*", { count: "exact" })
+                .in("collection_id", batch)
+                .order("collection_id", { ascending: true })
+                .order("miniature_id", { ascending: true })
+            );
             
             if (batchData) {
               allData.push(...batchData);
@@ -283,11 +332,14 @@ export async function createDatabaseBackup() {
       }
 
       if (table === "recipe_steps") {
-        // Fetch user's recipe IDs first
-        const { data: userRecipes } = await supabase
-          .from("painting_recipes")
-          .select("id")
-          .eq("user_id", user.id);
+        // Fetch user's recipe IDs first (paginated to handle >1000 items)
+        const userRecipes = await fetchAllRowsForQuery(
+          supabase
+            .from("painting_recipes")
+            .select("id", { count: "exact" })
+            .eq("user_id", user.id)
+            .order("id", { ascending: true })
+        );
 
         if (userRecipes && userRecipes.length > 0) {
           const recipeIds = userRecipes.map((r) => r.id);
@@ -298,15 +350,13 @@ export async function createDatabaseBackup() {
           
           for (let i = 0; i < recipeIds.length; i += batchSize) {
             const batch = recipeIds.slice(i, i + batchSize);
-            const { data: batchData, error: batchError } = await supabase
-              .from(table)
-              .select("*")
-              .in("recipe_id", batch);
-            
-            if (batchError) {
-              console.error(`Error fetching ${table} batch:`, batchError);
-              throw new Error(`Failed to backup ${table}: ${batchError.message}`);
-            }
+            const batchData = await fetchAllRowsForQuery(
+              supabase
+                .from(table)
+                .select("*", { count: "exact" })
+                .in("recipe_id", batch)
+                .order("id", { ascending: true })
+            );
             
             if (batchData) {
               allData.push(...batchData);
@@ -321,12 +371,17 @@ export async function createDatabaseBackup() {
         continue;
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error(`Error fetching ${table}:`, error);
-        throw new Error(`Failed to backup ${table}: ${error.message}`);
+      // Apply deterministic ordering
+      const compKeys = TABLES_COMPOSITE_KEYS[table];
+      if (compKeys) {
+        for (const k of compKeys) {
+          query = query.order(k, { ascending: true });
+        }
+      } else {
+        query = query.order("id", { ascending: true });
       }
+
+      const data = await fetchAllRowsForQuery(query);
 
       const csv = data && data.length > 0 ? convertToCSV(data, table) : "";
       backups.push({
@@ -385,11 +440,13 @@ export async function createUniversePhotosBackup(universeId: string) {
   if (universeGameIds.length > 0) {
     for (let i = 0; i < universeGameIds.length; i += BATCH) {
       const gameBatch = universeGameIds.slice(i, i + BATCH);
-      const { data: mgRows, error: mgErr } = await supabase
-        .from("miniature_games")
-        .select("miniature_id")
-        .in("game_id", gameBatch);
-      if (mgErr) throw new Error(`Failed to fetch miniature_games: ${mgErr.message}`);
+      const mgRows = await fetchAllRowsForQuery(
+        supabase
+          .from("miniature_games")
+          .select("miniature_id", { count: "exact" })
+          .in("game_id", gameBatch)
+          .order("miniature_id", { ascending: true })
+      );
       for (const row of mgRows ?? []) linkedMiniatureIds.add((row as { miniature_id: string }).miniature_id);
     }
   }
@@ -399,12 +456,14 @@ export async function createUniversePhotosBackup(universeId: string) {
   if (candidateIds.length > 0) {
     for (let i = 0; i < candidateIds.length; i += BATCH) {
       const batch = candidateIds.slice(i, i + BATCH);
-      const { data: owned, error: mErr } = await supabase
-        .from("miniatures")
-        .select("id")
-        .eq("user_id", user.id)
-        .in("id", batch);
-      if (mErr) throw new Error(`Failed to fetch miniatures: ${mErr.message}`);
+      const owned = await fetchAllRowsForQuery(
+        supabase
+          .from("miniatures")
+          .select("id", { count: "exact" })
+          .eq("user_id", user.id)
+          .in("id", batch)
+          .order("id", { ascending: true })
+      );
       for (const row of owned ?? []) miniatureIds.push((row as { id: string }).id);
     }
   }
@@ -413,12 +472,14 @@ export async function createUniversePhotosBackup(universeId: string) {
   if (miniatureIds.length > 0) {
     for (let i = 0; i < miniatureIds.length; i += BATCH) {
       const batch = miniatureIds.slice(i, i + BATCH);
-      const { data, error } = await supabase
-        .from("miniature_photos")
-        .select("storage_path")
-        .eq("user_id", user.id)
-        .in("miniature_id", batch);
-      if (error) throw new Error(`Failed to fetch miniature_photos: ${error.message}`);
+      const data = await fetchAllRowsForQuery(
+        supabase
+          .from("miniature_photos")
+          .select("storage_path", { count: "exact" })
+          .eq("user_id", user.id)
+          .in("miniature_id", batch)
+          .order("id", { ascending: true })
+      );
       if (data) photoPaths.push(...(data as { storage_path: string }[]));
     }
   }
@@ -475,10 +536,13 @@ export async function updatePhotoPathsAfterImport(pathMapping: Record<string, st
   }
   if (normalizedMapping.size === 0) return { success: true, updated: 0 };
 
-  const { data: photos } = await supabase
-    .from("miniature_photos")
-    .select("id, storage_path")
-    .eq("user_id", user.id);
+  const photos = await fetchAllRowsForQuery(
+    supabase
+      .from("miniature_photos")
+      .select("id, storage_path", { count: "exact" })
+      .eq("user_id", user.id)
+      .order("id", { ascending: true })
+  );
 
   if (!photos?.length) return { success: true, updated: 0 };
 
@@ -486,7 +550,7 @@ export async function updatePhotoPathsAfterImport(pathMapping: Record<string, st
   for (const photo of photos) {
     const stored = photo.storage_path ? normalizeStoragePath(photo.storage_path) : "";
     const newPath = normalizedMapping.get(stored);
-    if (newPath) {
+    if (newPath && newPath !== stored) {
       const { error } = await supabase
         .from("miniature_photos")
         .update({ storage_path: newPath })
@@ -522,7 +586,10 @@ export async function importDatabaseBackup(
 
     const REFERENCE_TABLES_INT_ID = ["collect_apps", "collect_config", "boardgames", "magazines", "records", "stories"];
     const NULL_UUID = "00000000-0000-0000-0000-000000000000";
+
+    // Only wipe reference tables that are present in the backup data
     for (const tableName of REFERENCE_DELETE_ORDER) {
+      if (!backupData[tableName] || backupData[tableName].trim().length === 0) continue;
       let q = supabase.from(tableName).delete();
       if (tableName === "paint_equivalents") {
         q = q.neq("paint_id", NULL_UUID);
@@ -541,7 +608,17 @@ export async function importDatabaseBackup(
       if (rows.length === 0) continue;
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH);
-        const { error } = await supabase.from(tableName).insert(batch);
+        let error;
+        if (tableName === "paint_equivalents") {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "paint_id,equivalent_paint_id" });
+          error = res.error;
+        } else if (batch[0] && "id" in batch[0]) {
+          const res = await supabase.from(tableName).upsert(batch, { onConflict: "id" });
+          error = res.error;
+        } else {
+          const res = await supabase.from(tableName).insert(batch);
+          error = res.error;
+        }
         if (error) {
           console.error(`Error importing ${tableName}:`, error);
           throw new Error(`Failed to import ${tableName}: ${error.message}`);
@@ -550,28 +627,44 @@ export async function importDatabaseBackup(
       }
     }
 
-    // User-owned tables: delete current user's rows, then insert backup rows with user_id replaced; all other columns (including id) copied.
-    // Junction tables (miniature_tags, etc.) have no user_id — delete rows that reference this user's miniatures/collections/recipes.
-    const { data: myMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-    const { data: myCollections } = await supabase.from("collections").select("id").eq("user_id", user.id);
-    const { data: myRecipes } = await supabase.from("painting_recipes").select("id").eq("user_id", user.id);
-    const miniatureIds = (myMiniatures ?? []).map((m) => m.id);
-    const collectionIds = (myCollections ?? []).map((c) => c.id);
-    const recipeIds = (myRecipes ?? []).map((r) => r.id);
+    // User-owned tables: delete current user's rows.
+    // Fetch user's miniature, collection, and recipe IDs (paginated) to delete junction records in safe URL batches.
+    const myMiniatures = await fetchAllRowsForQuery(
+      supabase.from("miniatures").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+    );
+    const myCollections = await fetchAllRowsForQuery(
+      supabase.from("collections").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+    );
+    const myRecipes = await fetchAllRowsForQuery(
+      supabase.from("painting_recipes").select("id", { count: "exact" }).eq("user_id", user.id).order("id", { ascending: true })
+    );
+
+    const miniatureIds = myMiniatures.map((m) => m.id);
+    const collectionIds = myCollections.map((c) => c.id);
+    const recipeIds = myRecipes.map((r) => r.id);
 
     if (miniatureIds.length > 0) {
-      for (const tableName of ["miniature_tags", "miniature_recipes", "miniature_games"]) {
-        const { error } = await supabase.from(tableName).delete().in("miniature_id", miniatureIds);
-        if (error) console.error(`Error deleting ${tableName}:`, error);
+      for (let i = 0; i < miniatureIds.length; i += BATCH) {
+        const batch = miniatureIds.slice(i, i + BATCH);
+        for (const tableName of ["miniature_tags", "miniature_recipes", "miniature_games"]) {
+          const { error } = await supabase.from(tableName).delete().in("miniature_id", batch);
+          if (error) console.error(`Error deleting ${tableName} batch:`, error);
+        }
       }
     }
     if (collectionIds.length > 0) {
-      const { error } = await supabase.from("collection_miniatures").delete().in("collection_id", collectionIds);
-      if (error) console.error("Error deleting collection_miniatures:", error);
+      for (let i = 0; i < collectionIds.length; i += BATCH) {
+        const batch = collectionIds.slice(i, i + BATCH);
+        const { error } = await supabase.from("collection_miniatures").delete().in("collection_id", batch);
+        if (error) console.error("Error deleting collection_miniatures batch:", error);
+      }
     }
     if (recipeIds.length > 0) {
-      const { error } = await supabase.from("recipe_steps").delete().in("recipe_id", recipeIds);
-      if (error) console.error("Error deleting recipe_steps:", error);
+      for (let i = 0; i < recipeIds.length; i += BATCH) {
+        const batch = recipeIds.slice(i, i + BATCH);
+        const { error } = await supabase.from("recipe_steps").delete().in("recipe_id", batch);
+        if (error) console.error("Error deleting recipe_steps batch:", error);
+      }
     }
 
     const USER_TABLES_WITH_USER_ID = [
@@ -589,6 +682,42 @@ export async function importDatabaseBackup(
       "user_paints", "saved_filters", "miniature_tags", "miniature_recipes", "miniature_games", "shared_miniatures",
     ];
 
+    // Cache valid reference table IDs for relational sanitization without row limits
+    const validFactions = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("factions").select("id", { count: "exact" }).order("id", { ascending: true }))).map((f: any) => f.id)
+    );
+    const validGames = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("games").select("id", { count: "exact" }).order("id", { ascending: true }))).map((g: any) => g.id)
+    );
+    const validEditions = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("editions").select("id", { count: "exact" }).order("id", { ascending: true }))).map((e: any) => e.id)
+    );
+    const validExpansions = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("expansions").select("id", { count: "exact" }).order("id", { ascending: true }))).map((e: any) => e.id)
+    );
+    const validBases = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("bases").select("id", { count: "exact" }).order("id", { ascending: true }))).map((b: any) => b.id)
+    );
+    const validBaseShapes = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("base_shapes").select("id", { count: "exact" }).order("id", { ascending: true }))).map((b: any) => b.id)
+    );
+    const validBaseTypes = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("base_types").select("id", { count: "exact" }).order("id", { ascending: true }))).map((b: any) => b.id)
+    );
+    const validStatuses = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("miniature_statuses").select("id", { count: "exact" }).order("id", { ascending: true }))).map((s: any) => s.id)
+    );
+    const validPaints = new Set<string>(
+      (await fetchAllRowsForQuery(supabase.from("paints").select("id", { count: "exact" }).order("id", { ascending: true }))).map((p: any) => p.id)
+    );
+
+    // Track user record IDs without hitting 1,000 row limits
+    const validBoxIds = new Set<string>();
+    const validTagIds = new Set<string>();
+    const validMiniatureIds = new Set<string>();
+    const validRecipeIds = new Set<string>();
+    const validCollectionIds = new Set<string>();
+
     const USER_TABLES_WITH_USER_ID_SET = new Set(USER_TABLES_WITH_USER_ID);
     for (const tableName of USER_INSERT_ORDER) {
       if (!backupData[tableName]) continue;
@@ -598,17 +727,22 @@ export async function importDatabaseBackup(
         ? rows.map((row) => ({ ...row, user_id: user.id }))
         : rows;
 
-      // Sanitize foreign keys before inserting to avoid constraint violations
-      if (tableName === "miniatures") {
-        const { data: dbBoxes } = await supabase.from("storage_boxes").select("id").eq("user_id", user.id);
-        const validBoxIds = new Set((dbBoxes ?? []).map((b) => b.id));
+      // Sanitize foreign keys before inserting to avoid constraint violations and track IDs
+      if (tableName === "tags") {
+        for (const r of toInsert) if (r.id) validTagIds.add(r.id);
+      } else if (tableName === "storage_boxes") {
+        for (const r of toInsert) if (r.id) validBoxIds.add(r.id);
+      } else if (tableName === "miniatures") {
         toInsert = toInsert.map((row) => ({
           ...row,
           storage_box_id: row.storage_box_id && validBoxIds.has(row.storage_box_id) ? row.storage_box_id : null,
+          faction_id: row.faction_id && validFactions.has(row.faction_id) ? row.faction_id : null,
+          base_id: row.base_id && validBases.has(row.base_id) ? row.base_id : null,
+          base_shape_id: row.base_shape_id && validBaseShapes.has(row.base_shape_id) ? row.base_shape_id : null,
+          base_type_id: row.base_type_id && validBaseTypes.has(row.base_type_id) ? row.base_type_id : null,
         }));
+        for (const r of toInsert) if (r.id) validMiniatureIds.add(r.id);
       } else if (tableName === "miniature_status") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
         const seen = new Set<string>();
         toInsert = toInsert.filter((row) => {
           if (!row.miniature_id || !validMiniatureIds.has(row.miniature_id)) {
@@ -618,55 +752,77 @@ export async function importDatabaseBackup(
           if (seen.has(row.miniature_id)) return false;
           seen.add(row.miniature_id);
           return true;
-        });
+        }).map((row) => ({
+          ...row,
+          status_id: row.status_id && validStatuses.has(row.status_id) ? row.status_id : null,
+        }));
       } else if (tableName === "miniature_photos") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
         toInsert = toInsert.filter((row) => row.miniature_id && validMiniatureIds.has(row.miniature_id));
-      } else if (tableName === "miniature_tags") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
-        const { data: dbTags } = await supabase.from("tags").select("id").eq("user_id", user.id);
-        const validTagIds = new Set((dbTags ?? []).map((t) => t.id));
-        toInsert = toInsert.filter(
-          (row) =>
-            row.miniature_id &&
-            validMiniatureIds.has(row.miniature_id) &&
-            row.tag_id &&
-            validTagIds.has(row.tag_id)
-        );
-      } else if (tableName === "miniature_recipes") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
-        const { data: dbRecipes } = await supabase.from("painting_recipes").select("id").eq("user_id", user.id);
-        const validRecipeIds = new Set((dbRecipes ?? []).map((r) => r.id));
-        toInsert = toInsert.filter(
-          (row) =>
-            row.miniature_id &&
-            validMiniatureIds.has(row.miniature_id) &&
-            row.recipe_id &&
-            validRecipeIds.has(row.recipe_id)
-        );
-      } else if (tableName === "miniature_games") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
-        toInsert = toInsert.filter((row) => row.miniature_id && validMiniatureIds.has(row.miniature_id));
+      } else if (tableName === "painting_recipes") {
+        toInsert = toInsert.map((row) => ({
+          ...row,
+          faction_id: row.faction_id && validFactions.has(row.faction_id) ? row.faction_id : null,
+        }));
+        for (const r of toInsert) if (r.id) validRecipeIds.add(r.id);
       } else if (tableName === "recipe_steps") {
-        const { data: dbRecipes } = await supabase.from("painting_recipes").select("id").eq("user_id", user.id);
-        const validRecipeIds = new Set((dbRecipes ?? []).map((r) => r.id));
-        toInsert = toInsert.filter((row) => row.recipe_id && validRecipeIds.has(row.recipe_id));
+        toInsert = toInsert.filter((row) => row.recipe_id && validRecipeIds.has(row.recipe_id)).map((row) => ({
+          ...row,
+          paint_id: row.paint_id && validPaints.has(row.paint_id) ? row.paint_id : null,
+        }));
+      } else if (tableName === "collections") {
+        for (const r of toInsert) if (r.id) validCollectionIds.add(r.id);
       } else if (tableName === "collection_miniatures") {
-        const { data: dbMiniatures } = await supabase.from("miniatures").select("id").eq("user_id", user.id);
-        const validMiniatureIds = new Set((dbMiniatures ?? []).map((m) => m.id));
-        const { data: dbCollections } = await supabase.from("collections").select("id").eq("user_id", user.id);
-        const validCollectionIds = new Set((dbCollections ?? []).map((c) => c.id));
+        const seen = new Set<string>();
         toInsert = toInsert.filter(
           (row) =>
             row.miniature_id &&
             validMiniatureIds.has(row.miniature_id) &&
             row.collection_id &&
-            validCollectionIds.has(row.collection_id)
+            validCollectionIds.has(row.collection_id) &&
+            !seen.has(`${row.collection_id}:${row.miniature_id}`) &&
+            seen.add(`${row.collection_id}:${row.miniature_id}`)
         );
+      } else if (tableName === "user_paints") {
+        toInsert = toInsert.filter((row) => row.paint_id && validPaints.has(row.paint_id));
+      } else if (tableName === "miniature_tags") {
+        const seen = new Set<string>();
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.tag_id &&
+            validTagIds.has(row.tag_id) &&
+            !seen.has(`${row.miniature_id}:${row.tag_id}`) &&
+            seen.add(`${row.miniature_id}:${row.tag_id}`)
+        );
+      } else if (tableName === "miniature_recipes") {
+        const seen = new Set<string>();
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.recipe_id &&
+            validRecipeIds.has(row.recipe_id) &&
+            !seen.has(`${row.miniature_id}:${row.recipe_id}`) &&
+            seen.add(`${row.miniature_id}:${row.recipe_id}`)
+        );
+      } else if (tableName === "miniature_games") {
+        const seen = new Set<string>();
+        toInsert = toInsert.filter(
+          (row) =>
+            row.miniature_id &&
+            validMiniatureIds.has(row.miniature_id) &&
+            row.game_id &&
+            validGames.has(row.game_id) &&
+            !seen.has(`${row.miniature_id}:${row.game_id}`) &&
+            seen.add(`${row.miniature_id}:${row.game_id}`)
+        ).map((row) => ({
+          ...row,
+          edition_id: row.edition_id && validEditions.has(row.edition_id) ? row.edition_id : null,
+          expansion_id: row.expansion_id && validExpansions.has(row.expansion_id) ? row.expansion_id : null,
+        }));
+      } else if (tableName === "shared_miniatures") {
+        toInsert = toInsert.filter((row) => row.miniature_id && validMiniatureIds.has(row.miniature_id));
       }
 
       if (toInsert.length === 0) continue;
