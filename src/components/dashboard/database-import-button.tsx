@@ -3,7 +3,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, AlertTriangle } from "lucide-react";
-import { importDatabaseBackupFromStoragePath } from "@/app/actions/backup";
+import {
+  importDatabaseBackupFromFile,
+  importDatabaseBackupFromStoragePath,
+} from "@/app/actions/backup";
 import { getPresignedUploadUrl } from "@/app/actions/photos";
 import { toast } from "sonner";
 import {
@@ -44,23 +47,32 @@ export function DatabaseImportButton() {
     setIsImporting(true);
 
     try {
-      // Upload ZIP to R2 via presigned URL first so the server action only receives a key (avoids 413 on Vercel)
-      const presignedRes = await getPresignedUploadUrl("import", pendingFile.name || "import.zip", "application/zip");
-      if (!presignedRes.success || !presignedRes.presignedUrl) {
-        throw new Error("Failed to generate upload URL");
+      let result;
+
+      // If file is under 4MB, send directly to server action (avoids R2 staging and browser CORS)
+      if (pendingFile.size <= 4 * 1024 * 1024) {
+        const formData = new FormData();
+        formData.append("file", pendingFile);
+        result = await importDatabaseBackupFromFile(formData);
+      } else {
+        // Upload ZIP to R2 via presigned URL first so the server action only receives a key (avoids 413 on Vercel)
+        const presignedRes = await getPresignedUploadUrl("import", pendingFile.name || "import.zip", "application/zip");
+        if (!presignedRes.success || !presignedRes.presignedUrl) {
+          throw new Error("Failed to generate upload URL");
+        }
+
+        const uploadRes = await fetch(presignedRes.presignedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/zip" },
+          body: pendingFile,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error(`Upload failed with status ${uploadRes.status}`);
+        }
+
+        result = await importDatabaseBackupFromStoragePath(presignedRes.key);
       }
-
-      const uploadRes = await fetch(presignedRes.presignedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "application/zip" },
-        body: pendingFile,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Upload failed with status ${uploadRes.status}`);
-      }
-
-      const result = await importDatabaseBackupFromStoragePath(presignedRes.key);
 
       if (!result.success) {
         throw new Error(result.error ?? result.photoErrors[0] ?? "Import failed");
