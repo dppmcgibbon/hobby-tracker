@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getPhotoImageUrl } from "@/lib/photos";
+import { getPhotoImageUrl, fetchPhotoBlob } from "@/lib/photos";
 
 interface MiniaturePhoto {
   id: string;
@@ -178,9 +178,7 @@ export function MiniaturePhotoDialog({
     setIsRemovingBg(true);
     try {
       const publicUrl = getR2PublicUrl(photo.storage_path);
-      const res = await fetch(publicUrl);
-      if (!res.ok) throw new Error("Failed to load image");
-      const blob = await res.blob();
+      const blob = await fetchPhotoBlob(publicUrl, photo.storage_path);
       const resultBlob = await removeBackgroundInBrowser(blob);
       const formData = new FormData();
       formData.append("file", resultBlob, "image.png");
@@ -213,6 +211,9 @@ export function MiniaturePhotoDialog({
             ? `${selectedMiniature.name} photo ${selectedPhotoIndex + 1}`
             : selectedMiniature.name}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          Miniature photo viewer and background removal
+        </DialogDescription>
         <TooltipProvider>
           <div className="relative">
             <div className="absolute top-2 right-2 z-10 flex gap-1">
@@ -340,6 +341,7 @@ export function MiniaturePhotoDialog({
                       sizes="(max-width: 1024px) 100vw, 896px"
                       className="object-contain"
                       loading="eager"
+                      crossOrigin="anonymous"
                       unoptimized
                       draggable={false}
                     />

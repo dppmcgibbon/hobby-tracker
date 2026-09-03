@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getR2PublicUrl } from "@/lib/r2";
@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getPhotoImageUrl } from "@/lib/photos";
+import { getPhotoImageUrl, fetchPhotoBlob } from "@/lib/photos";
 
 interface Photo {
   id: string;
@@ -137,9 +137,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
     setIsRemovingBg(true);
     try {
       const publicUrl = getR2PublicUrl(storagePath);
-      const res = await fetch(publicUrl);
-      if (!res.ok) throw new Error("Failed to load image");
-      const blob = await res.blob();
+      const blob = await fetchPhotoBlob(publicUrl, storagePath);
       const resultBlob = await removeBackgroundInBrowser(blob);
       const formData = new FormData();
       formData.append("file", resultBlob, "image.png");
@@ -166,9 +164,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
         const photo = photos[i];
         try {
           const publicUrl = getR2PublicUrl(photo.storage_path);
-          const res = await fetch(publicUrl);
-          if (!res.ok) continue;
-          const blob = await res.blob();
+          const blob = await fetchPhotoBlob(publicUrl, photo.storage_path);
           const resultBlob = await removeBackgroundInBrowser(blob);
           const formData = new FormData();
           formData.append("file", resultBlob, "image.png");
@@ -234,6 +230,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-cover"
                 loading="lazy"
+                crossOrigin="anonymous"
                 unoptimized={isLocalSupabase}
               />
             </button>
@@ -255,6 +252,9 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
             <DialogTitle className="sr-only">
               {photos[selectedIndex].caption || `${miniatureName} photo ${selectedIndex + 1}`}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Photo gallery viewer and background removal
+            </DialogDescription>
             <TooltipProvider>
               <div className="relative">
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -373,6 +373,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                     sizes="(max-width: 1024px) 100vw, 896px"
                     className="object-contain"
                     priority
+                    crossOrigin="anonymous"
                     unoptimized
                     draggable={false}
                   />
