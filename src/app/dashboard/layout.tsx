@@ -11,7 +11,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogoutButton } from "@/components/shared/logout-button";
-import { Home, Package, Palette, User, FolderOpen, Settings, Layers, Trophy, Shield } from "lucide-react";
+import {
+  Home,
+  Package,
+  Palette,
+  User,
+  FolderOpen,
+  Settings,
+  Layers,
+  Trophy,
+  Shield,
+  ChevronDown,
+  LayoutGrid,
+} from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -34,92 +46,103 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-background">
       {/* Header - Warhammer Gothic Style */}
       <header className="sticky top-0 z-50 w-full border-b-2 border-primary/30 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-lg shadow-black/50">
-        <div className="container flex h-16 items-center">
-          <div className="mr-8 flex">
+        <div className="container flex h-16 items-center justify-between gap-2">
+          <div className="mr-3 sm:mr-8 flex shrink-0">
             <Link href="/dashboard" className="flex items-center group">
-              <span className="font-black text-xl tracking-wider uppercase gold-glow text-primary">
+              <span className="font-black text-lg sm:text-xl tracking-wider uppercase gold-glow text-primary whitespace-nowrap">
                 Hobby Tracker
               </span>
             </Link>
           </div>
 
-          <nav className="flex items-center space-x-1 text-xs font-bold flex-1 uppercase tracking-wide">
+          <nav className="flex items-center space-x-1 text-xs font-bold flex-1 min-w-0 uppercase tracking-wide overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-1">
             <Link
               href="/dashboard"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
             >
               <Home className="h-4 w-4 inline-block mr-1.5" />
               Dashboard
             </Link>
             <Link
               href="/dashboard/miniatures"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
             >
               <Package className="h-4 w-4 inline-block mr-1.5" />
               Miniatures
             </Link>
-            <Link
-              href="/dashboard/legions"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Shield className="h-4 w-4 inline-block mr-1.5" />
-              Legions
-            </Link>
-            <Link
-              href="/dashboard/shortcuts"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Package className="h-4 w-4 inline-block mr-1.5" />
-              Shortcuts
-            </Link>
-            {isDaithi && (
-              <Link
-                href="/dashboard/collections"
-                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-              >
-                <FolderOpen className="h-4 w-4 inline-block mr-1.5" />
-                Collections
-              </Link>
-            )}
-            <Link
-              href="/dashboard/paints"
-              className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-            >
-              <Palette className="h-4 w-4 inline-block mr-1.5" />
-              Paints
-            </Link>
-            {isDaithi && (
-              <Link
-                href="/dashboard/collect-apps"
-                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-              >
-                <Layers className="h-4 w-4 inline-block mr-1.5" />
-                Collect
-              </Link>
-            )}
-            {isDaithi && (
-              <Link
-                href="/dashboard/game-progress"
-                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
-              >
-                <Trophy className="h-4 w-4 inline-block mr-1.5" />
-                Game progress
-              </Link>
-            )}
+
             {isDaithi && (
               <Link
                 href="/dashboard/admin"
-                className="px-3 py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30"
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
               >
                 <Settings className="h-4 w-4 inline-block mr-1.5" />
                 Admin
               </Link>
             )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center text-xs font-bold uppercase tracking-wide px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 outline-none cursor-pointer data-[state=open]:text-primary data-[state=open]:bg-primary/10 data-[state=open]:border-primary/30 whitespace-nowrap [&_svg:last-child]:transition-transform [&_svg:last-child]:duration-200 data-[state=open]:[&_svg:last-child]:rotate-180"
+                >
+                  <LayoutGrid className="h-4 w-4 inline-block mr-1.5" />
+                  <span>OTHER</span>
+                  <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-48 bg-card border-primary/30 shadow-lg shadow-black/50" align="end">
+                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <Link href="/dashboard/legions" className="flex items-center w-full">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Legions
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <Link href="/dashboard/shortcuts" className="flex items-center w-full">
+                    <Package className="mr-2 h-4 w-4" />
+                    Shortcuts
+                  </Link>
+                </DropdownMenuItem>
+                {isDaithi && (
+                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                    <Link href="/dashboard/collections" className="flex items-center w-full">
+                      <FolderOpen className="mr-2 h-4 w-4" />
+                      Collections
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <Link href="/dashboard/paints" className="flex items-center w-full">
+                    <Palette className="mr-2 h-4 w-4" />
+                    Paints
+                  </Link>
+                </DropdownMenuItem>
+                {isDaithi && (
+                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                    <Link href="/dashboard/collect-apps" className="flex items-center w-full">
+                      <Layers className="mr-2 h-4 w-4" />
+                      Collect
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {isDaithi && (
+                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                    <Link href="/dashboard/game-progress" className="flex items-center w-full">
+                      <Trophy className="mr-2 h-4 w-4" />
+                      Game Progress
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-sm border border-primary/20 hover:border-primary hover:bg-primary/10 transition-all">
+          <div className="flex items-center shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-sm border border-primary/20 hover:border-primary hover:bg-primary/10 transition-all">
                 <Avatar className="h-9 w-9 rounded-sm">
                   <AvatarFallback className="rounded-sm bg-gradient-to-br from-primary to-primary/70 text-black font-black">
                     {initials}
@@ -147,6 +170,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <LogoutButton />
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
         </div>
       </header>
 

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getPresignedUploadUrl, savePhotoRecord } from "@/app/actions/photos";
+import { getPresignedUploadUrl, savePhotoRecord, uploadMiniaturePhoto } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { Upload, X, Loader2 } from "lucide-react";
 
@@ -56,15 +56,15 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
     if (fileRejections.length > 0) {
       const rejection = fileRejections[0];
       const errors = rejection.errors;
-      
-      if (errors.some((e: any) => e.code === 'file-too-large')) {
-        setError('File is too large. Maximum size is 12MB.');
-      } else if (errors.some((e: any) => e.code === 'file-invalid-type')) {
-        setError('Invalid file type. Please upload a JPEG, PNG, or WebP image.');
-      } else if (errors.some((e: any) => e.code === 'too-many-files')) {
-        setError('Too many files. Please upload only one image at a time.');
+
+      if (errors.some((e: any) => e.code === "file-too-large")) {
+        setError("File is too large. Maximum size is 12MB.");
+      } else if (errors.some((e: any) => e.code === "file-invalid-type")) {
+        setError("Invalid file type. Please upload a JPEG, PNG, or WebP image.");
+      } else if (errors.some((e: any) => e.code === "too-many-files")) {
+        setError("Too many files. Please upload only one image at a time.");
       } else {
-        setError('File upload failed. Please try again.');
+        setError("File upload failed. Please try again.");
       }
     }
   }, []);
@@ -91,9 +91,13 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
       let fileToUpload: File = file;
       if (removeBackground) {
         const resultBlob = await removeBackgroundInBrowser(file);
-        fileToUpload = new File([resultBlob], file.name.replace(/\.[^.]+$/, ".png") || "image.png", {
-          type: "image/png",
-        });
+        fileToUpload = new File(
+          [resultBlob],
+          file.name.replace(/\.[^.]+$/, ".png") || "image.png",
+          {
+            type: "image/png",
+          }
+        );
       }
 
       // Step 1: Request presigned upload URL from Server Action
@@ -108,20 +112,60 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
       }
 
       // Step 2: Directly upload file to Cloudflare R2 via HTTP PUT
-      const uploadRes = await fetch(presignedRes.presignedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": fileToUpload.type || "image/jpeg",
-        },
-        body: fileToUpload,
-      });
+      let uploadedDirectly = false;
+      try {
+        const uploadRes = await fetch(presignedRes.presignedUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": fileToUpload.type || "image/jpeg",
+          },
+          body: fileToUpload,
+        });
 
-      if (!uploadRes.ok) {
-        throw new Error(`R2 upload failed with status ${uploadRes.status}`);
+        if (!uploadRes.ok) {
+          throw new Error(`R2 upload failed with status ${uploadRes.status}`);
+        }
+        uploadedDirectly = true;
+      } catch (uploadErr) {
+        // Fallback: If direct client-to-R2 upload fails (e.g. missing CORS configuration on Cloudflare R2)
+        // and the file is <= 4MB, attempt server-side upload action which bypasses browser CORS.
+        if (fileToUpload.size <= 4 * 1024 * 1024) {
+          try {
+            const formData = new FormData();
+            formData.append("file", fileToUpload);
+            if (caption) formData.append("caption", caption);
+            if (photoType) formData.append("photo_type", photoType);
+            await uploadMiniaturePhoto(miniatureId, formData);
+
+            setFile(null);
+            setPreview(null);
+            setCaption("");
+            setPhotoType("wip");
+            if (onSuccess) onSuccess();
+            router.refresh();
+            return;
+          } catch (fallbackErr) {
+            console.error("Server-side fallback upload failed:", fallbackErr);
+          }
+        }
+
+        const isNetworkOrCors =
+          uploadErr instanceof TypeError &&
+          (uploadErr.message.toLowerCase().includes("fetch") ||
+            uploadErr.message.toLowerCase().includes("failed"));
+
+        if (isNetworkOrCors) {
+          throw new Error(
+            "Upload blocked by Cloudflare R2 CORS. Please enable CORS on your R2 bucket in Cloudflare (see r2-cors.json)."
+          );
+        }
+        throw uploadErr;
       }
 
-      // Step 3: Save photo record to PostgreSQL database
-      await savePhotoRecord(miniatureId, presignedRes.key, caption, photoType);
+      if (uploadedDirectly) {
+        // Step 3: Save photo record to PostgreSQL database
+        await savePhotoRecord(miniatureId, presignedRes.key, caption, photoType);
+      }
 
       // Reset form
       setFile(null);
@@ -166,11 +210,19 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
           }`}
         >
           <input {...getInputProps()} />
-          <Upload className={`mx-auto text-muted-foreground ${compact ? "h-8 w-8" : "h-12 w-12"}`} />
+          <Upload
+            className={`mx-auto text-muted-foreground ${compact ? "h-8 w-8" : "h-12 w-12"}`}
+          />
           <p className={`text-muted-foreground ${compact ? "mt-1 text-xs" : "mt-2 text-sm"}`}>
-            {isDragActive ? "Drop the image here" : compact ? "Drop or click to upload" : "Drag & drop an image here, or click to select"}
+            {isDragActive
+              ? "Drop the image here"
+              : compact
+                ? "Drop or click to upload"
+                : "Drag & drop an image here, or click to select"}
           </p>
-          {!compact && <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 12MB)</p>}
+          {!compact && (
+            <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 12MB)</p>
+          )}
         </div>
       ) : (
         <div className={compact ? "space-y-2" : "space-y-4"}>
@@ -195,49 +247,54 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
           </div>
 
           {!compact && (
-          <div className="space-y-2">
-            <Label htmlFor="caption">Caption (optional)</Label>
-            <Input
-              id="caption"
-              placeholder="Add a caption..."
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              disabled={uploading}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="caption">Caption (optional)</Label>
+              <Input
+                id="caption"
+                placeholder="Add a caption..."
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                disabled={uploading}
+              />
+            </div>
           )}
 
           {!compact && (
-          <div className="space-y-2">
-            <Label htmlFor="photo_type">Photo Type</Label>
-            <Select value={photoType} onValueChange={setPhotoType} disabled={uploading}>
-              <SelectTrigger id="photo_type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="wip">Work in Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="detail">Detail Shot</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="photo_type">Photo Type</Label>
+              <Select value={photoType} onValueChange={setPhotoType} disabled={uploading}>
+                <SelectTrigger id="photo_type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wip">Work in Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="detail">Detail Shot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           {!compact && (
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remove_background"
-              checked={removeBackground}
-              onCheckedChange={(v) => setRemoveBackground(v === true)}
-              disabled={uploading}
-            />
-            <Label htmlFor="remove_background" className="text-sm font-normal cursor-pointer">
-              Remove background (runs in browser, no API key)
-            </Label>
-          </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remove_background"
+                checked={removeBackground}
+                onCheckedChange={(v) => setRemoveBackground(v === true)}
+                disabled={uploading}
+              />
+              <Label htmlFor="remove_background" className="text-sm font-normal cursor-pointer">
+                Remove background (runs in browser, no API key)
+              </Label>
+            </div>
           )}
 
-          <Button onClick={handleUpload} disabled={uploading} className="w-full" size={compact ? "sm" : "default"}>
+          <Button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="w-full"
+            size={compact ? "sm" : "default"}
+          >
             {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {uploading ? "Uploading..." : "Upload Photo"}
           </Button>
