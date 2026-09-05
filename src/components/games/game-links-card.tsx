@@ -3,26 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Globe,
-  ExternalLink,
-  Plus,
-  Edit2,
-  Trash2,
-  Loader2,
-  Link2,
-} from "lucide-react";
+import { Globe, ExternalLink, Plus, Edit2, Trash2, Loader2, Link2 } from "lucide-react";
 import { GameLinkDialog } from "@/components/games/game-link-dialog";
 import { deleteGameLink, type GameEntityType } from "@/app/actions/games";
-import type { GameInfoLink } from "@/lib/games/game-details";
+import { type GameInfoLink, isGameResourceLink } from "@/lib/games/game-details";
 
 interface GameLinksCardProps {
   entityType: GameEntityType;
@@ -30,15 +16,14 @@ interface GameLinksCardProps {
   links: GameInfoLink[];
 }
 
-export function GameLinksCard({
-  entityType,
-  entityId,
-  links,
-}: GameLinksCardProps) {
+export function GameLinksCard({ entityType, entityId, links }: GameLinksCardProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingLink, setEditingLink] = useState<GameInfoLink | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  // Filter out PDF documents and game images so they only appear in their dedicated tabs
+  const resourceLinks = links.filter(isGameResourceLink);
 
   const handleDelete = async (e: React.MouseEvent, linkId: string) => {
     e.preventDefault();
@@ -99,7 +84,7 @@ export function GameLinksCard({
         </CardHeader>
 
         <CardContent className="pt-4">
-          {links.length === 0 ? (
+          {resourceLinks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center border border-dashed border-primary/20 rounded-lg bg-neutral-950/40">
               <div className="p-3 rounded-full bg-primary/10 text-primary border border-primary/20 mb-3">
                 <Link2 className="h-6 w-6" />
@@ -128,7 +113,7 @@ export function GameLinksCard({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {links.map((link) => (
+              {resourceLinks.map((link) => (
                 <div
                   key={link.id || link.url}
                   className="relative p-3.5 rounded bg-muted/30 hover:bg-muted/70 border border-primary/20 hover:border-primary/50 transition-all group flex flex-col justify-between"

@@ -6,9 +6,9 @@ import { redirect } from "next/navigation";
 export default async function Home() {
   const user = await getUser();
 
-  // If already logged in, redirect to dashboard
+  // If already logged in, redirect to shortcuts
   if (user) {
-    redirect("/dashboard");
+    redirect("/dashboard/shortcuts");
   }
 
   return (

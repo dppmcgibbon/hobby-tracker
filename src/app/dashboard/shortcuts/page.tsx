@@ -37,10 +37,35 @@ export default async function ShortcutsPage() {
     return activeFilters.slice(0, 3).join(", ") + (activeFilters.length > 3 ? "..." : "");
   };
 
-  const buildFilterUrl = (filters: Record<string, string>) => {
+  const buildShortcutUrl = (filters: Record<string, string>) => {
+    const game = filters.gameId || filters.game;
+    const edition = filters.editionId || filters.edition;
+    const expansion = filters.expansionId || filters.expansion;
+    const universe = filters.universeId || filters.universe;
+
+    const hasGame = Boolean(game && game !== "all" && game !== "");
+    const hasEdition = Boolean(edition && edition !== "all" && edition !== "");
+    const hasExpansion = Boolean(expansion && expansion !== "all" && expansion !== "");
+
+    if (hasGame || hasEdition || hasExpansion) {
+      const params = new URLSearchParams();
+      if (universe && universe !== "all" && universe !== "") {
+        params.set("universe", universe);
+      }
+      if (hasGame) {
+        params.set("game", game);
+      }
+      if (hasEdition) {
+        params.set("edition", edition);
+      }
+      if (hasExpansion) {
+        params.set("expansion", expansion);
+      }
+      return `/dashboard/games/detail?${params.toString()}`;
+    }
+
+    // Fallback to miniatures if no game, edition, or expansion is specified
     const params = new URLSearchParams();
-    
-    // Map filter keys to URL parameter names
     const keyMap: Record<string, string> = {
       search: "search",
       factionId: "faction",
@@ -68,12 +93,12 @@ export default async function ShortcutsPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto">
       <div className="border-l-4 border-primary pl-4">
-        <h1 className="text-4xl font-black uppercase tracking-wider text-primary gold-glow">
+        <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow">
           Shortcuts
         </h1>
-        <p className="text-muted-foreground mt-2 text-base">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Quick access to your starred filter combinations
         </p>
       </div>
@@ -89,30 +114,30 @@ export default async function ShortcutsPage() {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 sm:gap-4">
           {starredFilters.map((filter) => (
             <Link
               key={filter.id}
-              href={buildFilterUrl(filter.filters)}
+              href={buildShortcutUrl(filter.filters)}
               className="group block"
               title={filter.name}
             >
               {filter.logo_url ? (
-                <div className="relative aspect-[16/9] bg-black rounded-sm border-2 border-primary/30 hover:border-primary/70 transition-all hover:shadow-gold flex items-center justify-center p-4">
+                <div className="relative aspect-[16/9] bg-black rounded-sm border-2 border-primary/30 hover:border-primary/70 transition-all hover:shadow-gold flex items-center justify-center p-2.5 sm:p-3">
                   <Image
                     src={filter.logo_url}
                     alt={filter.name}
-                    width={500}
-                    height={300}
+                    width={400}
+                    height={225}
                     unoptimized
                     className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
               ) : (
-                <div className="relative aspect-[16/9] bg-black rounded-sm border-2 border-primary/30 hover:border-primary/70 transition-all hover:shadow-gold flex items-center justify-center p-4">
+                <div className="relative aspect-[16/9] bg-black rounded-sm border-2 border-primary/30 hover:border-primary/70 transition-all hover:shadow-gold flex items-center justify-center p-2.5 sm:p-3">
                   <div className="text-center">
-                    <Star className="h-12 w-12 mx-auto text-primary fill-primary" />
-                    <p className="text-sm font-semibold text-primary mt-2">{filter.name}</p>
+                    <Star className="h-8 w-8 mx-auto text-primary fill-primary" />
+                    <p className="text-xs font-semibold text-primary mt-1.5 truncate">{filter.name}</p>
                   </div>
                 </div>
               )}

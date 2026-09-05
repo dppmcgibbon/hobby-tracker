@@ -15,15 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Upload,
-  X,
-  Loader2,
-  Trash2,
-  Image as ImageIcon,
-  Edit3,
-  BookOpen,
-} from "lucide-react";
+import { Upload, X, Loader2, Trash2, Image as ImageIcon, Edit3, BookOpen } from "lucide-react";
 import {
   getGameCoverUploadUrl,
   saveGameCover,
@@ -232,7 +224,7 @@ export function GameEditDialog({
             <Label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center justify-between">
               <span>Book / Box Cover Image</span>
               <span className="text-[10px] text-muted-foreground font-normal normal-case">
-                PNG, JPG, WebP up to 12MB • Stored in Cloudflare R2
+                PNG, JPG, WebP up to 12MB
               </span>
             </Label>
 
@@ -278,7 +270,7 @@ export function GameEditDialog({
                       Current Cover Artwork
                     </span>
                     <span className="text-[11px] text-muted-foreground block">
-                      Cloudflare R2 Storage
+                      Custom Cover Image
                     </span>
                   </div>
                 </div>
@@ -353,7 +345,8 @@ export function GameEditDialog({
               className="min-h-[160px] resize-y bg-neutral-950/60 border-primary/30 focus-visible:ring-primary text-sm leading-relaxed"
             />
             <p className="text-[11px] text-muted-foreground">
-              This text will be prominently displayed in the &quot;About The Game&quot; section on the detail page.
+              This text will be prominently displayed in the &quot;About The Game&quot; section on
+              the detail page.
             </p>
           </div>
         </div>

@@ -45,7 +45,7 @@ export default function LoginPage() {
     }
 
     // Full page redirect ensures newly set auth cookies are sent in HTTP headers to server
-    window.location.href = "/dashboard";
+    window.location.href = "/dashboard/shortcuts";
   };
 
   return (

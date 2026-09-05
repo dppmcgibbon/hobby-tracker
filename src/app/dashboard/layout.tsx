@@ -49,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="sticky top-0 z-50 w-full border-b-2 border-primary/30 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-lg shadow-black/50">
         <div className="container flex h-16 items-center justify-between gap-2">
           <div className="mr-3 sm:mr-8 flex shrink-0">
-            <Link href="/dashboard" className="flex items-center group">
+            <Link href="/dashboard/shortcuts" className="flex items-center group">
               <span className="font-black text-lg sm:text-xl tracking-wider uppercase gold-glow text-primary whitespace-nowrap">
                 Hobby Tracker
               </span>
@@ -58,11 +58,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <nav className="flex items-center space-x-1 text-xs font-bold flex-1 min-w-0 uppercase tracking-wide overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-1">
             <Link
-              href="/dashboard"
+              href="/dashboard/games"
               className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
             >
-              <Home className="h-4 w-4 inline-block mr-1.5" />
-              Dashboard
+              <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
+              Games
             </Link>
             <Link
               href="/dashboard/miniatures"
@@ -70,13 +70,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               <Package className="h-4 w-4 inline-block mr-1.5" />
               Miniatures
-            </Link>
-            <Link
-              href="/dashboard/games"
-              className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
-            >
-              <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
-              Games
             </Link>
 
             {isDaithi && (
@@ -104,6 +97,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 className="w-48 bg-card border-primary/30 shadow-lg shadow-black/50"
                 align="end"
               >
+                <DropdownMenuItem
+                  asChild
+                  className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                >
+                  <Link href="/dashboard" className="flex items-center w-full">
+                    <Home className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   asChild
                   className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"

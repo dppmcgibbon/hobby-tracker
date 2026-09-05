@@ -15,35 +15,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Globe, ExternalLink } from "lucide-react";
-import {
-  addGameLink,
-  updateGameLink,
-  type GameEntityType,
-} from "@/app/actions/games";
+import { addGameLink, updateGameLink, type GameEntityType } from "@/app/actions/games";
 import type { GameInfoLink } from "@/lib/games/game-details";
 
 interface GameLinkDialogProps {
   entityType: GameEntityType;
   entityId: string;
   initialLink?: GameInfoLink | null;
+  defaultCategory?: string;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-const CATEGORY_SUGGESTIONS = [
-  "Rules",
-  "Official",
-  "Wiki",
-  "Community",
-  "Video",
-  "Tools",
-];
+const CATEGORY_SUGGESTIONS = ["Rules", "Official", "Wiki", "Community", "Video", "Tools"];
 
 export function GameLinkDialog({
   entityType,
   entityId,
   initialLink,
+  defaultCategory,
   trigger,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
@@ -62,14 +53,14 @@ export function GameLinkDialog({
   const [title, setTitle] = useState(initialLink?.title || "");
   const [url, setUrl] = useState(initialLink?.url || "");
   const [description, setDescription] = useState(initialLink?.description || "");
-  const [category, setCategory] = useState(initialLink?.category || "");
+  const [category, setCategory] = useState(initialLink?.category || defaultCategory || "");
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
       setTitle(initialLink?.title || "");
       setUrl(initialLink?.url || "");
       setDescription(initialLink?.description || "");
-      setCategory(initialLink?.category || "");
+      setCategory(initialLink?.category || defaultCategory || "");
       setError(null);
     }
     setOpen(newOpen);
@@ -91,16 +82,18 @@ export function GameLinkDialog({
       return;
     }
 
-    // Ensure URL has protocol
-    if (!/^https?:\/\//i.test(cleanUrl)) {
+    // Ensure URL has protocol unless it is a relative path
+    if (!cleanUrl.startsWith("/") && !/^https?:\/\//i.test(cleanUrl)) {
       cleanUrl = `https://${cleanUrl}`;
     }
 
-    try {
-      new URL(cleanUrl);
-    } catch {
-      setError("Please enter a valid web address (e.g. https://wahapedia.ru).");
-      return;
+    if (!cleanUrl.startsWith("/")) {
+      try {
+        new URL(cleanUrl);
+      } catch {
+        setError("Please enter a valid web address (e.g. https://wahapedia.ru).");
+        return;
+      }
     }
 
     setSaving(true);
@@ -191,7 +184,8 @@ export function GameLinkDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="link-desc" className="text-xs font-bold uppercase tracking-wider">
-              Description <span className="text-muted-foreground text-[10px] normal-case">(Optional)</span>
+              Description{" "}
+              <span className="text-muted-foreground text-[10px] normal-case">(Optional)</span>
             </Label>
             <Input
               id="link-desc"
@@ -204,7 +198,8 @@ export function GameLinkDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="link-category" className="text-xs font-bold uppercase tracking-wider">
-              Category <span className="text-muted-foreground text-[10px] normal-case">(Optional)</span>
+              Category{" "}
+              <span className="text-muted-foreground text-[10px] normal-case">(Optional)</span>
             </Label>
             <Input
               id="link-category"

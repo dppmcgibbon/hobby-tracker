@@ -2,20 +2,22 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  ChevronRight,
-  ArrowLeft,
-  BookOpen,
-  Package,
-  Edit3,
-  Camera,
-} from "lucide-react";
+import { ChevronRight, BookOpen, Package, Edit3, Camera, FileText, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GameCover } from "@/components/games/game-cover";
-import { GameEditDialog } from "@/components/games/game-edit-dialog";
 import { GameLinksCard } from "@/components/games/game-links-card";
-import { getGameDetails, type GameInfoLink } from "@/lib/games/game-details";
+import { GamePdfsTab } from "@/components/games/game-pdfs-tab";
+import { GameImagesTab } from "@/components/games/game-images-tab";
+import { GameMiniaturesTab, type GameMiniatureItem } from "@/components/games/game-miniatures-tab";
+import { GameEditDialog } from "@/components/games/game-edit-dialog";
+import {
+  getGameDetails,
+  type GameInfoLink,
+  isGamePdfLink,
+  isGameResourceLink,
+} from "@/lib/games/game-details";
 import type { GameEntityType } from "@/app/actions/games";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,7 @@ interface GameDetailPageProps {
     game?: string;
     edition?: string;
     expansion?: string;
+    tab?: string;
   }>;
 }
 
@@ -37,9 +40,19 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
     game: gameId,
     edition: editionId,
     expansion: expansionId,
+    tab: tabParam,
   } = await searchParams;
 
-  if (!gameId && !editionId && !expansionId) {
+  const validTab =
+    tabParam && ["about", "pdfs", "images", "miniatures"].includes(tabParam) ? tabParam : "about";
+
+  const validExpansionId = expansionId && expansionId !== "all" ? expansionId : undefined;
+  const validEditionId = editionId && editionId !== "all" ? editionId : undefined;
+  const validGameId = gameId && gameId !== "all" ? gameId : undefined;
+  const validUniverseId =
+    universeIdParam && universeIdParam !== "all" ? universeIdParam : undefined;
+
+  if (!validGameId && !validEditionId && !validExpansionId) {
     notFound();
   }
 
@@ -49,16 +62,16 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   let game = null;
   let universe = null;
 
-  if (expansionId) {
+  if (validExpansionId) {
     const { data: expData } = await supabase
       .from("expansions")
       .select("id, name, sequence, year, description, edition_id, cover_image, links")
-      .eq("id", expansionId)
+      .eq("id", validExpansionId)
       .single();
     expansion = expData;
   }
 
-  const resolvedEditionId = editionId || expansion?.edition_id;
+  const resolvedEditionId = validEditionId || expansion?.edition_id;
   if (resolvedEditionId) {
     const { data: edData } = await supabase
       .from("editions")
@@ -68,7 +81,26 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
     edition = edData;
   }
 
-  const resolvedGameId = gameId || edition?.game_id;
+  // If no specific expansion was requested, but this edition has a sequence 1 Core Game
+  // expansion that holds content/rules, fall back to it
+  if (!expansion && resolvedEditionId) {
+    const { data: coreExp } = await supabase
+      .from("expansions")
+      .select("id, name, sequence, year, description, edition_id, cover_image, links")
+      .eq("edition_id", resolvedEditionId)
+      .eq("sequence", 1)
+      .maybeSingle();
+
+    if (
+      coreExp &&
+      (!edition?.links || (Array.isArray(edition.links) && edition.links.length === 0)) &&
+      !edition?.cover_image
+    ) {
+      expansion = coreExp;
+    }
+  }
+
+  const resolvedGameId = validGameId || edition?.game_id;
   if (resolvedGameId) {
     const { data: gameData } = await supabase
       .from("games")
@@ -82,7 +114,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
     notFound();
   }
 
-  const resolvedUniverseId = universeIdParam || game.universe_id;
+  const resolvedUniverseId = validUniverseId || game.universe_id;
   if (resolvedUniverseId) {
     const { data: uData } = await supabase
       .from("universes")
@@ -102,20 +134,22 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
       ? "edition"
       : "game";
 
-  const targetEntityId: string = isExpansion
-    ? expansion!.id
-    : isEdition
-      ? edition!.id
-      : game.id;
+  const targetEntityId: string = isExpansion ? expansion!.id : isEdition ? edition!.id : game.id;
+
+  const isCoreExpansion = expansion?.name?.toLowerCase() === "core game";
 
   const displayTitle = expansion
-    ? expansion.name
+    ? isCoreExpansion
+      ? `${game.name}: ${edition?.name || expansion.name}`
+      : expansion.name
     : isEdition
       ? `${game.name}: ${edition?.name}`
       : game.name;
 
   const itemSubtitle = expansion
-    ? `${game.name} • ${edition?.name || ""} Expansion`
+    ? isCoreExpansion
+      ? `${game.name} • ${edition?.name || ""} Core Game`
+      : `${game.name} • ${edition?.name || ""} Expansion`
     : isEdition
       ? `${game.name} Edition`
       : "Core Game System";
@@ -129,11 +163,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
 
   const rawDescription = expansion?.description || edition?.description || game.description;
 
-  const rawLinks = expansion
-    ? expansion.links
-    : isEdition
-      ? edition?.links
-      : game.links;
+  const rawLinks = expansion ? expansion.links : isEdition ? edition?.links : game.links;
 
   const targetLinks: GameInfoLink[] = Array.isArray(rawLinks)
     ? (rawLinks as unknown as GameInfoLink[])
@@ -141,19 +171,17 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
 
   const metadata = getGameDetails(expansion?.name || game.name, rawDescription, targetLinks);
 
-  // Compute back link destination
-  let backHref = "/dashboard/games";
-  let backLabel = "Back to Universes";
-  if (expansion) {
-    backHref = `/dashboard/games?universe=${resolvedUniverseId || ""}&game=${game.id}&edition=${edition?.id || ""}`;
-    backLabel = `Back to ${edition?.name || "Editions"}`;
-  } else if (isEdition) {
-    backHref = `/dashboard/games?universe=${resolvedUniverseId || ""}&game=${game.id}`;
-    backLabel = `Back to ${game.name}`;
-  } else if (resolvedUniverseId) {
-    backHref = `/dashboard/games?universe=${resolvedUniverseId}`;
-    backLabel = `Back to ${universe?.name || "Games"}`;
-  }
+  // Separate PDF documents from general resource links
+  const pdfLinks = metadata.links.filter(isGamePdfLink);
+  const resourceLinks = metadata.links.filter(isGameResourceLink);
+
+  const sortedPdfLinks = [...pdfLinks].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true })
+  );
+
+  const firstPdf = sortedPdfLinks[0];
+  const firstPdfUrl = firstPdf?.url || null;
+  const firstPdfTitle = firstPdf?.title || null;
 
   // URL for filtering miniatures of this game/edition/expansion
   const miniatureFilterParams = new URLSearchParams();
@@ -163,8 +191,75 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   if (expansion) miniatureFilterParams.set("expansion", expansion.id);
   const miniatureFilterUrl = `/dashboard/miniatures?${miniatureFilterParams.toString()}`;
 
+  // Fetch miniatures associated with this game/edition/expansion
+  let gameMiniaturesQuery = supabase
+    .from("miniature_games")
+    .select("miniature_id")
+    .eq("game_id", game.id);
+
+  if (expansion) {
+    gameMiniaturesQuery = gameMiniaturesQuery.eq("expansion_id", expansion.id);
+  } else if (edition) {
+    gameMiniaturesQuery = gameMiniaturesQuery.eq("edition_id", edition.id);
+  }
+
+  const { data: linkedRows } = await gameMiniaturesQuery;
+  const linkedMiniatureIds = Array.from(
+    new Set((linkedRows || []).map((r) => r.miniature_id).filter(Boolean))
+  );
+
+  let gameMiniatures: GameMiniatureItem[] = [];
+  if (linkedMiniatureIds.length > 0) {
+    const { data: minData } = await supabase
+      .from("miniatures")
+      .select(
+        `
+        id,
+        name,
+        quantity,
+        created_at,
+        unit_type,
+        factions (id, name),
+        miniature_status (status, completed_at, based, magnetised),
+        miniature_photos (id, storage_path, image_updated_at),
+        storage_boxes (id, name, location)
+      `
+      )
+      .in("id", linkedMiniatureIds)
+      .order("name");
+
+    gameMiniatures = (minData || []).map((m) => {
+      const faction = Array.isArray(m.factions) ? m.factions[0] : m.factions;
+      const status = Array.isArray(m.miniature_status) ? m.miniature_status[0] : m.miniature_status;
+      const storageBox = Array.isArray(m.storage_boxes) ? m.storage_boxes[0] : m.storage_boxes;
+      return {
+        id: m.id,
+        name: m.name,
+        quantity: m.quantity,
+        created_at: m.created_at,
+        unit_type: m.unit_type,
+        factions: (faction || null) as { name: string } | null,
+        miniature_status: (status || null) as {
+          status: string;
+          completed_at?: string | null;
+          based?: boolean | null;
+          magnetised?: boolean | null;
+        } | null,
+        miniature_photos: (m.miniature_photos || []) as {
+          storage_path: string;
+          image_updated_at?: string | null;
+        }[],
+        storage_box: (storageBox || null) as {
+          id: string;
+          name: string;
+          location?: string | null;
+        } | null,
+      };
+    });
+  }
+
   return (
-    <div className="space-y-6 w-full max-w-6xl mx-auto">
+    <Tabs defaultValue={validTab} className="space-y-6 w-full max-w-6xl mx-auto">
       {/* Breadcrumb Navigation */}
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
         <Link href="/dashboard/games" className="hover:text-primary transition-colors">
@@ -225,31 +320,36 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          {/* Edit Details Dialog Button */}
-          <GameEditDialog
-            entityType={targetEntityType}
-            entityId={targetEntityId}
-            title={displayTitle}
-            currentCoverImage={targetCoverImage}
-            currentDescription={rawDescription}
-            trigger={
-              <Button
-                variant="outline"
-                className="border-primary/40 hover:border-primary hover:bg-primary/10 text-xs font-bold uppercase tracking-wider px-3.5 py-2 h-auto text-primary"
-              >
-                <Edit3 className="h-4 w-4 mr-1.5" />
-                Edit Details
-              </Button>
-            }
-          />
-
-          <Link
-            href={backHref}
-            className="text-xs uppercase font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 px-3 py-2 rounded border border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {backLabel}
-          </Link>
+          <TabsList className="bg-card/80 border border-primary/30 p-1 h-9">
+            <TabsTrigger
+              value="about"
+              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+            >
+              <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+              Info
+            </TabsTrigger>
+            <TabsTrigger
+              value="pdfs"
+              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
+              PDFs
+            </TabsTrigger>
+            <TabsTrigger
+              value="images"
+              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+            >
+              <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+              Images
+            </TabsTrigger>
+            <TabsTrigger
+              value="miniatures"
+              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+            >
+              <Package className="h-3.5 w-3.5 mr-1.5" />
+              Miniatures
+            </TabsTrigger>
+          </TabsList>
         </div>
       </div>
 
@@ -265,6 +365,8 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
             coverImage={targetCoverImage}
             coverType={metadata.coverType}
             year={displayYear}
+            pdfCoverUrl={firstPdfUrl}
+            pdfCoverTitle={firstPdfTitle}
           />
 
           <div className="mt-5 w-full max-w-[340px] space-y-2">
@@ -285,70 +387,86 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
                 </Button>
               }
             />
-
-            <Button
-              asChild
-              variant="outline"
-              className="w-full border-primary/20 hover:border-primary hover:bg-primary/10 font-bold uppercase text-xs tracking-wider"
-            >
-              <Link href={miniatureFilterUrl}>
-                <Package className="h-4 w-4 mr-2 text-primary" />
-                View Miniatures
-              </Link>
-            </Button>
           </div>
         </div>
 
         {/* Right Column: Game Information, Text & Links */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="lg:col-span-8">
+          <TabsContent value="about" className="space-y-6 mt-0">
+            {/* About The Game Text */}
+            <Card className="warhammer-card border-primary/30">
+              <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    About The Game
+                  </CardTitle>
+                  <CardDescription className="text-xs uppercase tracking-wide mt-1">
+                    Background lore and game overview
+                  </CardDescription>
+                </div>
 
-          {/* About The Game Text */}
-          <Card className="warhammer-card border-primary/30">
-            <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  About The Game
-                </CardTitle>
-                <CardDescription className="text-xs uppercase tracking-wide mt-1">
-                  Background lore and game overview
-                </CardDescription>
-              </div>
+                {/* Edit text quick button */}
+                <GameEditDialog
+                  entityType={targetEntityType}
+                  entityId={targetEntityId}
+                  title={displayTitle}
+                  currentCoverImage={targetCoverImage}
+                  currentDescription={rawDescription}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 mr-1 text-primary" />
+                      Edit
+                    </Button>
+                  }
+                />
+              </CardHeader>
+              <CardContent className="pt-4">
+                <p className="text-base text-foreground/90 leading-relaxed whitespace-pre-line">
+                  {metadata.description}
+                </p>
+              </CardContent>
+            </Card>
 
-              {/* Edit text quick button */}
-              <GameEditDialog
-                entityType={targetEntityType}
-                entityId={targetEntityId}
-                title={displayTitle}
-                currentCoverImage={targetCoverImage}
-                currentDescription={rawDescription}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary"
-                  >
-                    <Edit3 className="h-3.5 w-3.5 mr-1 text-primary" />
-                    Edit
-                  </Button>
-                }
-              />
-            </CardHeader>
-            <CardContent className="pt-4">
-              <p className="text-base text-foreground/90 leading-relaxed whitespace-pre-line">
-                {metadata.description}
-              </p>
-            </CardContent>
-          </Card>
+            {/* Info & Resources Links Section - User Editable & Deletable */}
+            <GameLinksCard
+              entityType={targetEntityType}
+              entityId={targetEntityId}
+              links={resourceLinks}
+            />
+          </TabsContent>
 
-          {/* Info & Resources Links Section - User Editable & Deletable */}
-          <GameLinksCard
-            entityType={targetEntityType}
-            entityId={targetEntityId}
-            links={metadata.links}
-          />
+          <TabsContent value="pdfs" className="mt-0">
+            <GamePdfsTab
+              entityType={targetEntityType}
+              entityId={targetEntityId}
+              links={metadata.links}
+              gameTitle={displayTitle}
+            />
+          </TabsContent>
+
+          <TabsContent value="images" className="mt-0">
+            <GameImagesTab
+              entityType={targetEntityType}
+              entityId={targetEntityId}
+              links={metadata.links}
+              gameTitle={displayTitle}
+            />
+          </TabsContent>
+
+          <TabsContent value="miniatures" className="mt-0">
+            <GameMiniaturesTab
+              miniatures={gameMiniatures}
+              gameTitle={displayTitle}
+              miniaturesFilterUrl={miniatureFilterUrl}
+            />
+          </TabsContent>
         </div>
       </div>
-    </div>
+    </Tabs>
   );
 }

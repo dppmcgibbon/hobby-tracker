@@ -54,7 +54,7 @@ export default function SignupPage() {
     if (authData.user) {
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = "/dashboard";
+        window.location.href = "/dashboard/shortcuts";
       }, 2000);
     }
   };

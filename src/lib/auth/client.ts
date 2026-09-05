@@ -4,7 +4,7 @@ export async function signUp(email: string, password: string, displayName?: stri
   const supabase = createClient();
   const redirectTo =
     typeof window !== "undefined"
-      ? `${window.location.origin}/dashboard`
+      ? `${window.location.origin}/dashboard/shortcuts`
       : undefined;
   const { data, error } = await supabase.auth.signUp({
     email,

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Gamepad2, BookOpen, Package, Skull } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Gamepad2, BookOpen, Package, Skull, Loader2 } from "lucide-react";
 import { getR2PublicUrl } from "@/lib/r2";
+import { getPdfFirstPageDataUrl } from "@/lib/utils/pdf-thumbnail";
 
 interface GameCoverProps {
   title: string;
@@ -12,6 +13,8 @@ interface GameCoverProps {
   coverImage?: string | null;
   coverType?: "box" | "book";
   year?: number | null;
+  pdfCoverUrl?: string | null;
+  pdfCoverTitle?: string | null;
 }
 
 export function GameCover({
@@ -22,8 +25,41 @@ export function GameCover({
   coverImage,
   coverType = "box",
   year,
+  pdfCoverUrl,
+  pdfCoverTitle,
 }: GameCoverProps) {
   const [imageError, setImageError] = useState(false);
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+  const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null);
+  const [failedPdfUrl, setFailedPdfUrl] = useState<string | null>(null);
+
+  const pdfError = Boolean(pdfCoverUrl && failedPdfUrl === pdfCoverUrl);
+  const pdfLoading = Boolean(pdfCoverUrl && loadedPdfUrl !== pdfCoverUrl && !pdfError);
+  const effectivePdfDataUrl = pdfCoverUrl && loadedPdfUrl === pdfCoverUrl ? pdfDataUrl : null;
+  const hasPdfCover = Boolean(pdfCoverUrl && !pdfError);
+
+  useEffect(() => {
+    if (!pdfCoverUrl) return;
+
+    let active = true;
+    getPdfFirstPageDataUrl(pdfCoverUrl)
+      .then((dataUrl) => {
+        if (active) {
+          setPdfDataUrl(dataUrl);
+          setLoadedPdfUrl(pdfCoverUrl);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to extract PDF first page cover:", err);
+        if (active) {
+          setFailedPdfUrl(pdfCoverUrl);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [pdfCoverUrl]);
 
   const isBook = coverType === "book";
   const resolvedCoverUrl = coverImage ? getR2PublicUrl(coverImage) : coverUrl;
@@ -48,7 +84,28 @@ export function GameCover({
         {/* Inner Gold Foil Frame */}
         <div className="absolute inset-3 border border-primary/20 pointer-events-none z-20" />
 
-        {resolvedCoverUrl && !imageError ? (
+        {hasPdfCover && pdfLoading ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-neutral-950/90">
+            <div className="p-3 rounded-full bg-primary/15 border border-primary/40 animate-pulse mb-3">
+              <Loader2 className="h-7 w-7 text-primary animate-spin" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary gold-glow">
+              Loading PDF Cover...
+            </p>
+            {pdfCoverTitle && (
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide truncate max-w-[200px] mt-1">
+                {pdfCoverTitle} (Page 1)
+              </p>
+            )}
+          </div>
+        ) : hasPdfCover && effectivePdfDataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={effectivePdfDataUrl}
+            alt={title}
+            className="absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300"
+          />
+        ) : resolvedCoverUrl && !imageError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={resolvedCoverUrl}

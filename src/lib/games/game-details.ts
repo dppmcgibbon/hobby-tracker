@@ -4,6 +4,12 @@ export interface GameInfoLink {
   url: string;
   description?: string | null;
   category?: string | null;
+  r2_key?: string | null;
+  file_size?: number | null;
+  storage_path?: string | null;
+  caption?: string | null;
+  uploaded_at?: string | null;
+  image_updated_at?: string | null;
 }
 
 export interface GameMetadata {
@@ -11,6 +17,45 @@ export interface GameMetadata {
   coverType?: "box" | "book";
   description: string;
   links: GameInfoLink[];
+}
+
+/**
+ * Helper to identify whether a game link represents an uploaded image.
+ */
+export function isGameImageLink(link: GameInfoLink): boolean {
+  const cat = link.category?.toLowerCase();
+  const url = link.url?.toLowerCase() || "";
+  const storagePath = (link.storage_path || link.r2_key || "").toLowerCase();
+  return (
+    cat === "image" ||
+    storagePath.includes("/images/") ||
+    url.includes("/images/") ||
+    /\.(jpe?g|png|webp|gif|svg)(\?.*)?$/i.test(url)
+  );
+}
+
+/**
+ * Helper to identify whether a game link represents an uploaded or linked PDF document.
+ */
+export function isGamePdfLink(link: GameInfoLink): boolean {
+  if (isGameImageLink(link)) return false;
+  const cat = link.category?.toLowerCase();
+  const url = link.url?.toLowerCase() || "";
+  const storagePath = (link.storage_path || link.r2_key || "").toLowerCase();
+  return (
+    cat === "pdf" ||
+    storagePath.includes("/pdfs/") ||
+    url.endsWith(".pdf") ||
+    url.includes(".pdf?") ||
+    url.includes("/pdfs/")
+  );
+}
+
+/**
+ * Helper to identify whether a game link represents a general resource link.
+ */
+export function isGameResourceLink(link: GameInfoLink): boolean {
+  return !isGamePdfLink(link) && !isGameImageLink(link);
 }
 
 // Curated lore and cover metadata for known games, editions, and expansions

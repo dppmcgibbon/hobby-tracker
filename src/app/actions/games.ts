@@ -165,13 +165,15 @@ export async function updateExpansion(id: string, data: ExpansionInput) {
     .from("expansions")
     .update(validated)
     .eq("id", id)
-    .select(`
+    .select(
+      `
       *,
       edition:editions!inner(
         id,
         game_id
       )
-    `)
+    `
+    )
     .single();
 
   if (error) {
@@ -403,10 +405,7 @@ export async function saveGameCover(
 /**
  * Removes the cover image from the database and cleans up R2 storage.
  */
-export async function removeGameCover(
-  entityType: GameEntityType,
-  entityId: string
-) {
+export async function removeGameCover(entityType: GameEntityType, entityId: string) {
   await requireAuth();
   const supabase = await createClient();
   const tableName = getTableName(entityType);
@@ -417,10 +416,7 @@ export async function removeGameCover(
     .eq("id", entityId)
     .single();
 
-  const { error } = await supabase
-    .from(tableName)
-    .update({ cover_image: null })
-    .eq("id", entityId);
+  const { error } = await supabase.from(tableName).update({ cover_image: null }).eq("id", entityId);
 
   if (error) {
     throw new Error(error.message);
@@ -500,10 +496,7 @@ export async function uploadGameCoverServerSide(
 
   const { publicUrl } = await uploadR2Object(key, buffer, file.type);
 
-  const { error } = await supabase
-    .from(tableName)
-    .update({ cover_image: key })
-    .eq("id", entityId);
+  const { error } = await supabase.from(tableName).update({ cover_image: key }).eq("id", entityId);
 
   if (error) {
     await deleteR2Object(key);
@@ -542,7 +535,9 @@ export async function addGameLink(
     throw new Error(fetchError.message);
   }
 
-  const existingLinks = Array.isArray(current?.links) ? (current.links as Array<Record<string, unknown>>) : [];
+  const existingLinks = Array.isArray(current?.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
   const newLink = {
     id: crypto.randomUUID(),
     title: link.title.trim(),
@@ -586,7 +581,9 @@ export async function updateGameLink(
     throw new Error(fetchError.message);
   }
 
-  const existingLinks = Array.isArray(current?.links) ? (current.links as Array<Record<string, unknown>>) : [];
+  const existingLinks = Array.isArray(current?.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
   const updatedLinks = existingLinks.map((item) =>
     item.id === linkId
       ? {
@@ -612,10 +609,86 @@ export async function updateGameLink(
   return { success: true };
 }
 
-export async function deleteGameLink(
+export async function deleteGameLink(entityType: GameEntityType, entityId: string, linkId: string) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+
+  const existingLinks = Array.isArray(current?.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+  const targetLink = existingLinks.find((item) => item.id === linkId);
+  const updatedLinks = existingLinks.filter((item) => item.id !== linkId);
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  // Clean up R2 object if this was an uploaded PDF
+  if (targetLink) {
+    const r2Key =
+      (targetLink.r2_key as string) ||
+      (typeof targetLink.url === "string" && targetLink.url.includes("/games/")
+        ? targetLink.url
+        : null);
+    if (r2Key) {
+      try {
+        await deleteR2Object(r2Key);
+      } catch (delErr) {
+        console.warn("Failed to delete R2 PDF object:", delErr);
+      }
+    }
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Generates a presigned Cloudflare R2 upload URL for a PDF document.
+ */
+export async function getGamePdfUploadUrl(
   entityType: GameEntityType,
   entityId: string,
-  linkId: string
+  filename: string,
+  contentType = "application/pdf"
+) {
+  await requireAuth();
+  const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const key = `games/${entityType}/${entityId}/pdfs/${timestamp}-${cleanFilename}`;
+
+  const result = await generatePresignedUploadUrl(key, contentType);
+  return { success: true, ...result };
+}
+
+/**
+ * Saves an uploaded PDF document record to the game/edition/expansion links list.
+ */
+export async function saveGamePdf(
+  entityType: GameEntityType,
+  entityId: string,
+  input: {
+    title: string;
+    r2Key: string;
+    fileSize?: number | null;
+    description?: string | null;
+  }
 ) {
   await requireAuth();
   const supabase = await createClient();
@@ -631,8 +704,22 @@ export async function deleteGameLink(
     throw new Error(fetchError.message);
   }
 
-  const existingLinks = Array.isArray(current?.links) ? (current.links as Array<Record<string, unknown>>) : [];
-  const updatedLinks = existingLinks.filter((item) => item.id !== linkId);
+  const existingLinks = Array.isArray(current?.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+  const publicUrl = getR2PublicUrl(input.r2Key);
+
+  const newPdfLink = {
+    id: crypto.randomUUID(),
+    title: input.title.trim(),
+    url: publicUrl,
+    r2_key: input.r2Key,
+    category: "PDF",
+    description: input.description?.trim() || null,
+    file_size: input.fileSize || null,
+  };
+
+  const updatedLinks = [...existingLinks, newPdfLink];
 
   const { error: updateError } = await supabase
     .from(tableName)
@@ -644,7 +731,271 @@ export async function deleteGameLink(
   }
 
   revalidateGamePaths();
-  return { success: true };
+  return { success: true, link: newPdfLink };
 }
 
+/**
+ * Server-side fallback for uploading a PDF directly to Cloudflare R2 and saving it.
+ */
+export async function uploadGamePdfServerSide(
+  entityType: GameEntityType,
+  entityId: string,
+  formData: FormData
+) {
+  await requireAuth();
+  const file = formData.get("file") as File | null;
+  const title = (formData.get("title") as string | null) || file?.name || "Document";
+  const description = (formData.get("description") as string | null) || null;
 
+  if (!file) {
+    throw new Error("No PDF file provided.");
+  }
+
+  const cleanFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const key = `games/${entityType}/${entityId}/pdfs/${timestamp}-${cleanFilename}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const { key: r2Key } = await uploadR2Object(key, buffer, file.type || "application/pdf");
+
+  return await saveGamePdf(entityType, entityId, {
+    title,
+    r2Key,
+    fileSize: file.size,
+    description,
+  });
+}
+
+/**
+ * Generates a presigned Cloudflare R2 upload URL for a game/edition/expansion image.
+ */
+export async function getGameImageUploadUrl(
+  entityType: GameEntityType,
+  entityId: string,
+  filename: string,
+  contentType = "image/jpeg"
+) {
+  await requireAuth();
+  const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const key = `games/${entityType}/${entityId}/images/${timestamp}-${cleanFilename}`;
+
+  const result = await generatePresignedUploadUrl(key, contentType);
+  return { success: true, ...result };
+}
+
+/**
+ * Saves an uploaded image record to the game/edition/expansion links list.
+ */
+export async function saveGameImageRecord(
+  entityType: GameEntityType,
+  entityId: string,
+  input: {
+    storagePath: string;
+    caption?: string | null;
+  }
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+
+  const existingLinks = Array.isArray(current?.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+  const publicUrl = getR2PublicUrl(input.storagePath);
+
+  const newImage = {
+    id: crypto.randomUUID(),
+    title: input.caption?.trim() || "Game Photo",
+    url: publicUrl,
+    storage_path: input.storagePath,
+    r2_key: input.storagePath,
+    category: "IMAGE",
+    caption: input.caption?.trim() || null,
+    uploaded_at: new Date().toISOString(),
+    image_updated_at: null,
+  };
+
+  const updatedLinks = [...existingLinks, newImage];
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true, image: newImage };
+}
+
+/**
+ * Fallback server-side upload for a game image.
+ */
+export async function uploadGameImageServerSide(
+  entityType: GameEntityType,
+  entityId: string,
+  formData: FormData
+) {
+  await requireAuth();
+  const file = formData.get("file") as File | null;
+  const caption = (formData.get("caption") as string | null) || null;
+
+  if (!file) {
+    throw new Error("No image file provided.");
+  }
+
+  const cleanFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const key = `games/${entityType}/${entityId}/images/${timestamp}-${cleanFilename}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const { key: storagePath } = await uploadR2Object(key, buffer, file.type || "image/jpeg");
+
+  return await saveGameImageRecord(entityType, entityId, {
+    storagePath,
+    caption,
+  });
+}
+
+/**
+ * Replaces a game image in R2 with a new file (e.g. after background removal).
+ */
+export async function replaceGameImageWithImage(
+  entityType: GameEntityType,
+  entityId: string,
+  imageId: string,
+  formData: FormData
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requireAuth();
+    const supabase = await createClient();
+    const tableName = getTableName(entityType);
+
+    const file = formData.get("file") as File;
+    if (!file) {
+      return { success: false, error: "No file provided" };
+    }
+
+    const { data: current, error: fetchError } = await supabase
+      .from(tableName)
+      .select("links")
+      .eq("id", entityId)
+      .single();
+
+    if (fetchError || !current) {
+      return { success: false, error: "Game record not found" };
+    }
+
+    const existingLinks = Array.isArray(current.links)
+      ? (current.links as Array<Record<string, unknown>>)
+      : [];
+    const targetImage = existingLinks.find((item) => item.id === imageId);
+
+    if (!targetImage) {
+      return { success: false, error: "Image not found" };
+    }
+
+    const storagePath = (targetImage.storage_path as string) || (targetImage.r2_key as string);
+    if (!storagePath) {
+      return { success: false, error: "Image storage path not found" };
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    await uploadR2Object(storagePath, buffer, file.type || "image/png");
+
+    const now = new Date().toISOString();
+    const updatedLinks = existingLinks.map((item) => {
+      if (item.id === imageId) {
+        return {
+          ...item,
+          image_updated_at: now,
+        };
+      }
+      return item;
+    });
+
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({ links: updatedLinks })
+      .eq("id", entityId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    revalidateGamePaths();
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to replace image";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Deletes a game image and removes it from R2 storage.
+ */
+export async function deleteGameImage(
+  entityType: GameEntityType,
+  entityId: string,
+  imageId: string
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+  const targetImage = existingLinks.find((item) => item.id === imageId);
+  const updatedLinks = existingLinks.filter((item) => item.id !== imageId);
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const storagePath = (targetImage?.storage_path as string) || (targetImage?.r2_key as string);
+  if (storagePath) {
+    try {
+      await deleteR2Object(storagePath);
+    } catch (err) {
+      console.warn("Failed to delete image from R2:", err);
+    }
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
