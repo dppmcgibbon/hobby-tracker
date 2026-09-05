@@ -14,27 +14,11 @@ import { DeleteEditionButton } from "@/components/games/delete-edition-button";
 import { DeleteExpansionButton } from "@/components/games/delete-expansion-button";
 import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import type { Edition, Expansion } from "@/types";
 
-interface EditionWithExpansions {
-  id: string;
-  game_id: string;
-  name: string;
-  sequence: number;
-  year: number | null;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-  expansions?: Array<{
-    id: string;
-    edition_id: string;
-    name: string;
-    sequence: number;
-    year: number | null;
-    description: string | null;
-    created_at: string;
-    updated_at: string;
-  }>;
-}
+type EditionWithExpansions = Edition & {
+  expansions?: Expansion[];
+};
 
 async function GameDetailsContent({ id, universes }: { id: string; universes: { id: string; name: string }[] }) {
   const supabase = await createClient();

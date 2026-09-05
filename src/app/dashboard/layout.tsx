@@ -14,6 +14,7 @@ import { LogoutButton } from "@/components/shared/logout-button";
 import {
   Home,
   Package,
+  Gamepad2,
   Palette,
   User,
   FolderOpen,
@@ -70,6 +71,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Package className="h-4 w-4 inline-block mr-1.5" />
               Miniatures
             </Link>
+            <Link
+              href="/dashboard/games"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
+            >
+              <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
+              Games
+            </Link>
 
             {isDaithi && (
               <Link
@@ -92,35 +100,53 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-70" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-48 bg-card border-primary/30 shadow-lg shadow-black/50" align="end">
-                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+              <DropdownMenuContent
+                className="w-48 bg-card border-primary/30 shadow-lg shadow-black/50"
+                align="end"
+              >
+                <DropdownMenuItem
+                  asChild
+                  className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                >
                   <Link href="/dashboard/legions" className="flex items-center w-full">
                     <Shield className="mr-2 h-4 w-4" />
                     Legions
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                <DropdownMenuItem
+                  asChild
+                  className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                >
                   <Link href="/dashboard/shortcuts" className="flex items-center w-full">
                     <Package className="mr-2 h-4 w-4" />
                     Shortcuts
                   </Link>
                 </DropdownMenuItem>
                 {isDaithi && (
-                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <DropdownMenuItem
+                    asChild
+                    className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                  >
                     <Link href="/dashboard/collections" className="flex items-center w-full">
                       <FolderOpen className="mr-2 h-4 w-4" />
                       Collections
                     </Link>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                <DropdownMenuItem
+                  asChild
+                  className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                >
                   <Link href="/dashboard/paints" className="flex items-center w-full">
                     <Palette className="mr-2 h-4 w-4" />
                     Paints
                   </Link>
                 </DropdownMenuItem>
                 {isDaithi && (
-                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <DropdownMenuItem
+                    asChild
+                    className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                  >
                     <Link href="/dashboard/collect-apps" className="flex items-center w-full">
                       <Layers className="mr-2 h-4 w-4" />
                       Collect
@@ -128,7 +154,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   </DropdownMenuItem>
                 )}
                 {isDaithi && (
-                  <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10">
+                  <DropdownMenuItem
+                    asChild
+                    className="font-semibold uppercase text-xs tracking-wide cursor-pointer hover:text-primary hover:bg-primary/10 focus:text-primary focus:bg-primary/10"
+                  >
                     <Link href="/dashboard/game-progress" className="flex items-center w-full">
                       <Trophy className="mr-2 h-4 w-4" />
                       Game Progress
@@ -142,35 +171,47 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex items-center shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-sm border border-primary/20 hover:border-primary hover:bg-primary/10 transition-all">
-                <Avatar className="h-9 w-9 rounded-sm">
-                  <AvatarFallback className="rounded-sm bg-gradient-to-br from-primary to-primary/70 text-black font-black">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-card border-primary/30" align="end" forceMount>
-              <DropdownMenuLabel className="font-bold uppercase text-xs tracking-wide text-primary">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-bold leading-none">
-                    {profile?.display_name || "User"}
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground normal-case">{user.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-primary/20" />
-              <DropdownMenuItem asChild className="font-semibold uppercase text-xs tracking-wide cursor-pointer">
-                <Link href="/dashboard/profile">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-primary/20" />
-              <LogoutButton />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+                <Button
+                  variant="ghost"
+                  className="relative h-9 w-9 rounded-sm border border-primary/20 hover:border-primary hover:bg-primary/10 transition-all"
+                >
+                  <Avatar className="h-9 w-9 rounded-sm">
+                    <AvatarFallback className="rounded-sm bg-gradient-to-br from-primary to-primary/70 text-black font-black">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-56 bg-card border-primary/30"
+                align="end"
+                forceMount
+              >
+                <DropdownMenuLabel className="font-bold uppercase text-xs tracking-wide text-primary">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-bold leading-none">
+                      {profile?.display_name || "User"}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground normal-case">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-primary/20" />
+                <DropdownMenuItem
+                  asChild
+                  className="font-semibold uppercase text-xs tracking-wide cursor-pointer"
+                >
+                  <Link href="/dashboard/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-primary/20" />
+                <LogoutButton />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 

@@ -38,11 +38,18 @@ import type { Game } from "@/types";
 interface GameFormDialogProps {
   game?: Game;
   universes: { id: string; name: string }[];
+  defaultUniverseId?: string;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
 
-export function GameFormDialog({ game, universes, trigger, onSuccess }: GameFormDialogProps) {
+export function GameFormDialog({
+  game,
+  universes,
+  defaultUniverseId,
+  trigger,
+  onSuccess,
+}: GameFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,18 +59,22 @@ export function GameFormDialog({ game, universes, trigger, onSuccess }: GameForm
       name: game?.name || "",
       description: game?.description || "",
       publisher: game?.publisher || "",
-      universe_id: (game as any)?.universe_id || undefined,
+      universe_id: game?.universe_id || defaultUniverseId || undefined,
     },
   });
 
   const onSubmit = async (data: GameInput) => {
     setIsLoading(true);
     try {
+      const sanitizedData: GameInput = {
+        ...data,
+        universe_id: data.universe_id === "none" || !data.universe_id ? null : data.universe_id,
+      };
       if (game) {
-        await updateGame(game.id, data);
+        await updateGame(game.id, sanitizedData);
         toast.success("Game updated successfully");
       } else {
-        await createGame(data);
+        await createGame(sanitizedData);
         toast.success("Game created successfully");
       }
       setOpen(false);
@@ -116,10 +127,7 @@ export function GameFormDialog({ game, universes, trigger, onSuccess }: GameForm
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Universe</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || "none"}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a universe" />

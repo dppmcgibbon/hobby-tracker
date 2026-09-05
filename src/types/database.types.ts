@@ -261,30 +261,36 @@ export type Database = {
       }
       editions: {
         Row: {
+          cover_image: string | null
           created_at: string | null
           description: string | null
           game_id: string
           id: string
+          links: Json | null
           name: string
           sequence: number
           updated_at: string | null
           year: number | null
         }
         Insert: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           game_id: string
           id?: string
+          links?: Json | null
           name: string
           sequence: number
           updated_at?: string | null
           year?: number | null
         }
         Update: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           game_id?: string
           id?: string
+          links?: Json | null
           name?: string
           sequence?: number
           updated_at?: string | null
@@ -302,30 +308,36 @@ export type Database = {
       }
       expansions: {
         Row: {
+          cover_image: string | null
           created_at: string | null
           description: string | null
           edition_id: string
           id: string
+          links: Json | null
           name: string
           sequence: number
           updated_at: string | null
           year: number | null
         }
         Insert: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           edition_id: string
           id?: string
+          links?: Json | null
           name: string
           sequence: number
           updated_at?: string | null
           year?: number | null
         }
         Update: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           edition_id?: string
           id?: string
+          links?: Json | null
           name?: string
           sequence?: number
           updated_at?: string | null
@@ -381,27 +393,33 @@ export type Database = {
       }
       games: {
         Row: {
+          cover_image: string | null
           created_at: string | null
           description: string | null
           id: string
+          links: Json | null
           name: string
           publisher: string | null
           universe_id: string | null
           updated_at: string | null
         }
         Insert: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          links?: Json | null
           name: string
           publisher?: string | null
           universe_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          cover_image?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          links?: Json | null
           name?: string
           publisher?: string | null
           universe_id?: string | null

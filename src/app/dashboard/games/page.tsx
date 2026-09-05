@@ -1,115 +1,393 @@
-import { Suspense } from "react";
 import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
-import { getUniverses } from "@/lib/queries/miniatures";
-import { GameCard } from "@/components/games/game-card";
-import { GameFormDialog } from "@/components/games/game-form-dialog";
-import { GamesSearch } from "@/components/games/games-search";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Gamepad2 } from "lucide-react";
+import Link from "next/link";
+import { Gamepad2, ChevronRight, ArrowLeft } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-async function GamesContent({ searchQuery, universeId, universes }: { searchQuery?: string; universeId?: string; universes: { id: string; name: string }[] }) {
+export const dynamic = "force-dynamic";
+
+interface GamesPageProps {
+  searchParams: Promise<{
+    universe?: string;
+    game?: string;
+    edition?: string;
+  }>;
+}
+
+export default async function GamesPage({ searchParams }: GamesPageProps) {
+  await requireAuth();
   const supabase = await createClient();
+  const { universe: universeId, game: gameId, edition: editionId } = await searchParams;
 
-  // Fetch games with edition counts and universe
-  let query = supabase
-    .from("games")
-    .select(
-      `
-      *,
-      editions(count),
-      universe:universes(id, name)
-    `
-    )
-    .order("name");
+  // Level 4: Expansions list for a specific edition
+  // (Clicking an expansion routes to the Game Detail Page)
+  if (editionId && gameId) {
+    const [{ data: universe }, { data: game }, { data: edition }, { data: expansions }] =
+      await Promise.all([
+        universeId
+          ? supabase.from("universes").select("id, name").eq("id", universeId).single()
+          : Promise.resolve({ data: null }),
+        supabase.from("games").select("id, name, universe_id").eq("id", gameId).single(),
+        supabase.from("editions").select("id, name, year").eq("id", editionId).single(),
+        supabase
+          .from("expansions")
+          .select("id, name, sequence, year")
+          .eq("edition_id", editionId)
+          .order("sequence", { ascending: true }),
+      ]);
 
-  if (searchQuery) {
-    query = query.ilike("name", `%${searchQuery}%`);
-  }
+    const resolvedUniverseId = universeId || game?.universe_id || "";
 
-  if (universeId && universeId !== "all") {
-    query = query.eq("universe_id", universeId);
-  }
-
-  const { data: games } = await query;
-
-  if (!games || games.length === 0) {
     return (
-      <div className="text-center py-12">
-        <Gamepad2 className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-semibold">No games found</h3>
-        <p className="text-muted-foreground">
-          {searchQuery ? "Try adjusting your search" : "Get started by adding your first game"}
-        </p>
+      <div className="space-y-6 w-full">
+        {/* Breadcrumb Navigation */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <Link href="/dashboard/games" className="hover:text-primary transition-colors">
+            Universes
+          </Link>
+          {universe && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+              <Link
+                href={`/dashboard/games?universe=${resolvedUniverseId}`}
+                className="hover:text-primary transition-colors"
+              >
+                {universe.name}
+              </Link>
+            </>
+          )}
+          {game && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+              <Link
+                href={`/dashboard/games?universe=${resolvedUniverseId}&game=${game.id}`}
+                className="hover:text-primary transition-colors"
+              >
+                {game.name}
+              </Link>
+            </>
+          )}
+          <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+          <span className="text-primary">{edition?.name || "Edition"}</span>
+        </div>
+
+        {/* Heading */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-l-4 border-primary pl-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-3">
+              <Gamepad2 className="h-8 w-8 text-primary" />
+              {edition?.name || "Expansions"}
+            </h1>
+          </div>
+          <Link
+            href={`/dashboard/games?universe=${resolvedUniverseId}&game=${gameId}`}
+            className="text-xs uppercase font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Editions
+          </Link>
+        </div>
+
+        {/* Expansions Table */}
+        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-primary/20 hover:bg-muted/30">
+                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
+                  Expansion
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!expansions || expansions.length === 0 ? (
+                <TableRow>
+                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
+                    No expansions found for this edition.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                expansions.map((exp) => (
+                  <TableRow
+                    key={exp.id}
+                    className="border-primary/10 hover:bg-muted/20 transition-colors"
+                  >
+                    <TableCell className="p-0">
+                      <Link
+                        href={`/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${editionId}&expansion=${exp.id}`}
+                        className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
+                      >
+                        {exp.name}
+                        {exp.year && (
+                          <span className="text-xs font-normal text-muted-foreground ml-2">
+                            ({exp.year})
+                          </span>
+                        )}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {games.map((game) => (
-        <GameCard
-          key={game.id}
-          game={game}
-          universes={universes}
-          editionCount={
-            Array.isArray(game.editions) ? game.editions.length : game.editions?.[0]?.count || 0
-          }
-        />
-      ))}
-    </div>
-  );
-}
+  // Level 3: Editions list for a specific game
+  // (If an edition has no expansions, clicking it routes to the Game Detail Page)
+  if (gameId) {
+    const [{ data: universe }, { data: game }, { data: editions }] = await Promise.all([
+      universeId
+        ? supabase.from("universes").select("id, name").eq("id", universeId).single()
+        : Promise.resolve({ data: null }),
+      supabase.from("games").select("id, name, universe_id").eq("id", gameId).single(),
+      supabase
+        .from("editions")
+        .select("id, name, sequence, year, expansions(id)")
+        .eq("game_id", gameId)
+        .order("sequence", { ascending: true }),
+    ]);
 
-function LoadingSkeleton() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <Card key={i}>
-          <CardContent className="p-6">
-            <Skeleton className="h-6 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2 mb-4" />
-            <Skeleton className="h-20 w-full" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
+    const resolvedUniverseId = universeId || game?.universe_id || "";
 
-export default async function GamesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ search?: string; universe?: string }>;
-}) {
-  await requireAuth();
-  const { search, universe } = await searchParams;
-  const universes = await getUniverses();
-
-  return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Gamepad2 className="h-8 w-8" />
-            Games
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your game systems, editions, and expansions
-          </p>
+    return (
+      <div className="space-y-6 w-full">
+        {/* Breadcrumb Navigation */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <Link href="/dashboard/games" className="hover:text-primary transition-colors">
+            Universes
+          </Link>
+          {universe && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+              <Link
+                href={`/dashboard/games?universe=${resolvedUniverseId}`}
+                className="hover:text-primary transition-colors"
+              >
+                {universe.name}
+              </Link>
+            </>
+          )}
+          <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+          <span className="text-primary">{game?.name || "Game"}</span>
         </div>
-        <GameFormDialog universes={universes} />
+
+        {/* Heading */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-l-4 border-primary pl-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-3">
+              <Gamepad2 className="h-8 w-8 text-primary" />
+              {game?.name || "Editions"}
+            </h1>
+          </div>
+          {resolvedUniverseId && (
+            <Link
+              href={`/dashboard/games?universe=${resolvedUniverseId}`}
+              className="text-xs uppercase font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Games
+            </Link>
+          )}
+        </div>
+
+        {/* Editions Table */}
+        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-primary/20 hover:bg-muted/30">
+                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
+                  Edition
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!editions || editions.length === 0 ? (
+                <TableRow>
+                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
+                    No editions found for this game.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                editions.map((edition) => {
+                  const hasExpansions = edition.expansions && edition.expansions.length > 0;
+                  const href = hasExpansions
+                    ? `/dashboard/games?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`
+                    : `/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`;
+
+                  return (
+                    <TableRow
+                      key={edition.id}
+                      className="border-primary/10 hover:bg-muted/20 transition-colors"
+                    >
+                      <TableCell className="p-0">
+                        <Link
+                          href={href}
+                          className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
+                        >
+                          {edition.name}
+                          {edition.year && (
+                            <span className="text-xs font-normal text-muted-foreground ml-2">
+                              ({edition.year})
+                            </span>
+                          )}
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  // Level 2: Games list for a specific universe
+  // (If a game has no editions, clicking it routes directly to the Game Detail Page)
+  if (universeId) {
+    const [{ data: universe }, { data: games }] = await Promise.all([
+      supabase.from("universes").select("id, name").eq("id", universeId).single(),
+      supabase
+        .from("games")
+        .select("id, name, editions(id)")
+        .eq("universe_id", universeId)
+        .order("name", { ascending: true }),
+    ]);
+
+    return (
+      <div className="space-y-6 w-full">
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <Link href="/dashboard/games" className="hover:text-primary transition-colors">
+            Universes
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+          <span className="text-primary">{universe?.name || "Universe"}</span>
+        </div>
+
+        {/* Heading */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-l-4 border-primary pl-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-3">
+              <Gamepad2 className="h-8 w-8 text-primary" />
+              {universe?.name || "Games"}
+            </h1>
+          </div>
+          <Link
+            href="/dashboard/games"
+            className="text-xs uppercase font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Universes
+          </Link>
+        </div>
+
+        {/* Games Table */}
+        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-primary/20 hover:bg-muted/30">
+                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
+                  Game
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!games || games.length === 0 ? (
+                <TableRow>
+                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
+                    No games found in this universe.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                games.map((game) => {
+                  const hasEditions = game.editions && game.editions.length > 0;
+                  const href = hasEditions
+                    ? `/dashboard/games?universe=${universeId}&game=${game.id}`
+                    : `/dashboard/games/detail?universe=${universeId}&game=${game.id}`;
+
+                  return (
+                    <TableRow
+                      key={game.id}
+                      className="border-primary/10 hover:bg-muted/20 transition-colors"
+                    >
+                      <TableCell className="p-0">
+                        <Link
+                          href={href}
+                          className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
+                        >
+                          {game.name}
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  // Level 1: Universes list (Default)
+  const { data: universes, error } = await supabase
+    .from("universes")
+    .select("id, name")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (
+    <div className="space-y-6 w-full">
+      <div className="border-l-4 border-primary pl-4">
+        <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-3">
+          <Gamepad2 className="h-8 w-8 text-primary" />
+          Games
+        </h1>
       </div>
 
-      {/* Search */}
-      <GamesSearch universes={universes} />
-
-      {/* Games Grid */}
-      <Suspense fallback={<LoadingSkeleton />}>
-        <GamesContent searchQuery={search} universeId={universe} universes={universes} />
-      </Suspense>
+      {/* Universes Table */}
+      <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-primary/20 hover:bg-muted/30">
+              <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
+                Universe
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {universes?.map((universe) => (
+              <TableRow
+                key={universe.id}
+                className="border-primary/10 hover:bg-muted/20 transition-colors"
+              >
+                <TableCell className="p-0">
+                  <Link
+                    href={`/dashboard/games?universe=${universe.id}`}
+                    className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
+                  >
+                    {universe.name}
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
