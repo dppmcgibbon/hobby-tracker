@@ -17,6 +17,7 @@ import {
   type GameInfoLink,
   isGamePdfLink,
   isGameResourceLink,
+  sortGamePdfLinks,
 } from "@/lib/games/game-details";
 import type { GameEntityType } from "@/app/actions/games";
 
@@ -175,9 +176,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   const pdfLinks = metadata.links.filter(isGamePdfLink);
   const resourceLinks = metadata.links.filter(isGameResourceLink);
 
-  const sortedPdfLinks = [...pdfLinks].sort((a, b) =>
-    a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true })
-  );
+  const sortedPdfLinks = sortGamePdfLinks(pdfLinks);
 
   const firstPdf = sortedPdfLinks[0];
   const firstPdfUrl = firstPdf?.url || null;

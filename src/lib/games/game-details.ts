@@ -10,6 +10,7 @@ export interface GameInfoLink {
   caption?: string | null;
   uploaded_at?: string | null;
   image_updated_at?: string | null;
+  position?: number | null;
 }
 
 export interface GameMetadata {
@@ -49,6 +50,25 @@ export function isGamePdfLink(link: GameInfoLink): boolean {
     url.includes(".pdf?") ||
     url.includes("/pdfs/")
   );
+}
+
+/**
+ * Sorts PDF links by their explicit ordinal position (1, 2, 3...) if present,
+ * falling back to alphabetical comparison by title.
+ */
+export function sortGamePdfLinks(links: GameInfoLink[]): GameInfoLink[] {
+  return [...links].sort((a, b) => {
+    const posA = typeof a.position === "number" ? a.position : undefined;
+    const posB = typeof b.position === "number" ? b.position : undefined;
+    if (posA !== undefined && posB !== undefined) {
+      if (posA !== posB) return posA - posB;
+    } else if (posA !== undefined) {
+      return -1;
+    } else if (posB !== undefined) {
+      return 1;
+    }
+    return a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
+  });
 }
 
 /**

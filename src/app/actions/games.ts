@@ -690,6 +690,61 @@ export async function getGamePdfUploadUrl(
 }
 
 /**
+ * Reorders PDF documents by updating their ordinal position field in the links list.
+ */
+export async function reorderGamePdfs(
+  entityType: GameEntityType,
+  entityId: string,
+  orderedPdfIds: string[]
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error(fetchError?.message || "Record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const orderMap = new Map<string, number>();
+  orderedPdfIds.forEach((id, index) => {
+    orderMap.set(id, index + 1);
+  });
+
+  const updatedLinks = existingLinks.map((item) => {
+    const id = String(item.id);
+    if (orderMap.has(id)) {
+      return {
+        ...item,
+        position: orderMap.get(id),
+      };
+    }
+    return item;
+  });
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
  * Saves an uploaded PDF document record to the game/edition/expansion links list.
  */
 export async function saveGamePdf(
@@ -721,6 +776,24 @@ export async function saveGamePdf(
     : [];
   const publicUrl = getR2PublicUrl(input.r2Key);
 
+  // Compute next position for new PDF
+  const existingPdfPositions = existingLinks
+    .filter((item) => {
+      const cat = String(item.category || "").toLowerCase();
+      const url = String(item.url || "").toLowerCase();
+      const storage = String(item.storage_path || item.r2_key || "").toLowerCase();
+      return (
+        cat === "pdf" ||
+        storage.includes("/pdfs/") ||
+        url.endsWith(".pdf") ||
+        url.includes(".pdf?") ||
+        url.includes("/pdfs/")
+      );
+    })
+    .map((item) => (typeof item.position === "number" ? item.position : 0));
+  const nextPosition =
+    existingPdfPositions.length > 0 ? Math.max(...existingPdfPositions, 0) + 1 : 1;
+
   const newPdfLink = {
     id: crypto.randomUUID(),
     title: input.title.trim(),
@@ -729,6 +802,7 @@ export async function saveGamePdf(
     category: "PDF",
     description: input.description?.trim() || null,
     file_size: input.fileSize || null,
+    position: nextPosition,
   };
 
   const updatedLinks = [...existingLinks, newPdfLink];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { toast } from "sonner";
@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +34,19 @@ import {
   Loader2,
   AlertCircle,
   FileCheck2,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
   saveGamePdf,
   uploadGamePdfServerSide,
   deleteGameLink,
+  reorderGamePdfs,
   type GameEntityType,
 } from "@/app/actions/games";
-import { type GameInfoLink, isGamePdfLink } from "@/lib/games/game-details";
+import { type GameInfoLink, isGamePdfLink, sortGamePdfLinks } from "@/lib/games/game-details";
 
 interface GamePdfsTabProps {
   entityType: GameEntityType;
@@ -54,12 +66,20 @@ function formatBytes(bytes?: number | null): string {
 export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }: GamePdfsTabProps) {
   const router = useRouter();
 
-  // Filter and sort links for PDFs alphabetically
-  const pdfLinks = links
-    .filter(isGamePdfLink)
-    .sort((a, b) =>
-      a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true })
-    );
+  // Local state for sorted PDFs
+  const [pdfItems, setPdfItems] = useState<GameInfoLink[]>(() =>
+    sortGamePdfLinks(links.filter(isGamePdfLink))
+  );
+
+  // Sync with prop updates
+  useEffect(() => {
+    setPdfItems(sortGamePdfLinks(links.filter(isGamePdfLink)));
+  }, [links]);
+
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   // State for upload dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -230,7 +250,91 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     setPreviewPdfId((curr) => (curr === id ? null : id));
   };
 
-  const activePreviewPdf = pdfLinks.find((p) => p.id === previewPdfId);
+  // Reorder persistence
+  const persistOrder = async (orderedList: GameInfoLink[]) => {
+    setIsSavingOrder(true);
+    try {
+      const orderedIds = orderedList.map((p) => p.id);
+      await reorderGamePdfs(entityType, entityId, orderedIds);
+      toast.success("Document order updated");
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update order";
+      toast.error(msg);
+      // Revert to original
+      setPdfItems(sortGamePdfLinks(links.filter(isGamePdfLink)));
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
+  // Drag and drop event handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if ((e.target as HTMLElement).closest("button, a, input")) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${index}`);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const updated = [...pdfItems];
+    const [moved] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    const withNewPositions = updated.map((item, idx) => ({
+      ...item,
+      position: idx + 1,
+    }));
+
+    setPdfItems(withNewPositions);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    await persistOrder(withNewPositions);
+  };
+
+  // Move Up / Down button handlers
+  const handleMove = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= pdfItems.length) return;
+
+    const updated = [...pdfItems];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    const withNewPositions = updated.map((item, idx) => ({
+      ...item,
+      position: idx + 1,
+    }));
+
+    setPdfItems(withNewPositions);
+    await persistOrder(withNewPositions);
+  };
+
+  const activePreviewPdf = pdfItems.find((p) => p.id === previewPdfId);
 
   return (
     <Card className="warhammer-card border-primary/30">
@@ -239,20 +343,27 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             PDF Documents & Rules
+            {isSavingOrder && (
+              <span className="flex items-center gap-1 text-xs text-primary/80 normal-case font-normal ml-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                saving order...
+              </span>
+            )}
           </CardTitle>
           <CardDescription className="text-xs uppercase tracking-wide mt-1">
-            Rulebooks, reference guides, and supplements
+            Rulebooks, reference guides, and supplements • Drag rows or use arrows to reorder
           </CardDescription>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={handleOpenDialog}>
           <DialogTrigger asChild>
             <Button
-              className="btn-warhammer-primary font-bold uppercase text-xs tracking-wider h-8 px-3.5"
+              className="btn-warhammer-primary h-8 w-8 p-0"
               size="sm"
+              title="Upload PDF"
+              aria-label="Upload PDF"
             >
-              <Upload className="h-3.5 w-3.5 mr-1.5" />
-              Upload PDF
+              <Upload className="h-4 w-4" />
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg bg-card border-primary/30">
@@ -385,7 +496,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       </CardHeader>
 
       <CardContent className="pt-5 space-y-5">
-        {pdfLinks.length === 0 ? (
+        {pdfItems.length === 0 ? (
           <div className="text-center py-12 px-4 border border-dashed border-primary/20 rounded-sm bg-black/20">
             <div className="inline-flex p-3 rounded-full bg-primary/10 border border-primary/30 mb-3">
               <FileText className="h-8 w-8 text-primary/70" />
@@ -409,105 +520,174 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2.5">
-              {pdfLinks.map((pdf) => {
-                const isPreviewing = previewPdfId === pdf.id;
-                const isDeleting = deletingId === pdf.id;
+            <div className="border border-primary/25 rounded-md overflow-hidden bg-black/40 shadow-sm">
+              <Table>
+                <TableHeader className="bg-black/60 border-b border-primary/25">
+                  <TableRow className="border-primary/20 hover:bg-transparent">
+                    <TableHead className="w-28 text-center font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
+                      #
+                    </TableHead>
+                    <TableHead className="font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
+                      Document Title
+                    </TableHead>
+                    <TableHead className="w-52 text-right font-bold uppercase tracking-wider text-xs text-primary/90 py-3 pr-4">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pdfItems.map((pdf, index) => {
+                    const isPreviewing = previewPdfId === pdf.id;
+                    const isDeleting = deletingId === pdf.id;
+                    const isDragging = draggedIndex === index;
+                    const isDragOver = dragOverIndex === index && draggedIndex !== index;
+                    const ordinal = index + 1;
 
-                return (
-                  <div
-                    key={pdf.id}
-                    className={`flex items-center justify-between gap-3 p-3 rounded-sm border transition-all ${
-                      isPreviewing
-                        ? "border-primary bg-primary/10 shadow-gold"
-                        : "border-primary/20 bg-black/30 hover:border-primary/50 hover:bg-black/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="h-9 w-9 rounded-sm bg-red-950/50 border border-red-500/30 flex items-center justify-center shrink-0 text-red-400">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-foreground truncate hover:text-primary transition-colors">
-                            {pdf.title}
-                          </p>
-                          {pdf.file_size && (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-primary/10 shrink-0">
-                              {formatBytes(pdf.file_size)}
-                            </span>
-                          )}
-                        </div>
-                        {pdf.description && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">
-                            {pdf.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Preview toggle */}
-                      <Button
-                        variant={isPreviewing ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => togglePreview(pdf.id)}
-                        className={`h-8 px-2.5 text-xs font-bold uppercase tracking-wider ${
-                          isPreviewing
-                            ? "bg-primary text-black hover:bg-primary/90"
-                            : "border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                    return (
+                      <TableRow
+                        key={pdf.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDrop={(e) => handleDrop(e, index)}
+                        className={`group transition-all duration-150 select-none ${
+                          isDragging
+                            ? "opacity-30 bg-primary/10 border-dashed border-primary"
+                            : isDragOver
+                              ? "bg-primary/20 border-t-2 border-t-primary shadow-gold"
+                              : isPreviewing
+                                ? "bg-primary/10 border-primary/40 shadow-gold"
+                                : "border-primary/15 hover:bg-primary/5"
                         }`}
-                        title={isPreviewing ? "Close Preview" : "Preview PDF"}
                       >
-                        {isPreviewing ? (
-                          <>
-                            <EyeOff className="h-3.5 w-3.5 mr-1" />
-                            Hide
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3.5 w-3.5 mr-1" />
-                            Preview
-                          </>
-                        )}
-                      </Button>
+                        {/* Ordinal Column */}
+                        <TableCell className="text-center font-mono py-3 pl-3 pr-2">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <div
+                              className="cursor-grab active:cursor-grabbing text-muted-foreground/70 group-hover:text-primary transition-colors p-1 rounded hover:bg-primary/10"
+                              title="Drag to reorder"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                            <span className="inline-flex items-center justify-center min-w-[26px] h-6 px-1.5 rounded bg-primary/15 text-primary text-xs font-bold border border-primary/30">
+                              {ordinal}
+                            </span>
+                            <div className="flex flex-col -my-1 ml-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                disabled={index === 0 || isSavingOrder}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMove(index, "up");
+                                }}
+                                className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                title="Move up"
+                              >
+                                <ChevronUp className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={index === pdfItems.length - 1 || isSavingOrder}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMove(index, "down");
+                                }}
+                                className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                title="Move down"
+                              >
+                                <ChevronDown className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </TableCell>
 
-                      {/* Direct download/open in new tab */}
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2.5 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary text-xs font-bold uppercase tracking-wider"
-                      >
-                        <a
-                          href={pdf.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Open in new window"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
+                        {/* Document Title Column */}
+                        <TableCell className="py-3 px-3">
+                          <div className="min-w-0">
+                            <span className="font-bold text-sm text-foreground hover:text-primary transition-colors block truncate">
+                              {pdf.title}
+                            </span>
+                            {pdf.description && (
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                {pdf.description}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
 
-                      {/* Delete */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={isDeleting}
-                        onClick={(e) => handleDelete(e, pdf.id, pdf.title)}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        title="Delete PDF"
-                      >
-                        {isDeleting ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+                        {/* Actions Column */}
+                        <TableCell className="py-3 pr-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            {pdf.file_size && (
+                              <span className="text-[10px] uppercase font-bold font-mono tracking-wider px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-primary/10 shrink-0">
+                                {formatBytes(pdf.file_size)}
+                              </span>
+                            )}
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Button
+                                variant={isPreviewing ? "default" : "outline"}
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePreview(pdf.id);
+                                }}
+                                className={`h-7 w-7 p-0 ${
+                                  isPreviewing
+                                    ? "bg-primary text-black hover:bg-primary/90"
+                                    : "border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                                }`}
+                                title={isPreviewing ? "Close Preview" : "Preview PDF"}
+                                aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
+                              >
+                                {isPreviewing ? (
+                                  <EyeOff className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Eye className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-7 w-7 p-0 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                                title="Open in new window"
+                                aria-label="Open in new window"
+                              >
+                                <a
+                                  href={pdf.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isDeleting}
+                                onClick={(e) => handleDelete(e, pdf.id, pdf.title)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                title="Delete PDF"
+                              >
+                                {isDeleting ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
 
             {/* Embedded PDF Viewer when Preview is active */}
