@@ -12,7 +12,8 @@ import { EditionFormDialog } from "@/components/games/edition-form-dialog";
 import { ExpansionFormDialog } from "@/components/games/expansion-form-dialog";
 import { DeleteEditionButton } from "@/components/games/delete-edition-button";
 import { DeleteExpansionButton } from "@/components/games/delete-expansion-button";
-import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Gamepad2, Edit, ChevronDown, ChevronRight, Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Edition, Expansion } from "@/types";
 
@@ -53,6 +54,27 @@ async function GameDetailsContent({ id, universes }: { id: string; universes: { 
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs & Back */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <Link href="/dashboard/admin" className="hover:text-primary transition-colors">
+            Admin
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+          <Link href="/dashboard/admin/games" className="hover:text-primary transition-colors">
+            Games Management
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5 text-primary/50" />
+          <span className="text-primary">{game.name}</span>
+        </div>
+        <Link
+          href="/dashboard/admin/games"
+          className="text-xs uppercase font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Games
+        </Link>
+      </div>
       {/* Game Info Card */}
       <Card>
         <CardHeader>

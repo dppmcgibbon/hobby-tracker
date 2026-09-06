@@ -14,9 +14,10 @@ import { useTransition } from "react";
 
 interface GamesSearchProps {
   universes: { id: string; name: string }[];
+  basePath?: string;
 }
 
-export function GamesSearch({ universes }: GamesSearchProps) {
+export function GamesSearch({ universes, basePath = "/dashboard/admin/games" }: GamesSearchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -32,7 +33,7 @@ export function GamesSearch({ universes }: GamesSearchProps) {
       } else {
         params.delete("search");
       }
-      router.push(`/dashboard/games?${params.toString()}`);
+      router.push(`${basePath}?${params.toString()}`);
     });
   };
 
@@ -44,7 +45,7 @@ export function GamesSearch({ universes }: GamesSearchProps) {
       } else {
         params.set("universe", value);
       }
-      router.push(`/dashboard/games?${params.toString()}`);
+      router.push(`${basePath}?${params.toString()}`);
     });
   };
 

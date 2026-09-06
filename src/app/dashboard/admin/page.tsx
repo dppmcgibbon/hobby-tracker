@@ -12,7 +12,7 @@ export default async function AdminPage() {
       title: "Games Management",
       description: "Manage game systems, editions, and expansions",
       icon: Gamepad2,
-      href: "/dashboard/games",
+      href: "/dashboard/admin/games",
       color: "text-blue-500",
     },
     {

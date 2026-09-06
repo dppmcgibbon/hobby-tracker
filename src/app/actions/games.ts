@@ -35,6 +35,7 @@ export async function createGame(data: GameInput) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   return { success: true, game };
 }
 
@@ -56,6 +57,7 @@ export async function updateGame(id: string, data: GameInput) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   revalidatePath(`/dashboard/games/${id}`);
   return { success: true, game };
 }
@@ -71,6 +73,7 @@ export async function deleteGame(id: string) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   return { success: true };
 }
 
