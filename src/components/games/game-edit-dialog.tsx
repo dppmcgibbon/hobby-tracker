@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, X, Loader2, Trash2, Image as ImageIcon, Edit3, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   getGameCoverUploadUrl,
   saveGameCover,
@@ -33,6 +34,7 @@ interface GameEditDialogProps {
   currentCoverImage?: string | null;
   currentDescription?: string | null;
   trigger?: React.ReactNode;
+  mode?: "all" | "description" | "cover";
 }
 
 export function GameEditDialog({
@@ -42,6 +44,7 @@ export function GameEditDialog({
   currentCoverImage,
   currentDescription,
   trigger,
+  mode = "all",
 }: GameEditDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -121,53 +124,63 @@ export function GameEditDialog({
     setError(null);
 
     try {
-      // 1. Handle Cover Upload if a new file is chosen
-      if (coverFile) {
-        let uploaded = false;
-        try {
-          // Direct client-to-R2 upload
-          const presigned = await getGameCoverUploadUrl(
-            entityType,
-            entityId,
-            coverFile.name,
-            coverFile.type || "image/jpeg"
-          );
+      // 1. Handle Cover Upload if a new file is chosen and mode allows
+      if (mode !== "description") {
+        if (coverFile) {
+          let uploaded = false;
+          try {
+            // Direct client-to-R2 upload
+            const presigned = await getGameCoverUploadUrl(
+              entityType,
+              entityId,
+              coverFile.name,
+              coverFile.type || "image/jpeg"
+            );
 
-          const putRes = await fetch(presigned.presignedUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": coverFile.type || "image/jpeg",
-            },
-            body: coverFile,
-          });
+            const putRes = await fetch(presigned.presignedUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Type": coverFile.type || "image/jpeg",
+              },
+              body: coverFile,
+            });
 
-          if (putRes.ok) {
-            await saveGameCover(entityType, entityId, presigned.key);
-            uploaded = true;
+            if (putRes.ok) {
+              await saveGameCover(entityType, entityId, presigned.key);
+              uploaded = true;
+            }
+          } catch (directErr) {
+            console.warn("Direct R2 upload failed, trying server fallback:", directErr);
           }
-        } catch (directErr) {
-          console.warn("Direct R2 upload failed, trying server fallback:", directErr);
-        }
 
-        // Fallback to server action if direct PUT failed
-        if (!uploaded) {
-          const formData = new FormData();
-          formData.append("file", coverFile);
-          await uploadGameCoverServerSide(entityType, entityId, formData);
+          // Fallback to server action if direct PUT failed
+          if (!uploaded) {
+            const formData = new FormData();
+            formData.append("file", coverFile);
+            await uploadGameCoverServerSide(entityType, entityId, formData);
+          }
+        } else if (markRemoveCover && currentCoverImage) {
+          // Remove existing cover
+          await removeGameCover(entityType, entityId);
         }
-      } else if (markRemoveCover && currentCoverImage) {
-        // Remove existing cover
-        await removeGameCover(entityType, entityId);
       }
 
-      // 2. Handle Description Update
-      const originalDesc = (currentDescription || "").trim();
-      const newDesc = description.trim();
-      if (newDesc !== originalDesc) {
-        await updateGameDescription(entityType, entityId, newDesc);
+      // 2. Handle Description Update if mode allows
+      if (mode !== "cover") {
+        const originalDesc = (currentDescription || "").trim();
+        const newDesc = description.trim();
+        if (newDesc !== originalDesc) {
+          await updateGameDescription(entityType, entityId, newDesc);
+        }
       }
 
-      toast.success("Game details updated successfully!");
+      toast.success(
+        mode === "description"
+          ? "Lore description updated!"
+          : mode === "cover"
+            ? "Cover artwork updated!"
+            : "Game details updated successfully!"
+      );
       router.refresh();
       setOpen(false);
     } catch (err: unknown) {
@@ -193,22 +206,53 @@ export function GameEditDialog({
           <Button
             variant="outline"
             size="sm"
-            className="border-primary/40 hover:border-primary hover:bg-primary/10 text-xs font-bold uppercase tracking-wider"
+            className="border-primary/40 hover:border-primary hover:bg-primary/10 text-xs font-bold uppercase tracking-wider text-primary"
           >
             <Edit3 className="h-3.5 w-3.5 mr-1.5 text-primary" />
-            Edit Details
+            {mode === "description"
+              ? "Edit Text"
+              : mode === "cover"
+                ? "Edit Cover"
+                : "Edit Details"}
           </Button>
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl border-primary/30 warhammer-card max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "border-primary/30 warhammer-card max-h-[90vh] overflow-y-auto",
+          mode === "description"
+            ? "sm:max-w-xl"
+            : mode === "cover"
+              ? "sm:max-w-md"
+              : "sm:max-w-2xl"
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            Edit {title}
+            {mode === "description" ? (
+              <>
+                <BookOpen className="h-5 w-5 text-primary" />
+                Edit About Text
+              </>
+            ) : mode === "cover" ? (
+              <>
+                <ImageIcon className="h-5 w-5 text-primary" />
+                Edit Cover Artwork
+              </>
+            ) : (
+              <>
+                <Edit3 className="h-5 w-5 text-primary" />
+                Edit {title}
+              </>
+            )}
           </DialogTitle>
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Update the book/box cover artwork and lore description
+            {mode === "description"
+              ? `Update the background lore and overview for ${title}`
+              : mode === "cover"
+                ? `Upload or change the box / book cover artwork for ${title}`
+                : "Update the book/box cover artwork and lore description"}
           </p>
         </DialogHeader>
 
@@ -220,7 +264,8 @@ export function GameEditDialog({
 
         <div className="space-y-6 py-2">
           {/* Cover Image Section */}
-          <div className="space-y-3">
+          {mode !== "description" && (
+            <div className="space-y-3">
             <Label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center justify-between">
               <span>Book / Box Cover Image</span>
               <span className="text-[10px] text-muted-foreground font-normal normal-case">
@@ -323,32 +368,38 @@ export function GameEditDialog({
               </div>
             )}
           </div>
+          )}
 
           {/* Description Text Section */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="game-description"
-                className="text-xs font-bold uppercase tracking-wider text-foreground"
-              >
-                About The Game / Lore Description
-              </Label>
-              <span className="text-[10px] text-muted-foreground font-mono">
-                {description.length} characters
-              </span>
+          {mode !== "cover" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="game-description"
+                  className="text-xs font-bold uppercase tracking-wider text-foreground"
+                >
+                  About The Game / Lore Description
+                </Label>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {description.length} characters
+                </span>
+              </div>
+              <Textarea
+                id="game-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter lore background, synopsis, setting details, or gameplay overview..."
+                className={cn(
+                  "resize-y bg-neutral-950/60 border-primary/30 focus-visible:ring-primary text-sm leading-relaxed",
+                  mode === "description" ? "min-h-[240px]" : "min-h-[160px]"
+                )}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                This text will be prominently displayed in the &quot;About The Game&quot; section on
+                the detail page.
+              </p>
             </div>
-            <Textarea
-              id="game-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter lore background, synopsis, setting details, or gameplay overview..."
-              className="min-h-[160px] resize-y bg-neutral-950/60 border-primary/30 focus-visible:ring-primary text-sm leading-relaxed"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              This text will be prominently displayed in the &quot;About The Game&quot; section on
-              the detail page.
-            </p>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0 pt-3 border-t border-primary/20">

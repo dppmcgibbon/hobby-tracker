@@ -319,35 +319,39 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
           </h1>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
           <TabsList className="bg-card/80 border border-primary/30 p-1 h-9">
             <TabsTrigger
               value="about"
-              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
+              title="Info"
+              aria-label="Info"
             >
-              <BookOpen className="h-3.5 w-3.5 mr-1.5" />
-              Info
+              <BookOpen className="h-4 w-4" />
             </TabsTrigger>
             <TabsTrigger
               value="pdfs"
-              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
+              title="PDFs"
+              aria-label="PDFs"
             >
-              <FileText className="h-3.5 w-3.5 mr-1.5" />
-              PDFs
+              <FileText className="h-4 w-4" />
             </TabsTrigger>
             <TabsTrigger
               value="images"
-              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
+              title="Images"
+              aria-label="Images"
             >
-              <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
-              Images
+              <ImageIcon className="h-4 w-4" />
             </TabsTrigger>
             <TabsTrigger
               value="miniatures"
-              className="font-bold uppercase text-xs tracking-wider data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-3.5 cursor-pointer h-7"
+              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
+              title="Miniatures"
+              aria-label="Miniatures"
             >
-              <Package className="h-3.5 w-3.5 mr-1.5" />
-              Miniatures
+              <Package className="h-4 w-4" />
             </TabsTrigger>
           </TabsList>
         </div>
@@ -377,6 +381,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
               title={displayTitle}
               currentCoverImage={targetCoverImage}
               currentDescription={rawDescription}
+              mode="cover"
               trigger={
                 <Button
                   variant="outline"
@@ -406,21 +411,23 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
                   </CardDescription>
                 </div>
 
-                {/* Edit text quick button */}
+                {/* Edit Details button - icon only */}
                 <GameEditDialog
                   entityType={targetEntityType}
                   entityId={targetEntityId}
                   title={displayTitle}
                   currentCoverImage={targetCoverImage}
                   currentDescription={rawDescription}
+                  mode="all"
                   trigger={
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary"
+                      variant="outline"
+                      size="icon"
+                      className="border-primary/40 hover:border-primary hover:bg-primary/10 text-primary h-8 w-8"
+                      title="Edit Details"
+                      aria-label="Edit Details"
                     >
-                      <Edit3 className="h-3.5 w-3.5 mr-1 text-primary" />
-                      Edit
+                      <Edit3 className="h-4 w-4" />
                     </Button>
                   }
                 />
