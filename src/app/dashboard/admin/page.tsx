@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload, Layers, Palette } from "lucide-react";
+import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload, Layers, Palette, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -14,6 +14,13 @@ export default async function AdminPage() {
       icon: Gamepad2,
       href: "/dashboard/games",
       color: "text-blue-500",
+    },
+    {
+      title: "Shortcuts Management",
+      description: "Create and manage game shortcuts and transparent logos",
+      icon: Bookmark,
+      href: "/dashboard/admin/shortcuts",
+      color: "text-yellow-500",
     },
     {
       title: "Recipes Management",

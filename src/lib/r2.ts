@@ -28,8 +28,15 @@ export const r2Client = new S3Client({
  */
 export function getR2PublicUrl(keyOrUrl: string | null | undefined): string {
   if (!keyOrUrl) return "/placeholder-miniature.png";
-  if (keyOrUrl.startsWith("http://") || keyOrUrl.startsWith("https://")) {
+  if (
+    keyOrUrl.startsWith("http://") ||
+    keyOrUrl.startsWith("https://") ||
+    keyOrUrl.startsWith("/")
+  ) {
     return keyOrUrl;
+  }
+  if (keyOrUrl.startsWith("logos/")) {
+    return `/${keyOrUrl}`;
   }
   const cleanKey = keyOrUrl.replace(/^\/+/, "");
   if (!NEXT_PUBLIC_R2_PUBLIC_URL) {
