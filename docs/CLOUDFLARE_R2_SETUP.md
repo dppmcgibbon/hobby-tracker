@@ -46,7 +46,11 @@ When the browser uploads directly to R2 via `PUT`, it first sends an HTTP `OPTIO
       "*"
     ],
     "ExposeHeaders": [
-      "ETag"
+      "ETag",
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length",
+      "Content-Type"
     ],
     "MaxAgeSeconds": 3600
   }
