@@ -54,7 +54,7 @@ export function GameCard({ game, editionCount = 0, universes = [], onUpdate }: G
               <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
                 <Gamepad2 className="h-6 w-6 text-blue-500" />
               </div>
-              <Link href={`/dashboard/games/${game.id}`}>
+              <Link href={`/dashboard/admin/games/${game.id}`}>
                 <CardTitle className="text-xl uppercase tracking-wide hover:text-primary transition-colors cursor-pointer">
                   {game.name}
                 </CardTitle>
@@ -112,10 +112,15 @@ export function GameCard({ game, editionCount = 0, universes = [], onUpdate }: G
         {game.description && (
           <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{game.description}</p>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-primary/10">
           <Badge variant="secondary">
             {editionCount} {editionCount === 1 ? "Edition" : "Editions"}
           </Badge>
+          <Button asChild size="sm" variant="outline" className="border-primary/40 hover:bg-primary/10 text-xs font-semibold">
+            <Link href={`/dashboard/admin/games/${game.id}`}>
+              Manage Editions & Expansions &rarr;
+            </Link>
+          </Button>
         </div>
       </CardContent>
     </Card>

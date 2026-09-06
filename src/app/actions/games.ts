@@ -96,7 +96,9 @@ export async function createEdition(data: EditionInput) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   revalidatePath(`/dashboard/games/${validated.game_id}`);
+  revalidatePath(`/dashboard/admin/games/${validated.game_id}`);
   return { success: true, edition };
 }
 
@@ -118,7 +120,9 @@ export async function updateEdition(id: string, data: EditionInput) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   revalidatePath(`/dashboard/games/${validated.game_id}`);
+  revalidatePath(`/dashboard/admin/games/${validated.game_id}`);
   return { success: true, edition };
 }
 
@@ -133,6 +137,7 @@ export async function deleteEdition(id: string) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   return { success: true };
 }
 
@@ -155,6 +160,7 @@ export async function createExpansion(data: ExpansionInput) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   return { success: true, expansion };
 }
 
@@ -185,8 +191,10 @@ export async function updateExpansion(id: string, data: ExpansionInput) {
 
   // Revalidate both the games list and the specific game detail page
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   if (expansion?.edition?.game_id) {
     revalidatePath(`/dashboard/games/${expansion.edition.game_id}`);
+    revalidatePath(`/dashboard/admin/games/${expansion.edition.game_id}`);
   }
   return { success: true, expansion };
 }
@@ -202,6 +210,7 @@ export async function deleteExpansion(id: string) {
   }
 
   revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
   return { success: true };
 }
 
