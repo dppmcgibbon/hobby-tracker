@@ -34,6 +34,7 @@ interface GameEditDialogProps {
   currentCoverImage?: string | null;
   currentDescription?: string | null;
   trigger?: React.ReactNode;
+  triggerVariant?: "default" | "icon";
   mode?: "all" | "description" | "cover";
 }
 
@@ -44,6 +45,7 @@ export function GameEditDialog({
   currentCoverImage,
   currentDescription,
   trigger,
+  triggerVariant = "default",
   mode = "all",
 }: GameEditDialogProps) {
   const router = useRouter();
@@ -202,6 +204,28 @@ export function GameEditDialog({
       <DialogTrigger asChild>
         {trigger ? (
           trigger
+        ) : triggerVariant === "icon" ? (
+          <Button
+            variant="outline"
+            size="icon"
+            className="border-primary/40 hover:border-primary hover:bg-primary/10 text-primary h-8 w-8"
+            title={
+              mode === "description"
+                ? "Edit Text"
+                : mode === "cover"
+                  ? "Edit Cover"
+                  : "Edit Details"
+            }
+            aria-label={
+              mode === "description"
+                ? "Edit Text"
+                : mode === "cover"
+                  ? "Edit Cover"
+                  : "Edit Details"
+            }
+          >
+            <Edit3 className="h-4 w-4" />
+          </Button>
         ) : (
           <Button
             variant="outline"

@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, BookOpen, Package, Edit3, Camera, FileText, ImageIcon } from "lucide-react";
+import { ChevronRight, BookOpen, Package, Camera, FileText, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -419,17 +419,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
                   currentCoverImage={targetCoverImage}
                   currentDescription={rawDescription}
                   mode="all"
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="border-primary/40 hover:border-primary hover:bg-primary/10 text-primary h-8 w-8"
-                      title="Edit Details"
-                      aria-label="Edit Details"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                  }
+                  triggerVariant="icon"
                 />
               </CardHeader>
               <CardContent className="pt-4">
