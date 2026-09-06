@@ -14,10 +14,13 @@ interface PdfJsPage {
 
 interface PdfJsDocument {
   getPage(pageNumber: number): Promise<PdfJsPage>;
+  destroy?: () => Promise<void>;
+  numPages?: number;
 }
 
 interface PdfJsLoadingTask {
   promise: Promise<PdfJsDocument>;
+  destroy?: () => Promise<void>;
 }
 
 interface PdfJsGlobal {
@@ -31,6 +34,8 @@ interface PdfJsGlobal {
     standardFontDataUrl?: string;
     disableAutoFetch?: boolean;
     disableStream?: boolean;
+    disableRange?: boolean;
+    rangeChunkSize?: number;
   }): PdfJsLoadingTask;
 }
 
@@ -122,60 +127,78 @@ export async function getPdfFirstPageDataUrl(
 
   const pdfjsLib = await loadPdfJs();
 
-  // Attempt loading PDF. If CORS blocks direct fetch, retry via internal proxy
-  let loadingTask: PdfJsLoadingTask;
+  // If the URL is external (e.g. Cloudflare R2 or another domain),
+  // route through our same-origin PDF proxy so HTTP Range headers are fully exposed to PDF.js.
+  const isExternal =
+    pdfUrl.startsWith("http://") ||
+    pdfUrl.startsWith("https://");
+  
+  const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
+  const urlsToTry = isExternal ? [proxyUrl, pdfUrl] : [pdfUrl];
+
+  let pdfDoc: PdfJsDocument | null = null;
+  let lastError: unknown = null;
+
+  for (const targetUrl of urlsToTry) {
+    try {
+      const loadingTask = pdfjsLib.getDocument({
+        url: targetUrl,
+        cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+        cMapPacked: true,
+        standardFontDataUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
+        disableAutoFetch: true,
+        disableStream: true,
+        rangeChunkSize: 65536,
+      });
+
+      pdfDoc = await loadingTask.promise;
+      if (pdfDoc) break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (!pdfDoc) {
+    throw lastError || new Error("Failed to load PDF document.");
+  }
+
   try {
-    loadingTask = pdfjsLib.getDocument({
-      url: pdfUrl,
-      cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
-      cMapPacked: true,
-      standardFontDataUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
-      disableAutoFetch: false,
-      disableStream: false,
-    });
-    await loadingTask.promise;
-  } catch {
-    // Retry via internal proxy
-    const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
-    loadingTask = pdfjsLib.getDocument({
-      url: proxyUrl,
-      cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
-      cMapPacked: true,
-      standardFontDataUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
-      disableAutoFetch: false,
-      disableStream: false,
-    });
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to create canvas 2d context for PDF rendering.");
+    }
+
+    // White background for transparent PDF pages
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    await page.render({
+      canvasContext: ctx,
+      viewport,
+    }).promise;
+
+    let dataUrl = "";
+    try {
+      dataUrl = canvas.toDataURL(format, quality);
+    } catch {
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+    }
+
+    pdfCoverCache.set(cacheKey, dataUrl);
+    return dataUrl;
+  } finally {
+    // Release PDF worker memory
+    try {
+      await pdfDoc.destroy?.();
+    } catch {
+      // ignore destruction errors
+    }
   }
-
-  const pdf = await loadingTask.promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale });
-
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Unable to create canvas 2d context for PDF rendering.");
-  }
-
-  // White background for transparent PDF pages
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  await page.render({
-    canvasContext: ctx,
-    viewport,
-  }).promise;
-
-  let dataUrl = "";
-  try {
-    dataUrl = canvas.toDataURL(format, quality);
-  } catch {
-    dataUrl = canvas.toDataURL("image/jpeg", quality);
-  }
-
-  pdfCoverCache.set(cacheKey, dataUrl);
-  return dataUrl;
 }

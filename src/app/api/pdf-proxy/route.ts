@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "Range, Accept, Content-Type, Authorization",
+      "Access-Control-Expose-Headers":
+        "Accept-Ranges, Content-Range, Content-Length, Content-Type, Content-Disposition, ETag",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get("url");
@@ -15,27 +32,49 @@ export async function GET(request: NextRequest) {
     }
 
     const rangeHeader = request.headers.get("range");
-    const headers: Record<string, string> = {};
+    const upstreamHeaders: Record<string, string> = {};
     if (rangeHeader) {
-      headers["range"] = rangeHeader;
+      upstreamHeaders["Range"] = rangeHeader;
     }
 
-    const res = await fetch(targetUrl, { headers });
+    const upstreamRes = await fetch(targetUrl, {
+      headers: upstreamHeaders,
+      cache: "no-store",
+    });
+
     const responseHeaders = new Headers();
-    responseHeaders.set("Content-Type", res.headers.get("Content-Type") || "application/pdf");
-    if (res.headers.get("Content-Range")) {
-      responseHeaders.set("Content-Range", res.headers.get("Content-Range")!);
-    }
-    if (res.headers.get("Accept-Ranges")) {
-      responseHeaders.set("Accept-Ranges", res.headers.get("Accept-Ranges")!);
-    }
-    if (res.headers.get("Content-Length")) {
-      responseHeaders.set("Content-Length", res.headers.get("Content-Length")!);
-    }
-    responseHeaders.set("Access-Control-Allow-Origin", "*");
+    responseHeaders.set(
+      "Content-Type",
+      upstreamRes.headers.get("Content-Type") || "application/pdf"
+    );
 
-    return new NextResponse(res.body, {
-      status: res.status,
+    // Ensure range request headers are preserved and exposed to browser / PDF.js
+    const acceptRanges = upstreamRes.headers.get("Accept-Ranges") || "bytes";
+    responseHeaders.set("Accept-Ranges", acceptRanges);
+
+    if (upstreamRes.headers.get("Content-Range")) {
+      responseHeaders.set("Content-Range", upstreamRes.headers.get("Content-Range")!);
+    }
+    if (upstreamRes.headers.get("Content-Length")) {
+      responseHeaders.set("Content-Length", upstreamRes.headers.get("Content-Length")!);
+    }
+    if (upstreamRes.headers.get("ETag")) {
+      responseHeaders.set("ETag", upstreamRes.headers.get("ETag")!);
+    }
+
+    // Set inline disposition so browsers render the PDF inside iframes rather than prompting download
+    const filename = parsed.pathname.split("/").pop() || "document.pdf";
+    responseHeaders.set("Content-Disposition", `inline; filename="${filename}"`);
+
+    // CORS headers
+    responseHeaders.set("Access-Control-Allow-Origin", "*");
+    responseHeaders.set(
+      "Access-Control-Expose-Headers",
+      "Accept-Ranges, Content-Range, Content-Length, Content-Type, Content-Disposition, ETag"
+    );
+
+    return new NextResponse(upstreamRes.body, {
+      status: upstreamRes.status,
       headers: responseHeaders,
     });
   } catch (err: unknown) {
@@ -43,3 +82,4 @@ export async function GET(request: NextRequest) {
     return new NextResponse(msg, { status: 502 });
   }
 }
+

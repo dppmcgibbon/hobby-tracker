@@ -113,7 +113,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     if (fileRejections.length > 0) {
       const rej = fileRejections[0];
       if (rej.errors.some((e) => e.code === "file-too-large")) {
-        setError("File is too large. Maximum size is 200MB.");
+        setError("File is too large. Maximum size is 250MB.");
       } else {
         setError("Please select a valid PDF file.");
       }
@@ -127,7 +127,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       "application/pdf": [".pdf"],
     },
     maxFiles: 1,
-    maxSize: 200 * 1024 * 1024, // 200MB
+    maxSize: 250 * 1024 * 1024, // 250MB
   });
 
   const handleOpenDialog = (open: boolean) => {
@@ -160,9 +160,9 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       let uploadedToR2 = false;
       let r2Key = "";
 
-      // 1. Attempt direct presigned upload to Cloudflare R2
+      // 1. Attempt direct presigned upload to Cloudflare R2 with progress tracking
       try {
-        setUploadProgress("Preparing secure upload...");
+        setUploadProgress("Preparing secure direct upload...");
         const presigned = await getGamePdfUploadUrl(
           entityType,
           entityId,
@@ -170,21 +170,33 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           selectedFile.type || "application/pdf"
         );
 
-        setUploadProgress("Uploading PDF...");
-        const putRes = await fetch(presigned.presignedUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": selectedFile.type || "application/pdf",
-          },
-          body: selectedFile,
+        setUploadProgress("Uploading PDF (0%)...");
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", presigned.presignedUrl);
+          xhr.setRequestHeader("Content-Type", selectedFile.type || "application/pdf");
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const pct = Math.round((event.loaded / event.total) * 100);
+              const loadedMb = (event.loaded / (1024 * 1024)).toFixed(1);
+              const totalMb = (event.total / (1024 * 1024)).toFixed(1);
+              setUploadProgress(`Uploading PDF: ${loadedMb} MB / ${totalMb} MB (${pct}%)...`);
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Direct upload failed (HTTP ${xhr.status})`));
+            }
+          };
+          xhr.onerror = () => reject(new Error("Direct upload network error"));
+          xhr.onabort = () => reject(new Error("Upload aborted"));
+          xhr.send(selectedFile);
         });
 
-        if (putRes.ok) {
-          r2Key = presigned.key;
-          uploadedToR2 = true;
-        } else {
-          console.warn("Direct R2 upload responded with status:", putRes.status);
-        }
+        r2Key = presigned.key;
+        uploadedToR2 = true;
       } catch (directErr) {
         console.warn("Direct R2 presigned upload failed, trying server fallback:", directErr);
       }
@@ -199,7 +211,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           description: description.trim() || null,
         });
       } else {
-        setUploadProgress("Uploading PDF...");
+        setUploadProgress("Uploading via server fallback...");
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("title", pdfTitle.trim());
@@ -404,7 +416,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                       Click to choose or drag & drop a PDF
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Official rulebooks, errata, battle packs (up to 200MB)
+                      Official rulebooks, errata, battle packs (up to 250MB)
                     </p>
                   </div>
                 )}
@@ -725,7 +737,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
                 <div className="w-full h-[650px] bg-neutral-900">
                   <iframe
-                    src={activePreviewPdf.url}
+                    src={`/api/pdf-proxy?url=${encodeURIComponent(activePreviewPdf.url)}#view=FitH`}
                     className="w-full h-full border-none"
                     title={activePreviewPdf.title}
                   />
