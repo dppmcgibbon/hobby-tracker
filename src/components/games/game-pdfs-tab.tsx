@@ -113,7 +113,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     if (fileRejections.length > 0) {
       const rej = fileRejections[0];
       if (rej.errors.some((e) => e.code === "file-too-large")) {
-        setError("File is too large. Maximum size is 150MB.");
+        setError("File is too large. Maximum size is 200MB.");
       } else {
         setError("Please select a valid PDF file.");
       }
@@ -127,7 +127,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       "application/pdf": [".pdf"],
     },
     maxFiles: 1,
-    maxSize: 150 * 1024 * 1024, // 150MB
+    maxSize: 200 * 1024 * 1024, // 200MB
   });
 
   const handleOpenDialog = (open: boolean) => {
@@ -404,7 +404,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                       Click to choose or drag & drop a PDF
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Official rulebooks, errata, battle packs (up to 150MB)
+                      Official rulebooks, errata, battle packs (up to 200MB)
                     </p>
                   </div>
                 )}
