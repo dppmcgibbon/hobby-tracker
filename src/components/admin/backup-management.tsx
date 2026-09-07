@@ -547,20 +547,22 @@ export function BackupManagement({ initialStats }: BackupManagementProps) {
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Confirm Database Table Import
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 pt-2 text-muted-foreground text-sm">
-              <div>
-                You are about to restore database tables from:{" "}
-                <span className="font-semibold text-foreground font-mono">
-                  {pendingImportFile?.name}
-                </span>
-              </div>
-              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded text-destructive text-xs font-semibold">
-                Warning: This will permanently replace current records for all tables included in
-                the backup ZIP file.
-              </div>
-              <div className="text-xs text-muted-foreground">
-                We strongly recommend downloading a current table backup ZIP before importing. R2
-                storage (miniature photos and game PDFs) will NOT be affected.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2 text-muted-foreground text-sm">
+                <div>
+                  You are about to restore database tables from:{" "}
+                  <span className="font-semibold text-foreground font-mono">
+                    {pendingImportFile?.name}
+                  </span>
+                </div>
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded text-destructive text-xs font-semibold">
+                  Warning: This will permanently replace current records for all tables included in
+                  the backup ZIP file.
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  We strongly recommend downloading a current table backup ZIP before importing. R2
+                  storage (miniature photos and game PDFs) will NOT be affected.
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
