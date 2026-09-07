@@ -23,20 +23,23 @@ interface PdfJsLoadingTask {
   destroy?: () => Promise<void>;
 }
 
+interface PdfJsGetDocumentParams {
+  url?: string;
+  data?: ArrayBuffer | Uint8Array;
+  cMapUrl?: string;
+  cMapPacked?: boolean;
+  standardFontDataUrl?: string;
+  disableAutoFetch?: boolean;
+  disableStream?: boolean;
+  disableRange?: boolean;
+  rangeChunkSize?: number;
+}
+
 interface PdfJsGlobal {
   GlobalWorkerOptions: {
     workerSrc: string;
   };
-  getDocument(params: {
-    url: string;
-    cMapUrl?: string;
-    cMapPacked?: boolean;
-    standardFontDataUrl?: string;
-    disableAutoFetch?: boolean;
-    disableStream?: boolean;
-    disableRange?: boolean;
-    rangeChunkSize?: number;
-  }): PdfJsLoadingTask;
+  getDocument(params: PdfJsGetDocumentParams): PdfJsLoadingTask;
 }
 
 // Global in-memory cache for rendered PDF cover images
@@ -129,10 +132,8 @@ export async function getPdfFirstPageDataUrl(
 
   // If the URL is external (e.g. Cloudflare R2 or another domain),
   // route through our same-origin PDF proxy so HTTP Range headers are fully exposed to PDF.js.
-  const isExternal =
-    pdfUrl.startsWith("http://") ||
-    pdfUrl.startsWith("https://");
-  
+  const isExternal = pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://");
+
   const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
   const urlsToTry = isExternal ? [proxyUrl, pdfUrl] : [pdfUrl];
 
@@ -145,7 +146,8 @@ export async function getPdfFirstPageDataUrl(
         url: targetUrl,
         cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
         cMapPacked: true,
-        standardFontDataUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
+        standardFontDataUrl:
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
         disableAutoFetch: true,
         disableStream: true,
         rangeChunkSize: 65536,
@@ -195,6 +197,121 @@ export async function getPdfFirstPageDataUrl(
     return dataUrl;
   } finally {
     // Release PDF worker memory
+    try {
+      await pdfDoc.destroy?.();
+    } catch {
+      // ignore destruction errors
+    }
+  }
+}
+
+/**
+ * Renders the first page of a PDF document directly to an image Blob (image/webp or image/jpeg).
+ * Accepts a File, Blob, ArrayBuffer, or external/relative URL.
+ * When a File or Blob is provided, it reads the data locally with zero network round-trips.
+ */
+export async function renderPdfFirstPageToBlob(
+  source: File | Blob | ArrayBuffer | string,
+  options?: { scale?: number; format?: "image/webp" | "image/jpeg"; quality?: number }
+): Promise<Blob> {
+  const { scale = 1.5, format = "image/webp", quality = 0.9 } = options || {};
+  const pdfjsLib = await loadPdfJs();
+
+  let pdfDoc: PdfJsDocument | null = null;
+  let lastError: unknown = null;
+
+  if (typeof source === "string") {
+    const isExternal = source.startsWith("http://") || source.startsWith("https://");
+    const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(source)}`;
+    const urlsToTry = isExternal ? [proxyUrl, source] : [source];
+
+    for (const targetUrl of urlsToTry) {
+      try {
+        const loadingTask = pdfjsLib.getDocument({
+          url: targetUrl,
+          cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+          cMapPacked: true,
+          standardFontDataUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
+          disableAutoFetch: true,
+          disableStream: true,
+          rangeChunkSize: 65536,
+        });
+        pdfDoc = await loadingTask.promise;
+        if (pdfDoc) break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+  } else {
+    try {
+      const arrayBuffer =
+        source instanceof ArrayBuffer ? source : await (source as Blob).arrayBuffer();
+
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+        cMapPacked: true,
+        standardFontDataUrl:
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/",
+      });
+      pdfDoc = await loadingTask.promise;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (!pdfDoc) {
+    throw lastError || new Error("Failed to load PDF document for thumbnail rendering.");
+  }
+
+  try {
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to create canvas 2d context for PDF rendering.");
+    }
+
+    // White background for transparent PDF pages
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    await page.render({
+      canvasContext: ctx,
+      viewport,
+    }).promise;
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            // Fallback to jpeg if webp canvas export failed
+            canvas.toBlob(
+              (fallbackBlob) => {
+                if (fallbackBlob) {
+                  resolve(fallbackBlob);
+                } else {
+                  reject(new Error("Failed to export PDF canvas to Blob."));
+                }
+              },
+              "image/jpeg",
+              quality
+            );
+          }
+        },
+        format,
+        quality
+      );
+    });
+  } finally {
     try {
       await pdfDoc.destroy?.();
     } catch {

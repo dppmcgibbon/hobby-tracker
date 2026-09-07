@@ -37,16 +37,21 @@ import {
   GripVertical,
   ChevronUp,
   ChevronDown,
+  ImagePlus,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
+  getGamePdfCoverUploadUrl,
   saveGamePdf,
+  savePdfCoverImage,
   uploadGamePdfServerSide,
   deleteGameLink,
   reorderGamePdfs,
   type GameEntityType,
 } from "@/app/actions/games";
 import { type GameInfoLink, isGamePdfLink, sortGamePdfLinks } from "@/lib/games/game-details";
+import { getR2PublicUrl } from "@/lib/r2";
+import { renderPdfFirstPageToBlob } from "@/lib/utils/pdf-thumbnail";
 
 interface GamePdfsTabProps {
   entityType: GameEntityType;
@@ -93,6 +98,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   // State for deletion & preview
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPdfId, setPreviewPdfId] = useState<string | null>(null);
+  const [generatingCoverId, setGeneratingCoverId] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -100,12 +106,15 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       setSelectedFile(file);
       setError(null);
 
-      // Auto-populate title from clean filename
-      const cleanName = file.name
-        .replace(/\.pdf$/i, "")
-        .replace(/[-_]/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      setPdfTitle(cleanName);
+      // Auto-populate title as the last word before .pdf (hyphen-separated)
+      const nameWithoutExt = file.name.replace(/\.pdf$/i, "").trim();
+      const segments = nameWithoutExt
+        .split(/[-_]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const lastWord = segments[segments.length - 1] || nameWithoutExt;
+      const formattedTitle = lastWord ? lastWord.charAt(0).toUpperCase() + lastWord.slice(1) : "";
+      setPdfTitle(formattedTitle);
     }
   }, []);
 
@@ -154,26 +163,66 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
     setUploading(true);
     setError(null);
-    setUploadProgress("Preparing upload...");
+    setUploadProgress("Extracting cover image from PDF...");
 
     try {
+      // 1. Generate cover image blob from page 1 locally in the browser
+      let coverBlob: Blob | null = null;
+      try {
+        coverBlob = await renderPdfFirstPageToBlob(selectedFile, {
+          scale: 1.5,
+          format: "image/webp",
+          quality: 0.9,
+        });
+      } catch (thumbErr) {
+        console.warn("Failed to generate local PDF cover image:", thumbErr);
+      }
+
       let uploadedToR2 = false;
       let r2Key = "";
+      let coverImageKey: string | null = null;
 
-      // 1. Attempt direct presigned upload to Cloudflare R2 with progress tracking
+      // 2. Direct upload to Cloudflare R2
       try {
         setUploadProgress("Preparing secure direct upload...");
-        const presigned = await getGamePdfUploadUrl(
-          entityType,
-          entityId,
-          selectedFile.name,
-          selectedFile.type || "application/pdf"
-        );
+        const [presignedPdf, presignedCover] = await Promise.all([
+          getGamePdfUploadUrl(
+            entityType,
+            entityId,
+            selectedFile.name,
+            selectedFile.type || "application/pdf"
+          ),
+          coverBlob
+            ? getGamePdfCoverUploadUrl(
+                entityType,
+                entityId,
+                selectedFile.name,
+                coverBlob.type || "image/webp"
+              )
+            : Promise.resolve(null),
+        ]);
+
+        // Upload cover thumbnail to R2 if generated
+        if (presignedCover && coverBlob) {
+          try {
+            setUploadProgress("Uploading cover image...");
+            const coverRes = await fetch(presignedCover.presignedUrl, {
+              method: "PUT",
+              body: coverBlob,
+              headers: { "Content-Type": coverBlob.type || "image/webp" },
+            });
+            if (coverRes.ok) {
+              coverImageKey = presignedCover.key;
+            }
+          } catch (coverUploadErr) {
+            console.warn("Failed to upload direct cover image:", coverUploadErr);
+          }
+        }
 
         setUploadProgress("Uploading PDF (0%)...");
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open("PUT", presigned.presignedUrl);
+          xhr.open("PUT", presignedPdf.presignedUrl);
           xhr.setRequestHeader("Content-Type", selectedFile.type || "application/pdf");
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -195,13 +244,13 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           xhr.send(selectedFile);
         });
 
-        r2Key = presigned.key;
+        r2Key = presignedPdf.key;
         uploadedToR2 = true;
       } catch (directErr) {
         console.warn("Direct R2 presigned upload failed, trying server fallback:", directErr);
       }
 
-      // 2. Fallback to server-side action if direct PUT failed
+      // 3. Fallback to server-side action if direct PUT failed
       if (uploadedToR2 && r2Key) {
         setUploadProgress("Saving PDF record...");
         await saveGamePdf(entityType, entityId, {
@@ -209,6 +258,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           r2Key,
           fileSize: selectedFile.size,
           description: description.trim() || null,
+          coverImageKey,
         });
       } else {
         setUploadProgress("Uploading via server fallback...");
@@ -218,10 +268,13 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
         if (description.trim()) {
           formData.append("description", description.trim());
         }
+        if (coverBlob) {
+          formData.append("coverFile", coverBlob, "cover.webp");
+        }
         await uploadGamePdfServerSide(entityType, entityId, formData);
       }
 
-      toast.success("PDF uploaded successfully!");
+      toast.success("PDF uploaded successfully with cover image!");
       setDialogOpen(false);
       router.refresh();
     } catch (err: unknown) {
@@ -231,6 +284,48 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     } finally {
       setUploading(false);
       setUploadProgress(null);
+    }
+  };
+
+  // Generate cover on-demand for existing PDFs that don't have one
+  const handleGenerateCover = async (e: React.MouseEvent, pdf: GameInfoLink) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setGeneratingCoverId(pdf.id);
+    try {
+      toast.info("Extracting cover image from PDF...");
+      const blob = await renderPdfFirstPageToBlob(pdf.url, {
+        scale: 1.5,
+        format: "image/webp",
+        quality: 0.9,
+      });
+
+      const presigned = await getGamePdfCoverUploadUrl(
+        entityType,
+        entityId,
+        pdf.title || "document",
+        blob.type || "image/webp"
+      );
+
+      const uploadRes = await fetch(presigned.presignedUrl, {
+        method: "PUT",
+        body: blob,
+        headers: { "Content-Type": blob.type || "image/webp" },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Failed to upload cover to storage (HTTP ${uploadRes.status})`);
+      }
+
+      await savePdfCoverImage(entityType, entityId, pdf.id, presigned.key);
+      toast.success("Cover image generated and saved!");
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate cover image";
+      toast.error(msg);
+    } finally {
+      setGeneratingCoverId(null);
     }
   };
 
@@ -616,15 +711,52 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
                         {/* Document Title Column */}
                         <TableCell className="py-3 px-3">
-                          <div className="min-w-0">
-                            <span className="font-bold text-sm text-foreground hover:text-primary transition-colors block truncate">
-                              {pdf.title}
-                            </span>
-                            {pdf.description && (
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                {pdf.description}
-                              </p>
-                            )}
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {/* PDF Thumbnail */}
+                            <div className="w-10 h-14 rounded-sm border border-primary/30 overflow-hidden bg-black/60 shrink-0 shadow-md flex items-center justify-center relative">
+                              {pdf.cover_image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={getR2PublicUrl(pdf.cover_image)}
+                                  alt={pdf.title}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <FileText className="h-5 w-5 text-primary/50" />
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <span className="font-bold text-sm text-foreground hover:text-primary transition-colors block truncate">
+                                {pdf.title}
+                              </span>
+                              {pdf.description && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {pdf.description}
+                                </p>
+                              )}
+                              {!pdf.cover_image && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleGenerateCover(e, pdf)}
+                                  disabled={generatingCoverId === pdf.id}
+                                  className="inline-flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary mt-1 font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
+                                >
+                                  {generatingCoverId === pdf.id ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      Generating Cover...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ImagePlus className="h-3 w-3" />
+                                      Generate Cover
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
 

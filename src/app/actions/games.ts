@@ -665,6 +665,16 @@ export async function deleteGameLink(entityType: GameEntityType, entityId: strin
         console.warn("Failed to delete R2 PDF object:", delErr);
       }
     }
+
+    // Clean up associated cover image if present
+    const coverKey = (targetLink.cover_image as string) || null;
+    if (coverKey) {
+      try {
+        await deleteR2Object(coverKey);
+      } catch (delErr) {
+        console.warn("Failed to delete R2 PDF cover image object:", delErr);
+      }
+    }
   }
 
   revalidateGamePaths();
@@ -684,6 +694,36 @@ export async function getGamePdfUploadUrl(
   const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = Date.now();
   const key = `games/${entityType}/${entityId}/pdfs/${timestamp}-${cleanFilename}`;
+
+  const result = await generatePresignedUploadUrl(key, contentType);
+  return { success: true, ...result };
+}
+
+/**
+ * Generates a presigned Cloudflare R2 upload URL for a PDF cover/thumbnail image.
+ */
+export async function getGamePdfCoverUploadUrl(
+  entityType: GameEntityType,
+  entityId: string,
+  pdfFilename: string,
+  contentType = "image/webp"
+): Promise<{
+  success: true;
+  presignedUrl: string;
+  key: string;
+  publicUrl: string;
+}> {
+  await requireAuth();
+
+  const validTypes = ["image/webp", "image/jpeg", "image/png", "image/jpg"];
+  if (!validTypes.includes(contentType)) {
+    throw new Error("Invalid image content type for PDF cover.");
+  }
+
+  const cleanFilename = pdfFilename.replace(/\.pdf$/i, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = Date.now();
+  const ext = contentType === "image/jpeg" || contentType === "image/jpg" ? "jpg" : "webp";
+  const key = `games/${entityType}/${entityId}/pdfs/${timestamp}-${cleanFilename}-cover.${ext}`;
 
   const result = await generatePresignedUploadUrl(key, contentType);
   return { success: true, ...result };
@@ -755,6 +795,7 @@ export async function saveGamePdf(
     r2Key: string;
     fileSize?: number | null;
     description?: string | null;
+    coverImageKey?: string | null;
   }
 ) {
   await requireAuth();
@@ -799,10 +840,12 @@ export async function saveGamePdf(
     title: input.title.trim(),
     url: publicUrl,
     r2_key: input.r2Key,
+    cover_image: input.coverImageKey || null,
     category: "PDF",
     description: input.description?.trim() || null,
     file_size: input.fileSize || null,
     position: nextPosition,
+    uploaded_at: new Date().toISOString(),
   };
 
   const updatedLinks = [...existingLinks, newPdfLink];
@@ -830,6 +873,7 @@ export async function uploadGamePdfServerSide(
 ) {
   await requireAuth();
   const file = formData.get("file") as File | null;
+  const coverFile = formData.get("coverFile") as File | null;
   const title = (formData.get("title") as string | null) || file?.name || "Document";
   const description = (formData.get("description") as string | null) || null;
 
@@ -846,12 +890,95 @@ export async function uploadGamePdfServerSide(
 
   const { key: r2Key } = await uploadR2Object(key, buffer, file.type || "application/pdf");
 
+  let coverImageKey: string | null = null;
+  if (coverFile) {
+    try {
+      const coverClean = (coverFile.name || "cover.webp").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const coverKey = `games/${entityType}/${entityId}/pdfs/${timestamp}-${cleanFilename}-cover-${coverClean}`;
+      const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
+      const { key: uploadedCoverKey } = await uploadR2Object(
+        coverKey,
+        coverBuffer,
+        coverFile.type || "image/webp"
+      );
+      coverImageKey = uploadedCoverKey;
+    } catch (coverErr) {
+      console.warn("Failed to upload fallback cover image to R2:", coverErr);
+    }
+  }
+
   return await saveGamePdf(entityType, entityId, {
     title,
     r2Key,
     fileSize: file.size,
     description,
+    coverImageKey,
   });
+}
+
+/**
+ * Updates or persists a cover image key for an existing PDF document link.
+ */
+export async function savePdfCoverImage(
+  entityType: GameEntityType,
+  entityId: string,
+  linkId: string,
+  coverImageKey: string
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const targetLink = existingLinks.find((item) => item.id === linkId);
+  if (!targetLink) {
+    throw new Error("PDF document not found");
+  }
+
+  // Delete previous cover if different
+  const oldCoverKey = (targetLink.cover_image as string) || null;
+  if (oldCoverKey && oldCoverKey !== coverImageKey) {
+    try {
+      await deleteR2Object(oldCoverKey);
+    } catch (delErr) {
+      console.warn("Failed to delete old PDF cover from R2:", delErr);
+    }
+  }
+
+  const updatedLinks = existingLinks.map((item) => {
+    if (item.id === linkId) {
+      return {
+        ...item,
+        cover_image: coverImageKey,
+      };
+    }
+    return item;
+  });
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   isGameResourceLink,
   sortGamePdfLinks,
 } from "@/lib/games/game-details";
+import { getR2PublicUrl } from "@/lib/r2";
 import type { GameEntityType } from "@/app/actions/games";
 
 export const dynamic = "force-dynamic";
@@ -181,6 +182,9 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   const firstPdf = sortedPdfLinks[0];
   const firstPdfUrl = firstPdf?.url || null;
   const firstPdfTitle = firstPdf?.title || null;
+  const firstPdfPrecomputedCover = firstPdf?.cover_image
+    ? getR2PublicUrl(firstPdf.cover_image)
+    : null;
 
   // URL for filtering miniatures of this game/edition/expansion
   const miniatureFilterParams = new URLSearchParams();
@@ -370,6 +374,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
             year={displayYear}
             pdfCoverUrl={firstPdfUrl}
             pdfCoverTitle={firstPdfTitle}
+            pdfPrecomputedCoverUrl={firstPdfPrecomputedCover}
           />
 
           <div className="mt-5 w-full max-w-[340px] space-y-2">

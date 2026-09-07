@@ -11,6 +11,7 @@ export interface GameInfoLink {
   uploaded_at?: string | null;
   image_updated_at?: string | null;
   position?: number | null;
+  cover_image?: string | null;
 }
 
 export interface GameMetadata {

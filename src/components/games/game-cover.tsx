@@ -15,6 +15,7 @@ interface GameCoverProps {
   year?: number | null;
   pdfCoverUrl?: string | null;
   pdfCoverTitle?: string | null;
+  pdfPrecomputedCoverUrl?: string | null;
 }
 
 export function GameCover({
@@ -27,19 +28,27 @@ export function GameCover({
   year,
   pdfCoverUrl,
   pdfCoverTitle,
+  pdfPrecomputedCoverUrl,
 }: GameCoverProps) {
   const [imageError, setImageError] = useState(false);
+  const [precomputedError, setPrecomputedError] = useState(false);
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null);
   const [failedPdfUrl, setFailedPdfUrl] = useState<string | null>(null);
 
+  const hasPrecomputed = Boolean(pdfPrecomputedCoverUrl && !precomputedError);
   const pdfError = Boolean(pdfCoverUrl && failedPdfUrl === pdfCoverUrl);
-  const pdfLoading = Boolean(pdfCoverUrl && loadedPdfUrl !== pdfCoverUrl && !pdfError);
-  const effectivePdfDataUrl = pdfCoverUrl && loadedPdfUrl === pdfCoverUrl ? pdfDataUrl : null;
-  const hasPdfCover = Boolean(pdfCoverUrl && !pdfError);
+  // Only consider on-the-fly PDF loading if no valid precomputed cover is available
+  const pdfLoading = Boolean(
+    !hasPrecomputed && pdfCoverUrl && loadedPdfUrl !== pdfCoverUrl && !pdfError
+  );
+  const effectivePdfDataUrl =
+    !hasPrecomputed && pdfCoverUrl && loadedPdfUrl === pdfCoverUrl ? pdfDataUrl : null;
+  const hasPdfCover = Boolean(!hasPrecomputed && pdfCoverUrl && !pdfError);
 
   useEffect(() => {
-    if (!pdfCoverUrl) return;
+    // Skip on-the-fly extraction if we already have a valid precomputed cover from R2
+    if (!pdfCoverUrl || pdfPrecomputedCoverUrl) return;
 
     let active = true;
     getPdfFirstPageDataUrl(pdfCoverUrl)
@@ -59,7 +68,7 @@ export function GameCover({
     return () => {
       active = false;
     };
-  }, [pdfCoverUrl]);
+  }, [pdfCoverUrl, pdfPrecomputedCoverUrl]);
 
   const isBook = coverType === "book";
   const resolvedCoverUrl = coverImage ? getR2PublicUrl(coverImage) : coverUrl;
@@ -84,7 +93,15 @@ export function GameCover({
         {/* Inner Gold Foil Frame */}
         <div className="absolute inset-3 border border-primary/20 pointer-events-none z-20" />
 
-        {hasPdfCover && pdfLoading ? (
+        {hasPrecomputed && pdfPrecomputedCoverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={pdfPrecomputedCoverUrl}
+            alt={title}
+            className="absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300"
+            onError={() => setPrecomputedError(true)}
+          />
+        ) : hasPdfCover && pdfLoading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-neutral-950/90">
             <div className="p-3 rounded-full bg-primary/15 border border-primary/40 animate-pulse mb-3">
               <Loader2 className="h-7 w-7 text-primary animate-spin" />
