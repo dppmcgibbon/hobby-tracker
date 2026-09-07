@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, BookOpen, Package, Camera, FileText, ImageIcon } from "lucide-react";
+import { ChevronRight, BookOpen, Package, FileText, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -375,28 +375,10 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
             pdfCoverUrl={firstPdfUrl}
             pdfCoverTitle={firstPdfTitle}
             pdfPrecomputedCoverUrl={firstPdfPrecomputedCover}
+            entityType={targetEntityType}
+            entityId={targetEntityId}
+            firstPdfId={firstPdf?.id || null}
           />
-
-          <div className="mt-5 w-full max-w-[340px] space-y-2">
-            {/* Direct Cover Upload/Edit Trigger under the Cover */}
-            <GameEditDialog
-              entityType={targetEntityType}
-              entityId={targetEntityId}
-              title={displayTitle}
-              currentCoverImage={targetCoverImage}
-              currentDescription={rawDescription}
-              mode="cover"
-              trigger={
-                <Button
-                  variant="outline"
-                  className="w-full border-primary/30 hover:border-primary hover:bg-primary/10 font-bold uppercase text-xs tracking-wider"
-                >
-                  <Camera className="h-4 w-4 mr-2 text-primary" />
-                  {targetCoverImage ? "Change Cover Image" : "Upload Cover Image"}
-                </Button>
-              }
-            />
-          </div>
         </div>
 
         {/* Right Column: Game Information, Text & Links */}
@@ -422,7 +404,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
                   title={displayTitle}
                   currentCoverImage={targetCoverImage}
                   currentDescription={rawDescription}
-                  mode="all"
+                  mode="description"
                   triggerVariant="icon"
                 />
               </CardHeader>
