@@ -1,6 +1,18 @@
 import { requireAuth } from "@/lib/auth/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Archive, Tag, Gamepad2, BookOpen, Database, Shield, Upload, Layers, Palette, Bookmark } from "lucide-react";
+import {
+  Archive,
+  Tag,
+  Gamepad2,
+  BookOpen,
+  Database,
+  Shield,
+  Upload,
+  Layers,
+  Palette,
+  Bookmark,
+  FolderArchive,
+} from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -79,8 +91,15 @@ export default async function AdminPage() {
       color: "text-indigo-500",
     },
     {
+      title: "Backup Management",
+      description: "Export full table data CSVs and download R2 photos & game PDFs",
+      icon: FolderArchive,
+      href: "/dashboard/admin/backup",
+      color: "text-emerald-500",
+    },
+    {
       title: "Database Management",
-      description: "Backup and restore your database",
+      description: "Legacy database backup and restore",
       icon: Database,
       href: "/dashboard/admin/database",
       color: "text-red-500",
@@ -111,19 +130,13 @@ export default async function AdminPage() {
                   <div className="p-3 bg-primary/10 rounded-sm border border-primary/30">
                     <Icon className={`h-6 w-6 ${section.color}`} />
                   </div>
-                  <CardTitle className="text-xl uppercase tracking-wide">
-                    {section.title}
-                  </CardTitle>
+                  <CardTitle className="text-xl uppercase tracking-wide">{section.title}</CardTitle>
                 </div>
-                <CardDescription className="text-base">
-                  {section.description}
-                </CardDescription>
+                <CardDescription className="text-base">{section.description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full" variant="outline">
-                  <Link href={section.href}>
-                    Open {section.title.replace(" Management", "")}
-                  </Link>
+                  <Link href={section.href}>Open {section.title.replace(" Management", "")}</Link>
                 </Button>
               </CardContent>
             </Card>
