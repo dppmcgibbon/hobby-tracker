@@ -56,6 +56,7 @@ export function GameCoverModal({
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
+  const [isApplyingCrop, setIsApplyingCrop] = useState(false);
   const [lockAspect, setLockAspect] = useState<"free" | "3:4">("3:4");
 
   // Crop box state (percentages of container image)
@@ -73,6 +74,7 @@ export function GameCoverModal({
   useEffect(() => {
     if (open) {
       setCurrentDisplayUrl(imageUrl);
+      setOriginalBlob(null);
       setEditedBlob(null);
       setHasUnsavedChanges(false);
       setIsCropping(false);
@@ -129,14 +131,25 @@ export function GameCoverModal({
     setIsCropping(true);
   };
 
-  // Apply Crop via Canvas
+  // Apply Crop via Canvas (loads clean same-origin blob to avoid "The operation is insecure")
   const handleApplyCrop = async () => {
-    const img = imageElementRef.current;
-    if (!img) return;
+    if (isApplyingCrop) return;
+    setIsApplyingCrop(true);
 
     try {
-      const naturalWidth = img.naturalWidth;
-      const naturalHeight = img.naturalHeight;
+      // Ensure we have a same-origin Blob to prevent tainted canvas SecurityError
+      const sourceBlob = await ensureBlob();
+      const blobUrl = URL.createObjectURL(sourceBlob);
+
+      const cleanImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to load image for cropping"));
+        img.src = blobUrl;
+      });
+
+      const naturalWidth = cleanImg.naturalWidth;
+      const naturalHeight = cleanImg.naturalHeight;
 
       const sx = Math.max(0, Math.floor((cropRect.x / 100) * naturalWidth));
       const sy = Math.max(0, Math.floor((cropRect.y / 100) * naturalHeight));
@@ -147,6 +160,7 @@ export function GameCoverModal({
       );
 
       if (sWidth <= 0 || sHeight <= 0) {
+        URL.revokeObjectURL(blobUrl);
         toast.error("Invalid crop area selected.");
         return;
       }
@@ -157,12 +171,14 @@ export function GameCoverModal({
 
       const ctx = canvas.getContext("2d");
       if (!ctx) {
+        URL.revokeObjectURL(blobUrl);
         throw new Error("Unable to create canvas context");
       }
 
-      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+      ctx.drawImage(cleanImg, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+      URL.revokeObjectURL(blobUrl);
 
-      const mimeType = editedBlob?.type === "image/png" ? "image/png" : "image/webp";
+      const mimeType = sourceBlob.type === "image/png" ? "image/png" : "image/webp";
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
           (b) => (b ? resolve(b) : reject(new Error("Failed to export cropped image"))),
@@ -179,7 +195,10 @@ export function GameCoverModal({
       toast.success("Image cropped");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to apply crop";
+      console.error("Crop error:", err);
       toast.error(msg);
+    } finally {
+      setIsApplyingCrop(false);
     }
   };
 
@@ -446,10 +465,15 @@ export function GameCoverModal({
               <Button
                 type="button"
                 size="sm"
+                disabled={isApplyingCrop}
                 onClick={handleApplyCrop}
-                className="h-7 px-2.5 rounded-full bg-primary hover:bg-primary/90 text-black font-black text-xs uppercase tracking-wider"
+                className="h-7 px-2.5 rounded-full bg-primary hover:bg-primary/90 text-black font-black text-xs uppercase tracking-wider disabled:opacity-50"
               >
-                <Check className="h-3.5 w-3.5 mr-1" />
+                {isApplyingCrop ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                )}
                 Apply
               </Button>
 
@@ -457,6 +481,7 @@ export function GameCoverModal({
                 type="button"
                 variant="ghost"
                 size="sm"
+                disabled={isApplyingCrop}
                 onClick={handleCancelCrop}
                 className="h-7 px-2 rounded-full text-muted-foreground hover:text-foreground text-xs uppercase font-bold tracking-wider"
               >

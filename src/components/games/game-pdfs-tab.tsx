@@ -38,6 +38,8 @@ import {
   ChevronUp,
   ChevronDown,
   ImagePlus,
+  LayoutList,
+  LayoutGrid,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
@@ -75,6 +77,9 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   const [pdfItems, setPdfItems] = useState<GameInfoLink[]>(() =>
     sortGamePdfLinks(links.filter(isGamePdfLink))
   );
+
+  // View mode state (list view default)
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Sync with prop updates
   useEffect(() => {
@@ -462,144 +467,184 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           </CardDescription>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={handleOpenDialog}>
-          <DialogTrigger asChild>
-            <Button
-              className="btn-warhammer-primary h-8 w-8 p-0"
-              size="sm"
-              title="Upload PDF"
-              aria-label="Upload PDF"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg bg-card border-primary/30">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
-                <Upload className="h-5 w-5 text-primary" />
-                Upload PDF Document
-              </DialogTitle>
-            </DialogHeader>
-
-            <form onSubmit={handleUpload} className="space-y-4 pt-2">
-              {/* Dropzone */}
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive
-                    ? "border-primary bg-primary/10"
-                    : selectedFile
-                      ? "border-primary/50 bg-primary/5"
-                      : "border-primary/30 hover:border-primary/60 hover:bg-muted/30"
+        <div className="flex items-center gap-2.5">
+          {/* List vs Grid View Toggle */}
+          {pdfItems.length > 0 && (
+            <div className="flex items-center bg-black/60 border border-primary/30 rounded p-0.5 shadow-sm">
+              <Button
+                type="button"
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className={`h-7 w-7 p-0 rounded-sm ${
+                  viewMode === "list"
+                    ? "bg-primary text-black hover:bg-primary/90 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
+                title="List View"
+                aria-label="List View"
               >
-                <input {...getInputProps()} />
-                {selectedFile ? (
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <FileCheck2 className="h-10 w-10 text-primary" />
-                    <p className="text-sm font-bold text-foreground break-all">
-                      {selectedFile.name}
-                    </p>
-                    <span className="text-xs text-muted-foreground">
-                      {formatBytes(selectedFile.size)} • Click or drop to replace
+                <LayoutList className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className={`h-7 w-7 p-0 rounded-sm ${
+                  viewMode === "grid"
+                    ? "bg-primary text-black hover:bg-primary/90 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Grid View"
+                aria-label="Grid View"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          <Dialog open={dialogOpen} onOpenChange={handleOpenDialog}>
+            <DialogTrigger asChild>
+              <Button
+                className="btn-warhammer-primary h-8 w-8 p-0"
+                size="sm"
+                title="Upload PDF"
+                aria-label="Upload PDF"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg bg-card border-primary/30">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-primary" />
+                  Upload PDF Document
+                </DialogTitle>
+              </DialogHeader>
+
+              <form onSubmit={handleUpload} className="space-y-4 pt-2">
+                {/* Dropzone */}
+                <div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
+                    isDragActive
+                      ? "border-primary bg-primary/10"
+                      : selectedFile
+                        ? "border-primary/50 bg-primary/5"
+                        : "border-primary/30 hover:border-primary/60 hover:bg-muted/30"
+                  }`}
+                >
+                  <input {...getInputProps()} />
+                  {selectedFile ? (
+                    <div className="flex flex-col items-center gap-2 text-primary">
+                      <FileCheck2 className="h-10 w-10 text-primary" />
+                      <p className="text-sm font-bold text-foreground break-all">
+                        {selectedFile.name}
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {formatBytes(selectedFile.size)} • Click or drop to replace
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Upload className="h-10 w-10 text-primary/70" />
+                      <p className="text-sm font-bold text-foreground">
+                        Click to choose or drag & drop a PDF
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Official rulebooks, errata, battle packs (up to 250MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Title Input */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="pdf-title"
+                    className="text-xs font-bold uppercase tracking-wide text-foreground/90"
+                  >
+                    Document Title <span className="text-primary">*</span>
+                  </Label>
+                  <Input
+                    id="pdf-title"
+                    placeholder="e.g. Core Rulebook, Battle Pack, Reference Sheet"
+                    value={pdfTitle}
+                    onChange={(e) => setPdfTitle(e.target.value)}
+                    className="bg-background border-primary/30 text-sm focus-visible:border-primary"
+                    required
+                  />
+                </div>
+
+                {/* Optional Description */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="pdf-desc"
+                    className="text-xs font-bold uppercase tracking-wide text-foreground/90"
+                  >
+                    Description{" "}
+                    <span className="text-muted-foreground text-[10px] normal-case">
+                      (optional)
                     </span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Upload className="h-10 w-10 text-primary/70" />
-                    <p className="text-sm font-bold text-foreground">
-                      Click to choose or drag & drop a PDF
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Official rulebooks, errata, battle packs (up to 250MB)
-                    </p>
+                  </Label>
+                  <Input
+                    id="pdf-desc"
+                    placeholder="e.g. Official 1989 edition core rulebook with intro mission"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="bg-background border-primary/30 text-sm focus-visible:border-primary"
+                  />
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{error}</span>
                   </div>
                 )}
-              </div>
 
-              {/* Title Input */}
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="pdf-title"
-                  className="text-xs font-bold uppercase tracking-wide text-foreground/90"
-                >
-                  Document Title <span className="text-primary">*</span>
-                </Label>
-                <Input
-                  id="pdf-title"
-                  placeholder="e.g. Core Rulebook, Battle Pack, Reference Sheet"
-                  value={pdfTitle}
-                  onChange={(e) => setPdfTitle(e.target.value)}
-                  className="bg-background border-primary/30 text-sm focus-visible:border-primary"
-                  required
-                />
-              </div>
+                {/* Upload Progress Status */}
+                {uploadProgress && (
+                  <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/30 rounded p-2.5">
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0 text-primary" />
+                    <span>{uploadProgress}</span>
+                  </div>
+                )}
 
-              {/* Optional Description */}
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="pdf-desc"
-                  className="text-xs font-bold uppercase tracking-wide text-foreground/90"
-                >
-                  Description{" "}
-                  <span className="text-muted-foreground text-[10px] normal-case">(optional)</span>
-                </Label>
-                <Input
-                  id="pdf-desc"
-                  placeholder="e.g. Official 1989 edition core rulebook with intro mission"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="bg-background border-primary/30 text-sm focus-visible:border-primary"
-                />
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2.5">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Upload Progress Status */}
-              {uploadProgress && (
-                <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/30 rounded p-2.5">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0 text-primary" />
-                  <span>{uploadProgress}</span>
-                </div>
-              )}
-
-              <DialogFooter className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={uploading}
-                  className="text-xs font-bold uppercase tracking-wider"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={uploading || !selectedFile || !pdfTitle.trim()}
-                  className="btn-warhammer-primary text-xs font-bold uppercase tracking-wider"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-3.5 w-3.5 mr-1.5" />
-                      Upload PDF
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                    disabled={uploading}
+                    className="text-xs font-bold uppercase tracking-wider"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={uploading || !selectedFile || !pdfTitle.trim()}
+                    className="btn-warhammer-primary text-xs font-bold uppercase tracking-wider"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5 mr-1.5" />
+                        Upload PDF
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-5 space-y-5">
@@ -627,106 +672,91 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="border border-primary/25 rounded-md overflow-hidden bg-black/40 shadow-sm">
-              <Table>
-                <TableHeader className="bg-black/60 border-b border-primary/25">
-                  <TableRow className="border-primary/20 hover:bg-transparent">
-                    <TableHead className="w-28 text-center font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
-                      #
-                    </TableHead>
-                    <TableHead className="font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
-                      Document Title
-                    </TableHead>
-                    <TableHead className="w-52 text-right font-bold uppercase tracking-wider text-xs text-primary/90 py-3 pr-4">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pdfItems.map((pdf, index) => {
-                    const isPreviewing = previewPdfId === pdf.id;
-                    const isDeleting = deletingId === pdf.id;
-                    const isDragging = draggedIndex === index;
-                    const isDragOver = dragOverIndex === index && draggedIndex !== index;
-                    const ordinal = index + 1;
+            {viewMode === "list" ? (
+              <div className="border border-primary/25 rounded-md overflow-hidden bg-black/40 shadow-sm">
+                <Table>
+                  <TableHeader className="bg-black/60 border-b border-primary/25">
+                    <TableRow className="border-primary/20 hover:bg-transparent">
+                      <TableHead className="w-28 text-center font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
+                        #
+                      </TableHead>
+                      <TableHead className="font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
+                        Document Title
+                      </TableHead>
+                      <TableHead className="w-52 text-right font-bold uppercase tracking-wider text-xs text-primary/90 py-3 pr-4">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pdfItems.map((pdf, index) => {
+                      const isPreviewing = previewPdfId === pdf.id;
+                      const isDeleting = deletingId === pdf.id;
+                      const isDragging = draggedIndex === index;
+                      const isDragOver = dragOverIndex === index && draggedIndex !== index;
+                      const ordinal = index + 1;
 
-                    return (
-                      <TableRow
-                        key={pdf.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDrop={(e) => handleDrop(e, index)}
-                        className={`group transition-all duration-150 select-none ${
-                          isDragging
-                            ? "opacity-30 bg-primary/10 border-dashed border-primary"
-                            : isDragOver
-                              ? "bg-primary/20 border-t-2 border-t-primary shadow-gold"
-                              : isPreviewing
-                                ? "bg-primary/10 border-primary/40 shadow-gold"
-                                : "border-primary/15 hover:bg-primary/5"
-                        }`}
-                      >
-                        {/* Ordinal Column */}
-                        <TableCell className="text-center font-mono py-3 pl-3 pr-2">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <div
-                              className="cursor-grab active:cursor-grabbing text-muted-foreground/70 group-hover:text-primary transition-colors p-1 rounded hover:bg-primary/10"
-                              title="Drag to reorder"
-                            >
-                              <GripVertical className="h-4 w-4" />
-                            </div>
-                            <span className="inline-flex items-center justify-center min-w-[26px] h-6 px-1.5 rounded bg-primary/15 text-primary text-xs font-bold border border-primary/30">
-                              {ordinal}
-                            </span>
-                            <div className="flex flex-col -my-1 ml-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                disabled={index === 0 || isSavingOrder}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMove(index, "up");
-                                }}
-                                className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
-                                title="Move up"
+                      return (
+                        <TableRow
+                          key={pdf.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={handleDragEnd}
+                          onDrop={(e) => handleDrop(e, index)}
+                          className={`group transition-all duration-150 select-none ${
+                            isDragging
+                              ? "opacity-30 bg-primary/10 border-dashed border-primary"
+                              : isDragOver
+                                ? "bg-primary/20 border-t-2 border-t-primary shadow-gold"
+                                : isPreviewing
+                                  ? "bg-primary/10 border-primary/40 shadow-gold"
+                                  : "border-primary/15 hover:bg-primary/5"
+                          }`}
+                        >
+                          {/* Ordinal Column */}
+                          <TableCell className="text-center font-mono py-3 pl-3 pr-2">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <div
+                                className="cursor-grab active:cursor-grabbing text-muted-foreground/70 group-hover:text-primary transition-colors p-1 rounded hover:bg-primary/10"
+                                title="Drag to reorder"
                               >
-                                <ChevronUp className="h-3 w-3" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={index === pdfItems.length - 1 || isSavingOrder}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMove(index, "down");
-                                }}
-                                className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
-                                title="Move down"
-                              >
-                                <ChevronDown className="h-3 w-3" />
-                              </button>
+                                <GripVertical className="h-4 w-4" />
+                              </div>
+                              <span className="inline-flex items-center justify-center min-w-[26px] h-6 px-1.5 rounded bg-primary/15 text-primary text-xs font-bold border border-primary/30">
+                                {ordinal}
+                              </span>
+                              <div className="flex flex-col -my-1 ml-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  disabled={index === 0 || isSavingOrder}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMove(index, "up");
+                                  }}
+                                  className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                  title="Move up"
+                                >
+                                  <ChevronUp className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === pdfItems.length - 1 || isSavingOrder}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMove(index, "down");
+                                  }}
+                                  className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                  title="Move down"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
+                          </TableCell>
 
-                        {/* Document Title Column */}
-                        <TableCell className="py-3 px-3">
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            {/* PDF Thumbnail */}
-                            <div className="w-10 h-14 rounded-sm border border-primary/30 overflow-hidden bg-black/60 shrink-0 shadow-md flex items-center justify-center relative">
-                              {pdf.cover_image ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={getR2PublicUrl(pdf.cover_image)}
-                                  alt={pdf.title}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <FileText className="h-5 w-5 text-primary/50" />
-                              )}
-                            </div>
-
+                          {/* Document Title Column (Clean, without thumbnail) */}
+                          <TableCell className="py-3 px-3">
                             <div className="min-w-0">
                               <span className="font-bold text-sm text-foreground hover:text-primary transition-colors block truncate">
                                 {pdf.title}
@@ -736,103 +766,257 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                   {pdf.description}
                                 </p>
                               )}
-                              {!pdf.cover_image && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleGenerateCover(e, pdf)}
-                                  disabled={generatingCoverId === pdf.id}
-                                  className="inline-flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary mt-1 font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
-                                >
-                                  {generatingCoverId === pdf.id ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      Generating Cover...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <ImagePlus className="h-3 w-3" />
-                                      Generate Cover
-                                    </>
-                                  )}
-                                </button>
+                            </div>
+                          </TableCell>
+
+                          {/* Actions Column */}
+                          <TableCell className="py-3 pr-4 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              {pdf.file_size && (
+                                <span className="text-[10px] uppercase font-bold font-mono tracking-wider px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-primary/10 shrink-0">
+                                  {formatBytes(pdf.file_size)}
+                                </span>
                               )}
-                            </div>
-                          </div>
-                        </TableCell>
 
-                        {/* Actions Column */}
-                        <TableCell className="py-3 pr-4 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            {pdf.file_size && (
-                              <span className="text-[10px] uppercase font-bold font-mono tracking-wider px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-primary/10 shrink-0">
-                                {formatBytes(pdf.file_size)}
-                              </span>
-                            )}
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Button
-                                variant={isPreviewing ? "default" : "outline"}
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  togglePreview(pdf.id);
-                                }}
-                                className={`h-7 w-7 p-0 ${
-                                  isPreviewing
-                                    ? "bg-primary text-black hover:bg-primary/90"
-                                    : "border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
-                                }`}
-                                title={isPreviewing ? "Close Preview" : "Preview PDF"}
-                                aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
-                              >
-                                {isPreviewing ? (
-                                  <EyeOff className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Eye className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-
-                              <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="h-7 w-7 p-0 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
-                                title="Open in new window"
-                                aria-label="Open in new window"
-                              >
-                                <a
-                                  href={pdf.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  variant={isPreviewing ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePreview(pdf.id);
+                                  }}
+                                  className={`h-7 w-7 p-0 ${
+                                    isPreviewing
+                                      ? "bg-primary text-black hover:bg-primary/90"
+                                      : "border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                                  }`}
+                                  title={isPreviewing ? "Close Preview" : "Preview PDF"}
+                                  aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
                                 >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
+                                  {isPreviewing ? (
+                                    <EyeOff className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <Eye className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
 
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isDeleting}
-                                onClick={(e) => handleDelete(e, pdf.id, pdf.title)}
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                title="Delete PDF"
-                              >
-                                {isDeleting ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-3 w-3" />
-                                )}
-                              </Button>
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                                  title="Open in new window"
+                                  aria-label="Open in new window"
+                                >
+                                  <a
+                                    href={pdf.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
+                                </Button>
+
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={isDeleting}
+                                  onClick={(e) => handleDelete(e, pdf.id, pdf.title)}
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete PDF"
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              /* Grid View: Focused on thumbnail with doc title underneath */
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {pdfItems.map((pdf) => {
+                  const isPreviewing = previewPdfId === pdf.id;
+                  const isDeleting = deletingId === pdf.id;
+                  const coverUrl = pdf.cover_image ? getR2PublicUrl(pdf.cover_image) : null;
+
+                  return (
+                    <div
+                      key={pdf.id}
+                      className={`group relative flex flex-col rounded-md border transition-all duration-200 overflow-hidden bg-black/50 ${
+                        isPreviewing
+                          ? "border-primary shadow-gold ring-1 ring-primary"
+                          : "border-primary/25 hover:border-primary/60 hover:shadow-gold"
+                      }`}
+                    >
+                      {/* Thumbnail Container */}
+                      <div
+                        onClick={() => togglePreview(pdf.id)}
+                        className="relative aspect-[3/4] w-full bg-neutral-950 flex items-center justify-center overflow-hidden border-b border-primary/20 cursor-pointer"
+                      >
+                        {coverUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={coverUrl}
+                            alt={pdf.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center p-3 text-center">
+                            <FileText className="h-10 w-10 text-primary/40 mb-2" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              No Cover
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateCover(e, pdf);
+                              }}
+                              disabled={generatingCoverId === pdf.id}
+                              className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-2 font-semibold uppercase tracking-wider disabled:opacity-50"
+                            >
+                              {generatingCoverId === pdf.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <ImagePlus className="h-3 w-3" />
+                                  Generate Cover
+                                </>
+                              )}
+                            </button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                        )}
+
+                        {/* Actions Overlay */}
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-neutral-950/90 backdrop-blur-sm border border-primary/40 rounded p-1 shadow-xl">
+                          <Button
+                            variant={isPreviewing ? "default" : "ghost"}
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePreview(pdf.id);
+                            }}
+                            className={`h-6 w-6 p-0 ${
+                              isPreviewing
+                                ? "bg-primary text-black hover:bg-primary/90"
+                                : "text-muted-foreground hover:text-primary hover:bg-primary/20"
+                            }`}
+                            title={isPreviewing ? "Close Preview" : "Preview PDF"}
+                            aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
+                          >
+                            {isPreviewing ? (
+                              <EyeOff className="h-3 w-3" />
+                            ) : (
+                              <Eye className="h-3 w-3" />
+                            )}
+                          </Button>
+
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-primary/20"
+                            title="Open in new window"
+                            aria-label="Open in new window"
+                          >
+                            <a
+                              href={pdf.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isDeleting}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(e, pdf.id, pdf.title);
+                            }}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/20"
+                            title="Delete PDF"
+                            aria-label="Delete PDF"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Document Title Underneath */}
+                      <div className="p-3 flex flex-col justify-between flex-1 bg-card/20">
+                        <div>
+                          <span
+                            className="font-bold text-xs text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-snug cursor-pointer"
+                            title={pdf.title}
+                            onClick={() => togglePreview(pdf.id)}
+                          >
+                            {pdf.title}
+                          </span>
+                          {pdf.description && (
+                            <p
+                              className="text-[11px] text-muted-foreground line-clamp-1 mt-1"
+                              title={pdf.description}
+                            >
+                              {pdf.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/10 text-[10px] text-muted-foreground">
+                          {pdf.file_size ? (
+                            <span className="font-mono uppercase font-semibold">
+                              {formatBytes(pdf.file_size)}
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => togglePreview(pdf.id)}
+                            className={`p-1 rounded transition-colors ${
+                              isPreviewing
+                                ? "text-primary bg-primary/20"
+                                : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            }`}
+                            title={isPreviewing ? "Close Preview" : "Preview PDF"}
+                            aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
+                          >
+                            {isPreviewing ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Embedded PDF Viewer when Preview is active */}
             {activePreviewPdf && (

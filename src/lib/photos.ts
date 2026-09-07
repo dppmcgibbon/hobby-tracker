@@ -2,10 +2,7 @@
  * Returns the cache-busted image URL when the file has been replaced (e.g. after background removal).
  * Appending ?v=timestamp forces the browser to fetch the new image instead of serving a cached one.
  */
-export function getPhotoImageUrl(
-  publicUrl: string,
-  imageUpdatedAt?: string | null
-): string {
+export function getPhotoImageUrl(publicUrl: string, imageUpdatedAt?: string | null): string {
   if (!imageUpdatedAt) return publicUrl;
   const v = new Date(imageUpdatedAt).getTime();
   const sep = publicUrl.includes("?") ? "&" : "?";
@@ -24,10 +21,19 @@ export function getPhotoImageUrl(
  * 2. If direct fetch fails (e.g. strict CORS/network restrictions), seamlessly fall back
  *    to the same-origin server endpoint (/api/photos/blob?path=...).
  */
-export async function fetchPhotoBlob(
-  publicUrl: string,
-  storagePath?: string
-): Promise<Blob> {
+export async function fetchPhotoBlob(publicUrl: string, storagePath?: string): Promise<Blob> {
+  // Direct convert for data: or blob: URIs
+  if (publicUrl.startsWith("data:") || publicUrl.startsWith("blob:")) {
+    try {
+      const res = await fetch(publicUrl);
+      if (res.ok) {
+        return await res.blob();
+      }
+    } catch {
+      // fallback to network logic
+    }
+  }
+
   // 1. Direct fetch with cache-busting and explicit CORS mode
   try {
     const sep = publicUrl.includes("?") ? "&" : "?";
@@ -69,4 +75,3 @@ function extractKeyFromUrl(url: string): string | null {
     return null;
   }
 }
-
