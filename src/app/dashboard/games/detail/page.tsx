@@ -385,7 +385,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         <div className="lg:col-span-8">
           <TabsContent value="about" className="space-y-6 mt-0">
             {/* About The Game Text */}
-            <Card className="warhammer-card border-primary/30">
+            <Card className="warhammer-card border-primary/30 gap-0">
               <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
                 <div>
                   <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
@@ -408,7 +408,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
                   triggerVariant="icon"
                 />
               </CardHeader>
-              <CardContent className="pt-4">
+              <CardContent className="pt-3">
                 <p className="text-base text-foreground/90 leading-relaxed whitespace-pre-line">
                   {metadata.description}
                 </p>
