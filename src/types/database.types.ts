@@ -400,6 +400,7 @@ export type Database = {
           links: Json | null
           name: string
           publisher: string | null
+          sequence: number | null
           universe_id: string | null
           updated_at: string | null
         }
@@ -411,6 +412,7 @@ export type Database = {
           links?: Json | null
           name: string
           publisher?: string | null
+          sequence?: number | null
           universe_id?: string | null
           updated_at?: string | null
         }
@@ -422,6 +424,7 @@ export type Database = {
           links?: Json | null
           name?: string
           publisher?: string | null
+          sequence?: number | null
           universe_id?: string | null
           updated_at?: string | null
         }

@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ReorderableGamesTable } from "@/components/games/reorderable-games-table";
 
 export const dynamic = "force-dynamic";
 
@@ -96,47 +97,18 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         </div>
 
         {/* Expansions Table */}
-        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-primary/20 hover:bg-muted/30">
-                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
-                  Expansion
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!expansions || expansions.length === 0 ? (
-                <TableRow>
-                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
-                    No expansions found for this edition.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                expansions.map((exp) => (
-                  <TableRow
-                    key={exp.id}
-                    className="border-primary/10 hover:bg-muted/20 transition-colors"
-                  >
-                    <TableCell className="p-0">
-                      <Link
-                        href={`/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${editionId}&expansion=${exp.id}`}
-                        className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
-                      >
-                        {exp.name}
-                        {exp.year && (
-                          <span className="text-xs font-normal text-muted-foreground ml-2">
-                            ({exp.year})
-                          </span>
-                        )}
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <ReorderableGamesTable
+          type="expansions"
+          columnTitle="Expansion"
+          emptyMessage="No expansions found for this edition."
+          items={(expansions || []).map((exp) => ({
+            id: exp.id,
+            name: exp.name,
+            year: exp.year,
+            sequence: exp.sequence,
+            href: `/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${editionId}&expansion=${exp.id}`,
+          }))}
+        />
       </div>
     );
   }
@@ -200,54 +172,25 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         </div>
 
         {/* Editions Table */}
-        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-primary/20 hover:bg-muted/30">
-                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
-                  Edition
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!editions || editions.length === 0 ? (
-                <TableRow>
-                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
-                    No editions found for this game.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                editions.map((edition) => {
-                  const hasExpansions = edition.expansions && edition.expansions.length > 0;
-                  const href = hasExpansions
-                    ? `/dashboard/games?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`
-                    : `/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`;
+        <ReorderableGamesTable
+          type="editions"
+          columnTitle="Edition"
+          emptyMessage="No editions found for this game."
+          items={(editions || []).map((edition) => {
+            const hasExpansions = edition.expansions && edition.expansions.length > 0;
+            const href = hasExpansions
+              ? `/dashboard/games?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`
+              : `/dashboard/games/detail?universe=${resolvedUniverseId}&game=${gameId}&edition=${edition.id}`;
 
-                  return (
-                    <TableRow
-                      key={edition.id}
-                      className="border-primary/10 hover:bg-muted/20 transition-colors"
-                    >
-                      <TableCell className="p-0">
-                        <Link
-                          href={href}
-                          className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
-                        >
-                          {edition.name}
-                          {edition.year && (
-                            <span className="text-xs font-normal text-muted-foreground ml-2">
-                              ({edition.year})
-                            </span>
-                          )}
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+            return {
+              id: edition.id,
+              name: edition.name,
+              year: edition.year,
+              sequence: edition.sequence,
+              href,
+            };
+          })}
+        />
       </div>
     );
   }
@@ -259,8 +202,9 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
       supabase.from("universes").select("id, name").eq("id", universeId).single(),
       supabase
         .from("games")
-        .select("id, name, editions(id)")
+        .select("id, name, sequence, editions(id)")
         .eq("universe_id", universeId)
+        .order("sequence", { ascending: true, nullsFirst: false })
         .order("name", { ascending: true }),
     ]);
 
@@ -293,49 +237,24 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         </div>
 
         {/* Games Table */}
-        <div className="warhammer-card border-primary/30 rounded-sm overflow-hidden w-full">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-primary/20 hover:bg-muted/30">
-                <TableHead className="font-bold uppercase text-xs tracking-wide text-primary px-4 py-3">
-                  Game
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!games || games.length === 0 ? (
-                <TableRow>
-                  <TableCell className="px-4 py-8 text-center text-sm text-muted-foreground italic">
-                    No games found in this universe.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                games.map((game) => {
-                  const hasEditions = game.editions && game.editions.length > 0;
-                  const href = hasEditions
-                    ? `/dashboard/games?universe=${universeId}&game=${game.id}`
-                    : `/dashboard/games/detail?universe=${universeId}&game=${game.id}`;
+        <ReorderableGamesTable
+          type="games"
+          columnTitle="Game"
+          emptyMessage="No games found in this universe."
+          items={(games || []).map((game) => {
+            const hasEditions = game.editions && game.editions.length > 0;
+            const href = hasEditions
+              ? `/dashboard/games?universe=${universeId}&game=${game.id}`
+              : `/dashboard/games/detail?universe=${universeId}&game=${game.id}`;
 
-                  return (
-                    <TableRow
-                      key={game.id}
-                      className="border-primary/10 hover:bg-muted/20 transition-colors"
-                    >
-                      <TableCell className="p-0">
-                        <Link
-                          href={href}
-                          className="block w-full px-4 py-3.5 font-bold text-sm uppercase tracking-wide text-foreground hover:text-primary transition-colors"
-                        >
-                          {game.name}
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+            return {
+              id: game.id,
+              name: game.name,
+              sequence: game.sequence,
+              href,
+            };
+          })}
+        />
       </div>
     );
   }

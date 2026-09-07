@@ -214,6 +214,73 @@ export async function deleteExpansion(id: string) {
   return { success: true };
 }
 
+export async function reorderGames(orderedGameIds: string[]) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const updates = orderedGameIds.map((id, index) =>
+    supabase
+      .from("games")
+      .update({ sequence: index + 1 })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new Error(failed.error.message);
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
+  return { success: true };
+}
+
+export async function reorderEditions(orderedEditionIds: string[]) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const updates = orderedEditionIds.map((id, index) =>
+    supabase
+      .from("editions")
+      .update({ sequence: index + 1 })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new Error(failed.error.message);
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
+  return { success: true };
+}
+
+export async function reorderExpansions(orderedExpansionIds: string[]) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const updates = orderedExpansionIds.map((id, index) =>
+    supabase
+      .from("expansions")
+      .update({ sequence: index + 1 })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new Error(failed.error.message);
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/admin/games");
+  return { success: true };
+}
+
+
 // ==================== MINIATURE-GAME LINKS ====================
 
 export async function linkMiniatureToGame(data: MiniatureGameInput) {

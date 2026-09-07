@@ -5,6 +5,7 @@ export const gameSchema = z.object({
   description: z.string().max(10000).optional().nullable(),
   publisher: z.string().max(100).optional().nullable(),
   universe_id: z.string().uuid("Invalid universe").optional().nullable(),
+  sequence: z.number().int().optional().nullable(),
   cover_image: z.string().optional().nullable(),
 });
 
