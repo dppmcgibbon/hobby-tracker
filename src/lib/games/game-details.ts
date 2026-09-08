@@ -59,11 +59,39 @@ export function isGamePdfLink(link: GameInfoLink): boolean {
 }
 
 /**
- * Sorts PDF links by their explicit ordinal position (1, 2, 3...) if present,
+ * Resolves the category for a PDF link, defaulting to "Rules" if empty or unspecified.
+ */
+export function getPdfCategory(link: GameInfoLink): string {
+  const cat = link.pdf_category?.trim();
+  return cat && cat.length > 0 ? cat : "Rules";
+}
+
+/**
+ * Helper to identify whether a game link represents a PDF document in the "Rules" category.
+ */
+export function isGameRulesPdfLink(link: GameInfoLink): boolean {
+  if (!isGamePdfLink(link)) return false;
+  return getPdfCategory(link).toLowerCase() === "rules";
+}
+
+/**
+ * Sorts PDF links. "Rules" category PDFs are always prioritized first.
+ * Within the same category, items are sorted by their explicit ordinal position (1, 2, 3...) if present,
  * falling back to alphabetical comparison by title.
  */
 export function sortGamePdfLinks(links: GameInfoLink[]): GameInfoLink[] {
   return [...links].sort((a, b) => {
+    const isRulesA = isGameRulesPdfLink(a);
+    const isRulesB = isGameRulesPdfLink(b);
+    if (isRulesA && !isRulesB) return -1;
+    if (!isRulesA && isRulesB) return 1;
+
+    const catA = getPdfCategory(a).toLowerCase();
+    const catB = getPdfCategory(b).toLowerCase();
+    if (catA !== catB) {
+      return catA.localeCompare(catB, undefined, { sensitivity: "base" });
+    }
+
     const posA = typeof a.position === "number" ? a.position : undefined;
     const posB = typeof b.position === "number" ? b.position : undefined;
     if (posA !== undefined && posB !== undefined) {
@@ -75,6 +103,18 @@ export function sortGamePdfLinks(links: GameInfoLink[]): GameInfoLink[] {
     }
     return a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
   });
+}
+
+/**
+ * Returns the first PDF in the "Rules" category according to defined position and sorting rules.
+ * Strictly ignores any non-Rules category PDFs (e.g. Reference, Lore, House Rules).
+ * Returns null if no Rules PDFs exist.
+ */
+export function getFirstRulesPdf(links: GameInfoLink[]): GameInfoLink | null {
+  const rulesPdfs = links.filter(isGameRulesPdfLink);
+  if (rulesPdfs.length === 0) return null;
+  const sorted = sortGamePdfLinks(rulesPdfs);
+  return sorted[0] || null;
 }
 
 /**

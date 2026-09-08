@@ -19,6 +19,7 @@ import {
   uploadR2Object,
   getR2PublicUrl,
 } from "@/lib/r2";
+import { getFirstRulesPdf, type GameInfoLink } from "@/lib/games/game-details";
 
 // ==================== GAMES ====================
 
@@ -695,7 +696,7 @@ export async function deleteGameLink(entityType: GameEntityType, entityId: strin
 
   const { data: current, error: fetchError } = await supabase
     .from(tableName)
-    .select("links")
+    .select("links, cover_image")
     .eq("id", entityId)
     .single();
 
@@ -709,9 +710,25 @@ export async function deleteGameLink(entityType: GameEntityType, entityId: strin
   const targetLink = existingLinks.find((item) => item.id === linkId);
   const updatedLinks = existingLinks.filter((item) => item.id !== linkId);
 
+  const updatePayload: Record<string, unknown> = { links: updatedLinks };
+
+  // If the deleted link was currently used as the entity's cover_image
+  const deletedCoverKey = (targetLink?.cover_image as string) || null;
+  const currentEntityCover = (current?.cover_image as string) || null;
+  if (
+    currentEntityCover &&
+    (currentEntityCover === deletedCoverKey ||
+      currentEntityCover === (targetLink?.url as string) ||
+      currentEntityCover === (targetLink?.r2_key as string))
+  ) {
+    // Find the new first PDF in Rules
+    const newFirstRules = getFirstRulesPdf(updatedLinks as unknown as GameInfoLink[]);
+    updatePayload.cover_image = newFirstRules?.cover_image || null;
+  }
+
   const { error: updateError } = await supabase
     .from(tableName)
-    .update({ links: updatedLinks })
+    .update(updatePayload)
     .eq("id", entityId);
 
   if (updateError) {
@@ -810,7 +827,7 @@ export async function reorderGamePdfs(
 
   const { data: current, error: fetchError } = await supabase
     .from(tableName)
-    .select("links")
+    .select("links, cover_image")
     .eq("id", entityId)
     .single();
 
@@ -838,9 +855,17 @@ export async function reorderGamePdfs(
     return item;
   });
 
+  const updatePayload: Record<string, unknown> = { links: updatedLinks };
+
+  // Always keep the entity's cover_image in sync with the first Rules PDF if it has a cover
+  const firstRules = getFirstRulesPdf(updatedLinks as unknown as GameInfoLink[]);
+  if (firstRules?.cover_image) {
+    updatePayload.cover_image = firstRules.cover_image;
+  }
+
   const { error: updateError } = await supabase
     .from(tableName)
-    .update({ links: updatedLinks })
+    .update(updatePayload)
     .eq("id", entityId);
 
   if (updateError) {
@@ -872,7 +897,7 @@ export async function saveGamePdf(
 
   const { data: current, error: fetchError } = await supabase
     .from(tableName)
-    .select("links")
+    .select("links, cover_image")
     .eq("id", entityId)
     .single();
 
@@ -918,10 +943,18 @@ export async function saveGamePdf(
   };
 
   const updatedLinks = [...existingLinks, newPdfLink];
+  const updatePayload: Record<string, unknown> = { links: updatedLinks };
+
+  // If this new PDF is the first in the "Rules" category and has a cover image,
+  // set it as the entity cover if the entity doesn't already have one
+  const firstRules = getFirstRulesPdf(updatedLinks as unknown as GameInfoLink[]);
+  if (firstRules && firstRules.id === newPdfLink.id && input.coverImageKey && !current?.cover_image) {
+    updatePayload.cover_image = input.coverImageKey;
+  }
 
   const { error: updateError } = await supabase
     .from(tableName)
-    .update({ links: updatedLinks })
+    .update(updatePayload)
     .eq("id", entityId);
 
   if (updateError) {
@@ -1005,7 +1038,7 @@ export async function savePdfCoverImage(
 
   const { data: current, error: fetchError } = await supabase
     .from(tableName)
-    .select("links")
+    .select("links, cover_image")
     .eq("id", entityId)
     .single();
 
@@ -1042,9 +1075,17 @@ export async function savePdfCoverImage(
     return item;
   });
 
+  const updatePayload: Record<string, unknown> = { links: updatedLinks };
+
+  // If the updated PDF is the first PDF in the "Rules" category, sync its cover image directly to the entity
+  const firstRules = getFirstRulesPdf(updatedLinks as unknown as GameInfoLink[]);
+  if (firstRules && firstRules.id === linkId) {
+    updatePayload.cover_image = coverImageKey;
+  }
+
   const { error: updateError } = await supabase
     .from(tableName)
-    .update({ links: updatedLinks })
+    .update(updatePayload)
     .eq("id", entityId);
 
   if (updateError) {
