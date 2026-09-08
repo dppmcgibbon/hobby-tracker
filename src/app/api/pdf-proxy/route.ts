@@ -62,9 +62,14 @@ export async function GET(request: NextRequest) {
       responseHeaders.set("ETag", upstreamRes.headers.get("ETag")!);
     }
 
-    // Set inline disposition so browsers render the PDF inside iframes rather than prompting download
-    const filename = parsed.pathname.split("/").pop() || "document.pdf";
-    responseHeaders.set("Content-Disposition", `inline; filename="${filename}"`);
+    // Set disposition: attachment if download is requested, or inline so browsers render inside iframes
+    const isDownload = searchParams.get("download") === "true";
+    const customFilename = searchParams.get("filename") || parsed.pathname.split("/").pop() || "document.pdf";
+    const cleanFilename = customFilename.toLowerCase().endsWith(".pdf") ? customFilename : `${customFilename}.pdf`;
+    responseHeaders.set(
+      "Content-Disposition",
+      `${isDownload ? "attachment" : "inline"}; filename="${encodeURIComponent(cleanFilename)}"`
+    );
 
     // CORS headers
     responseHeaders.set("Access-Control-Allow-Origin", "*");

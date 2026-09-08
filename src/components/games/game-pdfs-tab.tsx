@@ -27,6 +27,7 @@ import {
 import {
   FileText,
   Upload,
+  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -820,6 +821,23 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                 </Button>
 
                                 <Button
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                                  title="Download PDF"
+                                  aria-label="Download PDF"
+                                >
+                                  <a
+                                    href={`/api/pdf-proxy?url=${encodeURIComponent(pdf.url)}&download=true&filename=${encodeURIComponent(pdf.title)}`}
+                                    download={`${pdf.title}.pdf`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </a>
+                                </Button>
+
+                                <Button
                                   variant="ghost"
                                   size="sm"
                                   disabled={isDeleting}
@@ -945,6 +963,23 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                           </Button>
 
                           <Button
+                            asChild
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-primary/20"
+                            title="Download PDF"
+                            aria-label="Download PDF"
+                          >
+                            <a
+                              href={`/api/pdf-proxy?url=${encodeURIComponent(pdf.url)}&download=true&filename=${encodeURIComponent(pdf.title)}`}
+                              download={`${pdf.title}.pdf`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+
+                          <Button
                             variant="ghost"
                             size="sm"
                             disabled={isDeleting}
@@ -1038,6 +1073,20 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                       <a href={activePreviewPdf.url} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Full Screen
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs font-bold uppercase tracking-wider hover:text-primary text-muted-foreground"
+                    >
+                      <a
+                        href={`/api/pdf-proxy?url=${encodeURIComponent(activePreviewPdf.url)}&download=true&filename=${encodeURIComponent(activePreviewPdf.title)}`}
+                        download={`${activePreviewPdf.title}.pdf`}
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
                       </a>
                     </Button>
                     <Button
