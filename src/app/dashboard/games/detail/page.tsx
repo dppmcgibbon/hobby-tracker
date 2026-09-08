@@ -18,6 +18,7 @@ import {
   isGamePdfLink,
   isGameResourceLink,
   sortGamePdfLinks,
+  getFirstRulesPdf,
 } from "@/lib/games/game-details";
 import { getR2PublicUrl } from "@/lib/r2";
 import type { GameEntityType } from "@/app/actions/games";
@@ -179,11 +180,12 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
 
   const sortedPdfLinks = sortGamePdfLinks(pdfLinks);
 
-  const firstPdf = sortedPdfLinks[0];
-  const firstPdfUrl = firstPdf?.url || null;
-  const firstPdfTitle = firstPdf?.title || null;
-  const firstPdfPrecomputedCover = firstPdf?.cover_image
-    ? getR2PublicUrl(firstPdf.cover_image)
+  // Cover photo resolution is strictly derived from the first PDF in the "Rules" category
+  const firstRulesPdf = getFirstRulesPdf(metadata.links);
+  const firstPdfUrl = firstRulesPdf?.url || null;
+  const firstPdfTitle = firstRulesPdf?.title || null;
+  const firstPdfPrecomputedCover = firstRulesPdf?.cover_image
+    ? getR2PublicUrl(firstRulesPdf.cover_image)
     : null;
 
   // URL for filtering miniatures of this game/edition/expansion
@@ -377,7 +379,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
             pdfPrecomputedCoverUrl={firstPdfPrecomputedCover}
             entityType={targetEntityType}
             entityId={targetEntityId}
-            firstPdfId={firstPdf?.id || null}
+            firstPdfId={firstRulesPdf?.id || null}
           />
         </div>
 

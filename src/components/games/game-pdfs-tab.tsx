@@ -73,12 +73,14 @@ import {
   MoreHorizontal,
   Pencil,
   X,
+  BookOpen,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
   getGamePdfCoverUploadUrl,
   saveGamePdf,
   savePdfCoverImage,
+  saveGameCover,
   uploadGamePdfServerSide,
   deleteGameLink,
   reorderGamePdfs,
@@ -89,7 +91,13 @@ import {
   updateGamePdfTitle,
   type GameEntityType,
 } from "@/app/actions/games";
-import { type GameInfoLink, isGamePdfLink, sortGamePdfLinks } from "@/lib/games/game-details";
+import {
+  type GameInfoLink,
+  isGamePdfLink,
+  sortGamePdfLinks,
+  isGameRulesPdfLink,
+  getFirstRulesPdf,
+} from "@/lib/games/game-details";
 import { getR2PublicUrl } from "@/lib/r2";
 import { renderPdfFirstPageToBlob } from "@/lib/utils/pdf-thumbnail";
 
@@ -165,6 +173,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
         activeCategory.toLowerCase()
     );
   }, [pdfItems, activeCategory]);
+
+  // The first PDF in the "Rules" category is strictly defined as the edition/game cover
+  const firstRulesPdf = useMemo(() => getFirstRulesPdf(pdfItems), [pdfItems]);
+  const firstRulesPdfId = firstRulesPdf?.id || null;
 
   // Count helper
   const getCategoryCount = useCallback(
@@ -587,6 +599,16 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       }
 
       await savePdfCoverImage(entityType, entityId, pdf.id, presigned.key);
+
+      // If this PDF is the first in the Rules category, also sync it immediately as the entity cover
+      if (pdf.id === firstRulesPdfId) {
+        try {
+          await saveGameCover(entityType, entityId, presigned.key);
+        } catch (syncErr) {
+          console.warn("Failed to sync game cover on entity:", syncErr);
+        }
+      }
+
       toast.success("Cover image generated and saved!");
       router.refresh();
     } catch (err: unknown) {
@@ -640,6 +662,48 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       setPdfItems(sortGamePdfLinks(links.filter(isGamePdfLink)));
     } finally {
       setIsSavingOrder(false);
+    }
+  };
+
+  // Set a Rules PDF directly as the edition cover (moving it to position #1 in Rules)
+  const handleSetAsCover = async (pdf: GameInfoLink) => {
+    if (!isGameRulesPdfLink(pdf)) {
+      toast.error("Only PDFs in the Rules category can be set as the cover.");
+      return;
+    }
+
+    if (pdf.id === firstRulesPdfId) {
+      toast.info(`"${pdf.title}" is already the edition cover.`);
+      return;
+    }
+
+    // Partition into Rules PDFs and non-Rules PDFs to preserve Rules-first grouping
+    const rulesPdfs = pdfItems.filter(isGameRulesPdfLink);
+    const nonRulesPdfs = pdfItems.filter((p) => !isGameRulesPdfLink(p));
+
+    // Place target PDF at index 0 of Rules
+    const reorderedRules = [pdf, ...rulesPdfs.filter((p) => p.id !== pdf.id)];
+    const fullList = [...reorderedRules, ...nonRulesPdfs];
+
+    const withNewPositions = fullList.map((item, idx) => ({
+      ...item,
+      position: idx + 1,
+    }));
+
+    setPdfItems(withNewPositions);
+
+    try {
+      await persistOrder(withNewPositions);
+
+      // If this PDF already has a precomputed cover, sync it to the entity record
+      if (pdf.cover_image) {
+        await saveGameCover(entityType, entityId, pdf.cover_image);
+      }
+
+      toast.success(`Set "${pdf.title}" as the edition cover.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to set document as cover";
+      toast.error(msg);
     }
   };
 
@@ -699,7 +763,12 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     const [moved] = updated.splice(oldIndex, 1);
     updated.splice(newTargetIndex, 0, moved);
 
-    const withNewPositions = updated.map((item, idx) => ({
+    // Make sure Rules category PDFs always stay grouped first
+    const rulesGroup = updated.filter(isGameRulesPdfLink);
+    const nonRulesGroup = updated.filter((p) => !isGameRulesPdfLink(p));
+    const grouped = [...rulesGroup, ...nonRulesGroup];
+
+    const withNewPositions = grouped.map((item, idx) => ({
       ...item,
       position: idx + 1,
     }));
@@ -728,7 +797,12 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     const [moved] = updated.splice(oldIndex, 1);
     updated.splice(newTargetIndex, 0, moved);
 
-    const withNewPositions = updated.map((item, idx) => ({
+    // Keep Rules category PDFs grouped at the beginning
+    const rulesGroup = updated.filter(isGameRulesPdfLink);
+    const nonRulesGroup = updated.filter((p) => !isGameRulesPdfLink(p));
+    const grouped = [...rulesGroup, ...nonRulesGroup];
+
+    const withNewPositions = grouped.map((item, idx) => ({
       ...item,
       position: idx + 1,
     }));
@@ -1346,9 +1420,20 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                   className="cursor-pointer group/title select-none"
                                   title="Double-click to rename title"
                                 >
-                                  <span className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate block">
-                                    {pdf.title}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate">
+                                      {pdf.title}
+                                    </span>
+                                    {pdf.id === firstRulesPdfId && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider shrink-0"
+                                        title="First PDF in Rules: This document provides the cover photo for the edition/game"
+                                      >
+                                        <BookOpen className="h-2.5 w-2.5 text-amber-400" />
+                                        Cover
+                                      </span>
+                                    )}
+                                  </div>
                                   {pdf.description && (
                                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                                       {pdf.description}
@@ -1369,6 +1454,44 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                               )}
 
                               <div className="flex items-center gap-1 shrink-0">
+                                {isGameRulesPdfLink(pdf) && pdf.id !== firstRulesPdfId && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSetAsCover(pdf);
+                                    }}
+                                    className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 border-amber-500/30"
+                                    title="Set as edition cover (moves to #1 in Rules)"
+                                  >
+                                    <BookOpen className="h-3 w-3 mr-1 text-amber-400" />
+                                    Set Cover
+                                  </Button>
+                                )}
+
+                                {!pdf.cover_image && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleGenerateCover(e, pdf);
+                                    }}
+                                    disabled={generatingCoverId === pdf.id}
+                                    className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-primary/15 border border-primary/20"
+                                    title="Generate cover thumbnail from PDF"
+                                  >
+                                    {generatingCoverId === pdf.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <ImagePlus className="h-3 w-3 mr-1" />
+                                        Cover
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
 
                                 <Button
                                   variant={isPreviewing ? "default" : "outline"}
@@ -1478,6 +1601,18 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                         onClick={() => togglePreview(pdf.id)}
                         className="relative aspect-[3/4] w-full bg-neutral-950 flex items-center justify-center overflow-hidden border-b border-primary/20 cursor-pointer"
                       >
+                        {pdf.id === firstRulesPdfId && (
+                          <div className="absolute top-2 left-2 z-10">
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/85 backdrop-blur-sm text-amber-300 border border-amber-500/50 text-[10px] font-black uppercase tracking-wider shadow-lg"
+                              title="First PDF in Rules: This document provides the cover photo for the edition/game"
+                            >
+                              <BookOpen className="h-2.5 w-2.5 text-amber-400" />
+                              Cover
+                            </span>
+                          </div>
+                        )}
+
                         {coverUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -1517,7 +1652,23 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                         )}
 
                         {/* Actions Overlay */}
-                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-neutral-950/90 backdrop-blur-sm border border-primary/40 rounded p-1 shadow-xl">
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-neutral-950/90 backdrop-blur-sm border border-primary/40 rounded p-1 shadow-xl z-20">
+                          {isGameRulesPdfLink(pdf) && pdf.id !== firstRulesPdfId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetAsCover(pdf);
+                              }}
+                              className="h-6 w-6 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20"
+                              title="Set as edition cover (moves to #1 in Rules)"
+                              aria-label="Set as edition cover"
+                            >
+                              <BookOpen className="h-3 w-3" />
+                            </Button>
+                          )}
+
                           <Button
                             variant={isPreviewing ? "default" : "ghost"}
                             size="sm"
@@ -1623,6 +1774,20 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                 {formatBytes(pdf.file_size)}
                               </span>
                             ) : null}
+                            {isGameRulesPdfLink(pdf) && pdf.id !== firstRulesPdfId && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetAsCover(pdf);
+                                }}
+                                className="text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:text-amber-300 hover:underline inline-flex items-center gap-0.5 ml-1"
+                                title="Set as edition cover (moves to #1 in Rules)"
+                              >
+                                <BookOpen className="h-2.5 w-2.5" />
+                                Make Cover
+                              </button>
+                            )}
                           </div>
                           <button
                             type="button"
