@@ -863,6 +863,7 @@ export async function saveGamePdf(
     fileSize?: number | null;
     description?: string | null;
     coverImageKey?: string | null;
+    pdfCategory?: string | null;
   }
 ) {
   await requireAuth();
@@ -909,6 +910,7 @@ export async function saveGamePdf(
     r2_key: input.r2Key,
     cover_image: input.coverImageKey || null,
     category: "PDF",
+    pdf_category: input.pdfCategory?.trim() || "Rules",
     description: input.description?.trim() || null,
     file_size: input.fileSize || null,
     position: nextPosition,
@@ -943,6 +945,10 @@ export async function uploadGamePdfServerSide(
   const coverFile = formData.get("coverFile") as File | null;
   const title = (formData.get("title") as string | null) || file?.name || "Document";
   const description = (formData.get("description") as string | null) || null;
+  const pdfCategory =
+    (formData.get("pdf_category") as string | null) ||
+    (formData.get("category") as string | null) ||
+    null;
 
   if (!file) {
     throw new Error("No PDF file provided.");
@@ -980,6 +986,7 @@ export async function uploadGamePdfServerSide(
     fileSize: file.size,
     description,
     coverImageKey,
+    pdfCategory,
   });
 }
 
@@ -1075,6 +1082,7 @@ export async function saveGameImageRecord(
   input: {
     storagePath: string;
     caption?: string | null;
+    album?: string | null;
   }
 ) {
   await requireAuth();
@@ -1103,6 +1111,7 @@ export async function saveGameImageRecord(
     storage_path: input.storagePath,
     r2_key: input.storagePath,
     category: "IMAGE",
+    album: input.album?.trim() || "Games",
     caption: input.caption?.trim() || null,
     uploaded_at: new Date().toISOString(),
     image_updated_at: null,
@@ -1134,6 +1143,7 @@ export async function uploadGameImageServerSide(
   await requireAuth();
   const file = formData.get("file") as File | null;
   const caption = (formData.get("caption") as string | null) || null;
+  const album = (formData.get("album") as string | null) || null;
 
   if (!file) {
     throw new Error("No image file provided.");
@@ -1151,6 +1161,7 @@ export async function uploadGameImageServerSide(
   return await saveGameImageRecord(entityType, entityId, {
     storagePath,
     caption,
+    album,
   });
 }
 
@@ -1278,4 +1289,601 @@ export async function deleteGameImage(
 
   revalidateGamePaths();
   return { success: true };
+}
+
+/**
+ * Updates the assigned album/category of an existing game image.
+ */
+export async function updateGameImageAlbum(
+  entityType: GameEntityType,
+  entityId: string,
+  imageId: string,
+  newAlbum: string
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const updatedLinks = existingLinks.map((link) => {
+    if (link.id === imageId) {
+      return { ...link, album: newAlbum.trim() || "Games" };
+    }
+    return link;
+  });
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Persists a newly created custom album name to the entity's IMAGE_ALBUMS_CATALOG.
+ */
+export async function addGameImageAlbum(
+  entityType: GameEntityType,
+  entityId: string,
+  albumName: string
+) {
+  await requireAuth();
+  const trimmed = albumName.trim();
+  if (!trimmed) {
+    throw new Error("Album name cannot be empty");
+  }
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogIndex = existingLinks.findIndex(
+    (l) => (l.category as string)?.toUpperCase() === "IMAGE_ALBUMS_CATALOG"
+  );
+
+  let updatedLinks: Array<Record<string, unknown>>;
+  if (catalogIndex >= 0) {
+    const catalog = existingLinks[catalogIndex];
+    const albums = Array.isArray(catalog.albums) ? (catalog.albums as string[]) : [];
+    if (!albums.some((a) => a.toLowerCase() === trimmed.toLowerCase())) {
+      const updatedCatalog = { ...catalog, albums: [...albums, trimmed] };
+      updatedLinks = [
+        ...existingLinks.slice(0, catalogIndex),
+        updatedCatalog,
+        ...existingLinks.slice(catalogIndex + 1),
+      ];
+    } else {
+      return { success: true };
+    }
+  } else {
+    const newCatalog = {
+      id: "image-albums-catalog",
+      category: "IMAGE_ALBUMS_CATALOG",
+      albums: ["Games", "Artwork", trimmed],
+    };
+    updatedLinks = [...existingLinks, newCatalog];
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Renames an existing game image album in the catalog and updates all associated images.
+ */
+export async function renameGameImageAlbum(
+  entityType: GameEntityType,
+  entityId: string,
+  oldAlbumName: string,
+  newAlbumName: string
+) {
+  await requireAuth();
+  const oldTrimmed = oldAlbumName.trim();
+  const newTrimmed = newAlbumName.trim();
+
+  if (!newTrimmed) {
+    throw new Error("Album name cannot be empty");
+  }
+  if (oldTrimmed.toLowerCase() === newTrimmed.toLowerCase()) {
+    return { success: true };
+  }
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogEntry = existingLinks.find(
+    (l) => (l.category as string)?.toUpperCase() === "IMAGE_ALBUMS_CATALOG"
+  );
+  const currentAlbums: string[] = Array.isArray(catalogEntry?.albums)
+    ? (catalogEntry.albums as string[])
+    : ["Games", "Artwork"];
+
+  if (currentAlbums.some((a) => a.toLowerCase() === newTrimmed.toLowerCase())) {
+    throw new Error(`Album "${newTrimmed}" already exists`);
+  }
+
+  const updatedAlbums = currentAlbums.map((a) =>
+    a.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : a
+  );
+  if (!updatedAlbums.some((a) => a.toLowerCase() === newTrimmed.toLowerCase())) {
+    updatedAlbums.push(newTrimmed);
+  }
+
+  let catalogFound = false;
+  const updatedLinks = existingLinks.map((link) => {
+    if ((link.category as string)?.toUpperCase() === "IMAGE_ALBUMS_CATALOG") {
+      catalogFound = true;
+      return {
+        ...link,
+        albums: updatedAlbums,
+      };
+    }
+    const linkAlbum = ((link.album as string) && (link.album as string).trim()) || "Games";
+    if (linkAlbum.toLowerCase() === oldTrimmed.toLowerCase()) {
+      return { ...link, album: newTrimmed };
+    }
+    return link;
+  });
+
+  if (!catalogFound) {
+    updatedLinks.push({
+      id: "image-albums-catalog",
+      category: "IMAGE_ALBUMS_CATALOG",
+      albums: updatedAlbums,
+    });
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Removes an album from the catalog and re-homes any assigned images to the fallback remaining album.
+ */
+export async function deleteGameImageAlbum(
+  entityType: GameEntityType,
+  entityId: string,
+  albumName: string
+) {
+  await requireAuth();
+  const trimmed = albumName.trim();
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogEntry = existingLinks.find(
+    (l) => (l.category as string)?.toUpperCase() === "IMAGE_ALBUMS_CATALOG"
+  );
+  const currentAlbums: string[] = Array.isArray(catalogEntry?.albums)
+    ? (catalogEntry.albums as string[])
+    : ["Games", "Artwork"];
+
+  const remainingAlbums = currentAlbums.filter(
+    (a) => a.toLowerCase() !== trimmed.toLowerCase()
+  );
+
+  if (remainingAlbums.length === 0) {
+    throw new Error("Cannot delete the only album. At least one album must remain.");
+  }
+
+  const fallbackAlbum = remainingAlbums[0];
+
+  let catalogFound = false;
+  const updatedLinks = existingLinks.map((link) => {
+    if ((link.category as string)?.toUpperCase() === "IMAGE_ALBUMS_CATALOG") {
+      catalogFound = true;
+      return {
+        ...link,
+        albums: remainingAlbums,
+      };
+    }
+    const linkAlbum = ((link.album as string) && (link.album as string).trim()) || "Games";
+    if (linkAlbum.toLowerCase() === trimmed.toLowerCase()) {
+      return { ...link, album: fallbackAlbum };
+    }
+    return link;
+  });
+
+  if (!catalogFound) {
+    updatedLinks.push({
+      id: "image-albums-catalog",
+      category: "IMAGE_ALBUMS_CATALOG",
+      albums: remainingAlbums,
+    });
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true, fallbackAlbum };
+}
+
+/**
+ * Updates the assigned category of an existing game PDF document.
+ */
+export async function updateGamePdfCategory(
+  entityType: GameEntityType,
+  entityId: string,
+  pdfId: string,
+  newCategory: string
+) {
+  await requireAuth();
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const updatedLinks = existingLinks.map((link) => {
+    if (link.id === pdfId) {
+      return { ...link, pdf_category: newCategory.trim() || "Rules" };
+    }
+    return link;
+  });
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Persists a newly created custom PDF category name to the entity's PDF_CATEGORIES_CATALOG.
+ */
+export async function addGamePdfCategory(
+  entityType: GameEntityType,
+  entityId: string,
+  categoryName: string
+) {
+  await requireAuth();
+  const trimmed = categoryName.trim();
+  if (!trimmed) {
+    throw new Error("Category name cannot be empty");
+  }
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogIndex = existingLinks.findIndex(
+    (l) => (l.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG"
+  );
+
+  let updatedLinks: Array<Record<string, unknown>>;
+  if (catalogIndex >= 0) {
+    const catalog = existingLinks[catalogIndex];
+    const categories = Array.isArray(catalog.pdf_categories)
+      ? (catalog.pdf_categories as string[])
+      : Array.isArray(catalog.categories)
+      ? (catalog.categories as string[])
+      : [];
+    if (!categories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      const updatedCatalog = {
+        ...catalog,
+        pdf_categories: [...categories, trimmed],
+      };
+      updatedLinks = [
+        ...existingLinks.slice(0, catalogIndex),
+        updatedCatalog,
+        ...existingLinks.slice(catalogIndex + 1),
+      ];
+    } else {
+      return { success: true };
+    }
+  } else {
+    const newCatalog = {
+      id: "pdf-categories-catalog",
+      category: "PDF_CATEGORIES_CATALOG",
+      pdf_categories: ["Rules", "Reference", trimmed],
+    };
+    updatedLinks = [...existingLinks, newCatalog];
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Renames an existing PDF category in the catalog and updates all associated PDFs.
+ */
+export async function renameGamePdfCategory(
+  entityType: GameEntityType,
+  entityId: string,
+  oldCategoryName: string,
+  newCategoryName: string
+) {
+  await requireAuth();
+  const oldTrimmed = oldCategoryName.trim();
+  const newTrimmed = newCategoryName.trim();
+
+  if (!newTrimmed) {
+    throw new Error("Category name cannot be empty");
+  }
+  if (oldTrimmed.toLowerCase() === newTrimmed.toLowerCase()) {
+    return { success: true };
+  }
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogEntry = existingLinks.find(
+    (l) => (l.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG"
+  );
+  const currentCategories: string[] = Array.isArray(catalogEntry?.pdf_categories)
+    ? (catalogEntry.pdf_categories as string[])
+    : Array.isArray(catalogEntry?.categories)
+    ? (catalogEntry.categories as string[])
+    : ["Rules", "Reference"];
+
+  if (currentCategories.some((c) => c.toLowerCase() === newTrimmed.toLowerCase())) {
+    throw new Error(`Category "${newTrimmed}" already exists`);
+  }
+
+  const updatedCategories = currentCategories.map((c) =>
+    c.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : c
+  );
+  if (!updatedCategories.some((c) => c.toLowerCase() === newTrimmed.toLowerCase())) {
+    updatedCategories.push(newTrimmed);
+  }
+
+  let catalogFound = false;
+  const updatedLinks = existingLinks.map((link) => {
+    if ((link.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG") {
+      catalogFound = true;
+      return {
+        ...link,
+        pdf_categories: updatedCategories,
+      };
+    }
+    const linkCategory =
+      ((link.pdf_category as string) && (link.pdf_category as string).trim()) || "Rules";
+    if (linkCategory.toLowerCase() === oldTrimmed.toLowerCase()) {
+      return { ...link, pdf_category: newTrimmed };
+    }
+    return link;
+  });
+
+  if (!catalogFound) {
+    updatedLinks.push({
+      id: "pdf-categories-catalog",
+      category: "PDF_CATEGORIES_CATALOG",
+      pdf_categories: updatedCategories,
+    });
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
+ * Removes a PDF category from the catalog and re-homes any assigned PDFs to the fallback remaining category.
+ */
+export async function deleteGamePdfCategory(
+  entityType: GameEntityType,
+  entityId: string,
+  categoryName: string
+) {
+  await requireAuth();
+  const trimmed = categoryName.trim();
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const catalogEntry = existingLinks.find(
+    (l) => (l.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG"
+  );
+  const currentCategories: string[] = Array.isArray(catalogEntry?.pdf_categories)
+    ? (catalogEntry.pdf_categories as string[])
+    : Array.isArray(catalogEntry?.categories)
+    ? (catalogEntry.categories as string[])
+    : ["Rules", "Reference"];
+
+  const remainingCategories = currentCategories.filter(
+    (c) => c.toLowerCase() !== trimmed.toLowerCase()
+  );
+
+  if (remainingCategories.length === 0) {
+    throw new Error("Cannot delete the only category. At least one category must remain.");
+  }
+
+  const fallbackCategory = remainingCategories[0];
+
+  let catalogFound = false;
+  const updatedLinks = existingLinks.map((link) => {
+    if ((link.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG") {
+      catalogFound = true;
+      return {
+        ...link,
+        pdf_categories: remainingCategories,
+      };
+    }
+    const linkCategory =
+      ((link.pdf_category as string) && (link.pdf_category as string).trim()) || "Rules";
+    if (linkCategory.toLowerCase() === trimmed.toLowerCase()) {
+      return { ...link, pdf_category: fallbackCategory };
+    }
+    return link;
+  });
+
+  if (!catalogFound) {
+    updatedLinks.push({
+      id: "pdf-categories-catalog",
+      category: "PDF_CATEGORIES_CATALOG",
+      pdf_categories: remainingCategories,
+    });
+  }
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true, fallbackCategory };
 }

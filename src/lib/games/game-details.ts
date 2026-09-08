@@ -4,6 +4,10 @@ export interface GameInfoLink {
   url: string;
   description?: string | null;
   category?: string | null;
+  album?: string | null;
+  albums?: string[];
+  pdf_category?: string | null;
+  pdf_categories?: string[];
   r2_key?: string | null;
   file_size?: number | null;
   storage_path?: string | null;
@@ -40,6 +44,7 @@ export function isGameImageLink(link: GameInfoLink): boolean {
  * Helper to identify whether a game link represents an uploaded or linked PDF document.
  */
 export function isGamePdfLink(link: GameInfoLink): boolean {
+  if (link.category?.toUpperCase() === "PDF_CATEGORIES_CATALOG") return false;
   if (isGameImageLink(link)) return false;
   const cat = link.category?.toLowerCase();
   const url = link.url?.toLowerCase() || "";
@@ -76,6 +81,12 @@ export function sortGamePdfLinks(links: GameInfoLink[]): GameInfoLink[] {
  * Helper to identify whether a game link represents a general resource link.
  */
 export function isGameResourceLink(link: GameInfoLink): boolean {
+  if (
+    link.category?.toUpperCase() === "IMAGE_ALBUMS_CATALOG" ||
+    link.category?.toUpperCase() === "PDF_CATEGORIES_CATALOG"
+  ) {
+    return false;
+  }
   return !isGamePdfLink(link) && !isGameImageLink(link);
 }
 

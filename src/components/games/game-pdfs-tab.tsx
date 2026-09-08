@@ -1,13 +1,37 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -21,6 +45,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
@@ -41,6 +66,13 @@ import {
   ImagePlus,
   LayoutList,
   LayoutGrid,
+  Folder,
+  FolderPlus,
+  FolderArchive,
+  Layers,
+  MoreHorizontal,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
@@ -50,6 +82,10 @@ import {
   uploadGamePdfServerSide,
   deleteGameLink,
   reorderGamePdfs,
+  updateGamePdfCategory,
+  addGamePdfCategory,
+  renameGamePdfCategory,
+  deleteGamePdfCategory,
   type GameEntityType,
 } from "@/app/actions/games";
 import { type GameInfoLink, isGamePdfLink, sortGamePdfLinks } from "@/lib/games/game-details";
@@ -87,13 +123,84 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     setPdfItems(sortGamePdfLinks(links.filter(isGamePdfLink)));
   }, [links]);
 
-  // Drag and drop state
+  // Extract custom categories from PDF_CATEGORIES_CATALOG entry
+  const catalogEntry = links.find(
+    (l) => (l.category as string)?.toUpperCase() === "PDF_CATEGORIES_CATALOG"
+  );
+  const catalogCategories: string[] = useMemo(() => {
+    if (Array.isArray(catalogEntry?.pdf_categories)) return catalogEntry.pdf_categories;
+    return [];
+  }, [catalogEntry]);
+
+  // Extract distinct categories from all PDFs (defaulting missing category to "Rules")
+  const itemCategories = useMemo(() => {
+    return Array.from(
+      new Set(pdfItems.map((p) => (p.pdf_category && p.pdf_category.trim()) || "Rules"))
+    );
+  }, [pdfItems]);
+
+  // Consolidated unique list of all categories: uses catalog if set, otherwise defaults to "Rules", "Reference"
+  const allCategories = useMemo(() => {
+    const baseList = Array.isArray(catalogEntry?.pdf_categories)
+      ? catalogEntry.pdf_categories.filter((c): c is string => Boolean(c && c.trim()))
+      : ["Rules", "Reference"];
+    const set = new Set<string>(baseList);
+    for (const c of itemCategories) {
+      if (c && c.trim()) set.add(c.trim());
+    }
+    if (set.size === 0) set.add("Rules");
+    return Array.from(set);
+  }, [catalogEntry, itemCategories]);
+
+  // Active category tab: default "Rules"
+  const [activeCategory, setActiveCategory] = useState<string>("Rules");
+
+  // Filtered PDFs for currently active category
+  const displayedPdfs = useMemo(() => {
+    if (activeCategory === "ALL") return pdfItems;
+    return pdfItems.filter(
+      (p) =>
+        ((p.pdf_category && p.pdf_category.trim()) || "Rules").toLowerCase() ===
+        activeCategory.toLowerCase()
+    );
+  }, [pdfItems, activeCategory]);
+
+  // Count helper
+  const getCategoryCount = useCallback(
+    (categoryName: string) => {
+      if (categoryName === "ALL") return pdfItems.length;
+      return pdfItems.filter(
+        (p) =>
+          ((p.pdf_category && p.pdf_category.trim()) || "Rules").toLowerCase() ===
+          categoryName.toLowerCase()
+      ).length;
+    },
+    [pdfItems]
+  );
+
+  // Drag and drop state for reordering & moving categories
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggedPdfId, setDraggedPdfId] = useState<string | null>(null);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [isMovingPdf, setIsMovingPdf] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+
+  // New Category Dialog State
+  const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  // Rename & Delete Category State
+  const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
+  const [renameCategoryInput, setRenameCategoryInput] = useState<string>("");
+  const [isRenamingCategory, setIsRenamingCategory] = useState<boolean>(false);
+  const [categoryToDeleteCustom, setCategoryToDeleteCustom] = useState<string | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState<boolean>(false);
 
   // State for upload dialog
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState<string>("Rules");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfTitle, setPdfTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -105,6 +212,105 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPdfId, setPreviewPdfId] = useState<string | null>(null);
   const [generatingCoverId, setGeneratingCoverId] = useState<string | null>(null);
+
+  const handleMovePdf = async (pdfId: string, targetCategory: string) => {
+    const targetPdf = pdfItems.find((p) => p.id === pdfId);
+    if (!targetPdf) return;
+    const currentCat = (targetPdf.pdf_category && targetPdf.pdf_category.trim()) || "Rules";
+    if (currentCat.toLowerCase() === targetCategory.toLowerCase()) return;
+
+    setIsMovingPdf(true);
+    try {
+      await updateGamePdfCategory(entityType, entityId, pdfId, targetCategory);
+      toast.success(`Moved document to "${targetCategory}"`);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to move PDF";
+      toast.error(msg);
+    } finally {
+      setIsMovingPdf(false);
+      setDragOverCategory(null);
+      setDraggedPdfId(null);
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    if (allCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error(`Category "${trimmed}" already exists.`);
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      await addGamePdfCategory(entityType, entityId, trimmed);
+      toast.success(`Category "${trimmed}" created!`);
+      setActiveCategory(trimmed);
+      setNewCategoryName("");
+      setNewCategoryDialogOpen(false);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create category";
+      toast.error(msg);
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
+  const handleOpenRenameCategory = (categoryName: string) => {
+    setCategoryToRename(categoryName);
+    setRenameCategoryInput(categoryName);
+  };
+
+  const handleConfirmRenameCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryToRename) return;
+    const trimmed = renameCategoryInput.trim();
+    if (!trimmed) {
+      toast.error("Category name cannot be empty");
+      return;
+    }
+    if (trimmed.toLowerCase() === categoryToRename.toLowerCase()) {
+      setCategoryToRename(null);
+      return;
+    }
+    setIsRenamingCategory(true);
+    try {
+      await renameGamePdfCategory(entityType, entityId, categoryToRename, trimmed);
+      toast.success(`Renamed category to "${trimmed}"`);
+      if (activeCategory.toLowerCase() === categoryToRename.toLowerCase()) {
+        setActiveCategory(trimmed);
+      }
+      setCategoryToRename(null);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to rename category";
+      toast.error(msg);
+    } finally {
+      setIsRenamingCategory(false);
+    }
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryToDeleteCustom) return;
+    setIsDeletingCategory(true);
+    try {
+      const res = await deleteGamePdfCategory(entityType, entityId, categoryToDeleteCustom);
+      toast.success(`Deleted category "${categoryToDeleteCustom}"`);
+      if (activeCategory.toLowerCase() === categoryToDeleteCustom.toLowerCase()) {
+        setActiveCategory(res.fallbackCategory || "Rules");
+      }
+      setCategoryToDeleteCustom(null);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete category";
+      toast.error(msg);
+    } finally {
+      setIsDeletingCategory(false);
+    }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -152,6 +358,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       setDescription("");
       setError(null);
       setUploadProgress(null);
+      setUploadCategory(activeCategory === "ALL" ? "Rules" : activeCategory);
     }
     setDialogOpen(open);
   };
@@ -265,12 +472,14 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           fileSize: selectedFile.size,
           description: description.trim() || null,
           coverImageKey,
+          pdfCategory: uploadCategory,
         });
       } else {
         setUploadProgress("Uploading via server fallback...");
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("title", pdfTitle.trim());
+        formData.append("pdf_category", uploadCategory);
         if (description.trim()) {
           formData.append("description", description.trim());
         }
@@ -281,6 +490,9 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       }
 
       toast.success("PDF uploaded successfully with cover image!");
+      if (activeCategory !== "ALL" && activeCategory.toLowerCase() !== uploadCategory.toLowerCase()) {
+        setActiveCategory(uploadCategory);
+      }
       setDialogOpen(false);
       router.refresh();
     } catch (err: unknown) {
@@ -382,14 +594,16 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   };
 
   // Drag and drop event handlers
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number, pdfId?: string) => {
     if ((e.target as HTMLElement).closest("button, a, input")) {
       e.preventDefault();
       return;
     }
     setDraggedIndex(index);
+    if (pdfId) setDraggedPdfId(pdfId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${index}`);
+    if (pdfId) e.dataTransfer.setData("application/x-pdf-id", pdfId);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -403,6 +617,8 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setDraggedPdfId(null);
+    setDragOverCategory(null);
   };
 
   const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
@@ -413,9 +629,25 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       return;
     }
 
+    const movedItem = displayedPdfs[draggedIndex];
+    const targetItem = displayedPdfs[targetIndex];
+    if (!movedItem || !targetItem) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
     const updated = [...pdfItems];
-    const [moved] = updated.splice(draggedIndex, 1);
-    updated.splice(targetIndex, 0, moved);
+    const oldIndex = updated.findIndex((p) => p.id === movedItem.id);
+    const newTargetIndex = updated.findIndex((p) => p.id === targetItem.id);
+    if (oldIndex < 0 || newTargetIndex < 0) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const [moved] = updated.splice(oldIndex, 1);
+    updated.splice(newTargetIndex, 0, moved);
 
     const withNewPositions = updated.map((item, idx) => ({
       ...item,
@@ -430,13 +662,21 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   };
 
   // Move Up / Down button handlers
-  const handleMove = async (index: number, direction: "up" | "down") => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= pdfItems.length) return;
+  const handleMove = async (displayedIndex: number, direction: "up" | "down") => {
+    const targetDisplayedIndex = direction === "up" ? displayedIndex - 1 : displayedIndex + 1;
+    if (targetDisplayedIndex < 0 || targetDisplayedIndex >= displayedPdfs.length) return;
+
+    const currentItem = displayedPdfs[displayedIndex];
+    const targetItem = displayedPdfs[targetDisplayedIndex];
+    if (!currentItem || !targetItem) return;
 
     const updated = [...pdfItems];
-    const [moved] = updated.splice(index, 1);
-    updated.splice(targetIndex, 0, moved);
+    const oldIndex = updated.findIndex((p) => p.id === currentItem.id);
+    const newTargetIndex = updated.findIndex((p) => p.id === targetItem.id);
+    if (oldIndex < 0 || newTargetIndex < 0) return;
+
+    const [moved] = updated.splice(oldIndex, 1);
+    updated.splice(newTargetIndex, 0, moved);
 
     const withNewPositions = updated.map((item, idx) => ({
       ...item,
@@ -451,7 +691,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
   return (
     <Card className="warhammer-card border-primary/30">
-      <CardHeader className="pb-4 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
         <div>
           <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -578,6 +818,31 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                   />
                 </div>
 
+                {/* Category Selection */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="upload-category-select"
+                    className="text-xs font-bold uppercase tracking-wide text-foreground/90 flex items-center justify-between"
+                  >
+                    <span>Category</span>
+                    <span className="text-[10px] text-primary font-normal">
+                      Default: Rules
+                    </span>
+                  </Label>
+                  <Select value={uploadCategory} onValueChange={setUploadCategory}>
+                    <SelectTrigger id="upload-category-select" className="bg-background border-primary/30 text-xs">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-primary/30">
+                      {allCategories.map((c) => (
+                        <SelectItem key={c} value={c} className="text-xs">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Optional Description */}
                 <div className="space-y-1.5">
                   <Label
@@ -648,7 +913,201 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
         </div>
       </CardHeader>
 
-      <CardContent className="pt-5 space-y-5">
+      <CardContent className="pt-2.5 space-y-4">
+        {/* Categories Bar - Lightweight Pill Navigation */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 pb-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {allCategories.map((cat) => {
+              const count = getCategoryCount(cat);
+              const isActive = activeCategory.toLowerCase() === cat.toLowerCase();
+              const isDragOver = dragOverCategory?.toLowerCase() === cat.toLowerCase();
+              const isCustom =
+                cat.toLowerCase() !== "rules" && cat.toLowerCase() !== "reference";
+
+              return (
+                <div
+                  key={cat}
+                  className="relative group/category inline-flex items-center"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverCategory !== cat) setDragOverCategory(cat);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverCategory === cat) setDragOverCategory(null);
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const pdfId = e.dataTransfer.getData("application/x-pdf-id") || draggedPdfId;
+                    setDragOverCategory(null);
+                    setDraggedPdfId(null);
+                    setDraggedIndex(null);
+                    if (pdfId) {
+                      await handleMovePdf(pdfId, cat);
+                    }
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all",
+                      isActive
+                        ? "bg-primary/20 text-primary border border-primary/40 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent",
+                      isDragOver &&
+                        "bg-primary/30 border-primary text-primary ring-2 ring-primary/60 scale-105"
+                    )}
+                  >
+                    <Folder className={cn("h-3 w-3", isActive ? "text-primary" : "text-muted-foreground/60")} />
+                    <span>{cat}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] tabular-nums font-mono",
+                        isActive ? "text-primary/90 font-bold" : "text-muted-foreground/50"
+                      )}
+                    >
+                      {count}
+                    </span>
+
+                    {/* Subtle options menu trigger for Rename and Delete */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <span
+                          role="button"
+                          title={`Category options for "${cat}"`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            "p-0.5 rounded-full transition-all ml-0.5 text-muted-foreground hover:text-primary hover:bg-primary/20",
+                            isActive
+                              ? "opacity-80 hover:opacity-100"
+                              : "opacity-0 group-hover/category:opacity-70 hover:!opacity-100"
+                          )}
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="bg-card border-primary/30 min-w-36 z-50">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenRenameCategory(cat);
+                          }}
+                          className="text-xs cursor-pointer flex items-center gap-2"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          <span>Rename</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={allCategories.length <= 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCategoryToDeleteCustom(cat);
+                          }}
+                          className="text-xs cursor-pointer flex items-center gap-2 text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* "All" pill */}
+            <button
+              type="button"
+              onClick={() => setActiveCategory("ALL")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all",
+                activeCategory === "ALL"
+                  ? "bg-primary/20 text-primary border border-primary/40 font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent"
+              )}
+            >
+              <Layers className={cn("h-3 w-3", activeCategory === "ALL" ? "text-primary" : "text-muted-foreground/60")} />
+              <span>All</span>
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums font-mono",
+                  activeCategory === "ALL" ? "text-primary/90 font-bold" : "text-muted-foreground/50"
+                )}
+              >
+                {pdfItems.length}
+              </span>
+            </button>
+          </div>
+
+          {/* New Category Trigger - Lightweight ghost chip */}
+          <Dialog open={newCategoryDialogOpen} onOpenChange={setNewCategoryDialogOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors border border-dashed border-primary/30"
+              >
+                <FolderPlus className="h-3 w-3" />
+                <span>New Category</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xs bg-card border-primary/30">
+              <DialogHeader>
+                <DialogTitle className="text-base font-black uppercase tracking-wider text-primary flex items-center gap-2">
+                  <FolderPlus className="h-4 w-4 text-primary" />
+                  New Category
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Create a custom PDF category for {gameTitle}.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateCategory} className="space-y-3 pt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="pdf-category-name" className="text-xs font-bold uppercase tracking-wider">
+                    Category Name
+                  </Label>
+                  <Input
+                    id="pdf-category-name"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g. Campaign, Errata, Scenarios"
+                    autoFocus
+                    maxLength={30}
+                    className="h-8 text-xs bg-neutral-900 border-primary/30"
+                  />
+                </div>
+                <DialogFooter className="pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewCategoryDialogOpen(false)}
+                    disabled={isCreatingCategory}
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!newCategoryName.trim() || isCreatingCategory}
+                    className="btn-warhammer-primary text-xs font-bold uppercase tracking-wider"
+                  >
+                    {isCreatingCategory ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         {pdfItems.length === 0 ? (
           <div className="text-center py-12 px-4 border border-dashed border-primary/20 rounded-sm bg-black/20">
             <div className="inline-flex p-3 rounded-full bg-primary/10 border border-primary/30 mb-3">
@@ -671,6 +1130,52 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
               Upload First PDF
             </Button>
           </div>
+        ) : displayedPdfs.length === 0 ? (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (dragOverCategory !== activeCategory) setDragOverCategory(activeCategory);
+            }}
+            onDragLeave={() => {
+              if (dragOverCategory === activeCategory) setDragOverCategory(null);
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              const pdfId = e.dataTransfer.getData("application/x-pdf-id") || draggedPdfId;
+              setDragOverCategory(null);
+              setDraggedPdfId(null);
+              setDraggedIndex(null);
+              if (pdfId && activeCategory !== "ALL") {
+                await handleMovePdf(pdfId, activeCategory);
+              }
+            }}
+            className={cn(
+              "text-center py-12 px-4 border border-dashed rounded-sm transition-all",
+              dragOverCategory === activeCategory
+                ? "border-primary bg-primary/15 ring-2 ring-primary"
+                : "border-primary/20 bg-black/20"
+            )}
+          >
+            <div className="inline-flex p-3 rounded-full bg-primary/10 border border-primary/30 mb-3">
+              <FolderArchive className="h-8 w-8 text-primary/70" />
+            </div>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              Category "{activeCategory}" is Empty
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              Drag documents from other categories onto "{activeCategory}" or drop them here, or upload a new PDF directly to this category.
+            </p>
+            <Button
+              onClick={() => handleOpenDialog(true)}
+              variant="outline"
+              size="sm"
+              className="mt-4 border-primary/40 hover:border-primary hover:bg-primary/10 text-xs font-bold uppercase tracking-wider text-primary"
+            >
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+              Upload PDF to {activeCategory}
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {viewMode === "list" ? (
@@ -684,13 +1189,13 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                       <TableHead className="font-bold uppercase tracking-wider text-xs text-primary/90 py-3">
                         Document Title
                       </TableHead>
-                      <TableHead className="w-52 text-right font-bold uppercase tracking-wider text-xs text-primary/90 py-3 pr-4">
+                      <TableHead className="w-56 text-right font-bold uppercase tracking-wider text-xs text-primary/90 py-3 pr-4">
                         Actions
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pdfItems.map((pdf, index) => {
+                    {displayedPdfs.map((pdf, index) => {
                       const isPreviewing = previewPdfId === pdf.id;
                       const isDeleting = deletingId === pdf.id;
                       const isDragging = draggedIndex === index;
@@ -701,7 +1206,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                         <TableRow
                           key={pdf.id}
                           draggable
-                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragStart={(e) => handleDragStart(e, index, pdf.id)}
                           onDragOver={(e) => handleDragOver(e, index)}
                           onDragEnd={handleDragEnd}
                           onDrop={(e) => handleDrop(e, index)}
@@ -742,7 +1247,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={index === pdfItems.length - 1 || isSavingOrder}
+                                  disabled={index === displayedPdfs.length - 1 || isSavingOrder}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleMove(index, "down");
@@ -756,10 +1261,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                             </div>
                           </TableCell>
 
-                          {/* Document Title Column (Clean, without thumbnail) */}
+                          {/* Document Title Column */}
                           <TableCell className="py-3 px-3">
                             <div className="min-w-0">
-                              <span className="font-bold text-sm text-foreground hover:text-primary transition-colors block truncate">
+                              <span className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate block">
                                 {pdf.title}
                               </span>
                               {pdf.description && (
@@ -772,14 +1277,15 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
                           {/* Actions Column */}
                           <TableCell className="py-3 pr-4 text-right">
-                            <div className="flex items-center justify-end gap-3">
+                            <div className="flex items-center justify-end gap-2.5">
                               {pdf.file_size && (
                                 <span className="text-[10px] uppercase font-bold font-mono tracking-wider px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-primary/10 shrink-0">
                                   {formatBytes(pdf.file_size)}
                                 </span>
                               )}
 
-                              <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-1 shrink-0">
+
                                 <Button
                                   variant={isPreviewing ? "default" : "outline"}
                                   size="sm"
@@ -863,19 +1369,25 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
             ) : (
               /* Grid View: Focused on thumbnail with doc title underneath */
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {pdfItems.map((pdf) => {
+                {displayedPdfs.map((pdf, index) => {
                   const isPreviewing = previewPdfId === pdf.id;
                   const isDeleting = deletingId === pdf.id;
+                  const isBeingDragged = draggedPdfId === pdf.id;
                   const coverUrl = pdf.cover_image ? getR2PublicUrl(pdf.cover_image) : null;
 
                   return (
                     <div
                       key={pdf.id}
-                      className={`group relative flex flex-col rounded-md border transition-all duration-200 overflow-hidden bg-black/50 ${
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index, pdf.id)}
+                      onDragEnd={handleDragEnd}
+                      className={cn(
+                        "group relative flex flex-col rounded-md border transition-all duration-200 overflow-hidden bg-black/50",
+                        isBeingDragged && "opacity-30 border-dashed border-primary ring-2 ring-primary",
                         isPreviewing
                           ? "border-primary shadow-gold ring-1 ring-primary"
                           : "border-primary/25 hover:border-primary/60 hover:shadow-gold"
-                      }`}
+                      )}
                     >
                       {/* Thumbnail Container */}
                       <div
@@ -1020,18 +1532,18 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                           )}
                         </div>
 
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/10 text-[10px] text-muted-foreground">
-                          {pdf.file_size ? (
-                            <span className="font-mono uppercase font-semibold">
-                              {formatBytes(pdf.file_size)}
-                            </span>
-                          ) : (
-                            <span />
-                          )}
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/10 text-[10px] text-muted-foreground gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {pdf.file_size ? (
+                              <span className="font-mono uppercase font-semibold shrink-0">
+                                {formatBytes(pdf.file_size)}
+                              </span>
+                            ) : null}
+                          </div>
                           <button
                             type="button"
                             onClick={() => togglePreview(pdf.id)}
-                            className={`p-1 rounded transition-colors ${
+                            className={`p-1 rounded transition-colors shrink-0 ${
                               isPreviewing
                                 ? "text-primary bg-primary/20"
                                 : "text-muted-foreground hover:text-primary hover:bg-primary/10"
@@ -1061,6 +1573,9 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                     <FileText className="h-4 w-4 text-primary shrink-0" />
                     <span className="text-xs font-bold uppercase tracking-wider text-primary truncate">
                       {activePreviewPdf.title}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 border border-primary/30 text-primary font-medium shrink-0">
+                      {activePreviewPdf.pdf_category || "Rules"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1111,6 +1626,105 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
             )}
           </div>
         )}
+
+        {/* Rename Category Dialog */}
+        <Dialog
+          open={!!categoryToRename}
+          onOpenChange={(open) => {
+            if (!open) setCategoryToRename(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md bg-card border-primary/30">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Rename Category</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-xs">
+                Enter a new name for the &ldquo;{categoryToRename}&rdquo; category. All PDFs in this category will be updated.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleConfirmRenameCategory} className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="rename-category-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Category Name
+                </Label>
+                <Input
+                  id="rename-category-input"
+                  value={renameCategoryInput}
+                  onChange={(e) => setRenameCategoryInput(e.target.value)}
+                  placeholder="e.g. Rulebooks, Quick Reference..."
+                  autoFocus
+                  disabled={isRenamingCategory}
+                  className="bg-black/50 border-primary/30 focus:border-primary"
+                />
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isRenamingCategory}
+                  onClick={() => setCategoryToRename(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isRenamingCategory || !renameCategoryInput.trim()}
+                >
+                  {isRenamingCategory ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      Renaming...
+                    </>
+                  ) : (
+                    "Save Name"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Category Confirmation Dialog */}
+        <AlertDialog
+          open={!!categoryToDeleteCustom}
+          onOpenChange={(open) => {
+            if (!open) setCategoryToDeleteCustom(null);
+          }}
+        >
+          <AlertDialogContent className="bg-card border-destructive/40">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                Delete Category &ldquo;{categoryToDeleteCustom}&rdquo;?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground text-xs">
+                This will remove the category from your list. Any PDFs currently inside this category will be automatically moved to{" "}
+                <span className="font-semibold text-primary">
+                  &ldquo;{allCategories.find((c) => c.toLowerCase() !== categoryToDeleteCustom?.toLowerCase()) || "Rules"}&rdquo;
+                </span>
+                . No documents will be deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel disabled={isDeletingCategory}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isDeletingCategory}
+                onClick={handleConfirmDeleteCategory}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {isDeletingCategory ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Category"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
