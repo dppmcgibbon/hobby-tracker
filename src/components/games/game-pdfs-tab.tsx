@@ -86,6 +86,7 @@ import {
   addGamePdfCategory,
   renameGamePdfCategory,
   deleteGamePdfCategory,
+  updateGamePdfTitle,
   type GameEntityType,
 } from "@/app/actions/games";
 import { type GameInfoLink, isGamePdfLink, sortGamePdfLinks } from "@/lib/games/game-details";
@@ -197,6 +198,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   const [isRenamingCategory, setIsRenamingCategory] = useState<boolean>(false);
   const [categoryToDeleteCustom, setCategoryToDeleteCustom] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState<boolean>(false);
+
+  // Inline Document Title Edit State
+  const [editingPdfId, setEditingPdfId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>("");
 
   // State for upload dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -310,6 +315,51 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
     } finally {
       setIsDeletingCategory(false);
     }
+  };
+
+  const handleStartEditTitle = (pdf: GameInfoLink) => {
+    setEditingPdfId(pdf.id);
+    setEditingTitle(pdf.title);
+  };
+
+  const handleSaveTitle = async (pdfId: string) => {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) {
+      toast.error("Document title cannot be empty");
+      return;
+    }
+
+    const currentItem = pdfItems.find((p) => p.id === pdfId);
+    if (currentItem && currentItem.title === trimmed) {
+      setEditingPdfId(null);
+      return;
+    }
+
+    // Optimistic update
+    setPdfItems((prev) =>
+      prev.map((p) => (p.id === pdfId ? { ...p, title: trimmed } : p))
+    );
+    setEditingPdfId(null);
+
+    try {
+      await updateGamePdfTitle(entityType, entityId, pdfId, trimmed);
+      toast.success("Document title updated");
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update title";
+      toast.error(msg);
+      // Revert optimistic update
+      if (currentItem) {
+        setPdfItems((prev) =>
+          prev.map((p) => (p.id === pdfId ? { ...p, title: currentItem.title } : p))
+        );
+      }
+    }
+  };
+
+  const handleCancelEditTitle = () => {
+    setEditingPdfId(null);
+    setEditingTitle("");
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -1264,13 +1314,47 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                           {/* Document Title Column */}
                           <TableCell className="py-3 px-3">
                             <div className="min-w-0">
-                              <span className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate block">
-                                {pdf.title}
-                              </span>
-                              {pdf.description && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                  {pdf.description}
-                                </p>
+                              {editingPdfId === pdf.id ? (
+                                <div
+                                  className="flex items-center gap-1.5"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                >
+                                  <Input
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleSaveTitle(pdf.id);
+                                      } else if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        handleCancelEditTitle();
+                                      }
+                                    }}
+                                    onBlur={() => handleSaveTitle(pdf.id)}
+                                    autoFocus
+                                    className="h-7 text-sm font-bold bg-black/60 border-primary focus:border-primary px-2 max-w-sm"
+                                  />
+                                </div>
+                              ) : (
+                                <div
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartEditTitle(pdf);
+                                  }}
+                                  className="cursor-pointer group/title select-none"
+                                  title="Double-click to rename title"
+                                >
+                                  <span className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate block">
+                                    {pdf.title}
+                                  </span>
+                                  {pdf.description && (
+                                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                      {pdf.description}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </TableCell>

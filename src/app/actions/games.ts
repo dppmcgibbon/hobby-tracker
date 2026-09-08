@@ -1631,6 +1631,58 @@ export async function updateGamePdfCategory(
 }
 
 /**
+ * Updates the title of an existing game PDF document.
+ */
+export async function updateGamePdfTitle(
+  entityType: GameEntityType,
+  entityId: string,
+  pdfId: string,
+  newTitle: string
+) {
+  await requireAuth();
+  const trimmed = newTitle.trim();
+  if (!trimmed) {
+    throw new Error("Document title cannot be empty");
+  }
+
+  const supabase = await createClient();
+  const tableName = getTableName(entityType);
+
+  const { data: current, error: fetchError } = await supabase
+    .from(tableName)
+    .select("links")
+    .eq("id", entityId)
+    .single();
+
+  if (fetchError || !current) {
+    throw new Error("Game record not found");
+  }
+
+  const existingLinks = Array.isArray(current.links)
+    ? (current.links as Array<Record<string, unknown>>)
+    : [];
+
+  const updatedLinks = existingLinks.map((link) => {
+    if (link.id === pdfId) {
+      return { ...link, title: trimmed };
+    }
+    return link;
+  });
+
+  const { error: updateError } = await supabase
+    .from(tableName)
+    .update({ links: updatedLinks })
+    .eq("id", entityId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidateGamePaths();
+  return { success: true };
+}
+
+/**
  * Persists a newly created custom PDF category name to the entity's PDF_CATEGORIES_CATALOG.
  */
 export async function addGamePdfCategory(
