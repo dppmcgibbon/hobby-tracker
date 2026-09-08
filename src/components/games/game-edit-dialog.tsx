@@ -15,8 +15,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, X, Loader2, Trash2, Image as ImageIcon, Edit3, BookOpen } from "lucide-react";
+import { Upload, X, Loader2, Trash2, Image as ImageIcon, Edit3, BookOpen, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { rotateImageFile } from "@/lib/image-transform";
 import {
   getGameCoverUploadUrl,
   saveGameCover,
@@ -55,6 +56,7 @@ export function GameEditDialog({
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [markRemoveCover, setMarkRemoveCover] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Sync state on open
@@ -113,6 +115,25 @@ export function GameEditDialog({
   const handleClearSelectedFile = () => {
     setCoverFile(null);
     setCoverPreview(null);
+  };
+
+  const handleRotateCoverPreview = async () => {
+    if (!coverFile || isRotating) return;
+    setIsRotating(true);
+    try {
+      const rotatedFile = await rotateImageFile(coverFile, 90);
+      setCoverFile(rotatedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreview(reader.result as string);
+      };
+      reader.readAsDataURL(rotatedFile);
+      toast.success("Cover rotated 90°");
+    } catch {
+      toast.error("Failed to rotate cover");
+    } finally {
+      setIsRotating(false);
+    }
   };
 
   const handleRemoveExistingCover = () => {
@@ -315,15 +336,34 @@ export function GameEditDialog({
                   </p>
                   <p className="text-[10px] text-emerald-400 mt-1">Ready to upload</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearSelectedFile}
-                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRotateCoverPreview}
+                    disabled={isRotating || saving}
+                    title="Rotate 90° clockwise"
+                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 w-8 p-0"
+                  >
+                    {isRotating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCw className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearSelectedFile}
+                    disabled={isRotating || saving}
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                    title="Clear selection"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ) : currentDisplayCoverUrl ? (
               <div className="relative rounded border border-primary/30 bg-neutral-950/60 p-3 flex items-center justify-between gap-4">

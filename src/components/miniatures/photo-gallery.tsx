@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, RotateCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
+import { rotateImageBlob } from "@/lib/image-transform";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -43,6 +44,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const [photoToDelete, setPhotoToDelete] = useState<Photo | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [isRemovingAllBg, setIsRemovingAllBg] = useState(false);
   const [lightboxZoomed, setLightboxZoomed] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -152,6 +154,30 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
       toast.error(err instanceof Error ? err.message : "Failed to remove background");
     } finally {
       setIsRemovingBg(false);
+    }
+  };
+
+  const handleRotate = async (photoId: string, storagePath: string) => {
+    if (isRotating || isRemovingBg) return;
+    setIsRotating(true);
+    try {
+      const publicUrl = getR2PublicUrl(storagePath);
+      const blob = await fetchPhotoBlob(publicUrl, storagePath);
+      const rotatedBlob = await rotateImageBlob(blob, 90);
+      const formData = new FormData();
+      const ext = rotatedBlob.type === "image/png" ? "png" : "jpg";
+      formData.append("file", rotatedBlob, `image.${ext}`);
+      const result = await replacePhotoWithImage(photoId, formData);
+      if (result.success) {
+        toast.success("Photo rotated 90°");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rotate photo");
+    } finally {
+      setIsRotating(false);
     }
   };
 
@@ -324,6 +350,31 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Remove background</TooltipContent>
+                  </Tooltip>
+                )}
+                {miniatureId && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur"
+                        onClick={() =>
+                          handleRotate(
+                            photos[selectedIndex].id,
+                            photos[selectedIndex].storage_path
+                          )
+                        }
+                        disabled={isRotating || isRemovingBg}
+                      >
+                        {isRotating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Rotate 90° clockwise</TooltipContent>
                   </Tooltip>
                 )}
                 <Button

@@ -5,10 +5,11 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, RotateCw, Loader2 } from "lucide-react";
 import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
+import { rotateImageBlob } from "@/lib/image-transform";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -60,6 +61,7 @@ export function MiniaturePhotoDialog({
   const [photoToDelete, setPhotoToDelete] = useState<MiniaturePhoto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const router = useRouter();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
@@ -196,6 +198,31 @@ export function MiniaturePhotoDialog({
     }
   };
 
+  const handleRotate = async () => {
+    const photo = selectedMiniature.miniature_photos[selectedPhotoIndex];
+    if (!photo || isRotating || isRemovingBg) return;
+    setIsRotating(true);
+    try {
+      const publicUrl = getR2PublicUrl(photo.storage_path);
+      const blob = await fetchPhotoBlob(publicUrl, photo.storage_path);
+      const rotatedBlob = await rotateImageBlob(blob, 90);
+      const formData = new FormData();
+      const ext = rotatedBlob.type === "image/png" ? "png" : "jpg";
+      formData.append("file", rotatedBlob, `image.${ext}`);
+      const result = await replacePhotoWithImage(photo.id, formData);
+      if (result.success) {
+        toast.success("Photo rotated 90°");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rotate photo");
+    } finally {
+      setIsRotating(false);
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent
@@ -278,6 +305,26 @@ export function MiniaturePhotoDialog({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Remove background</TooltipContent>
+                </Tooltip>
+              )}
+              {selectedMiniature.miniature_photos.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="bg-background/90"
+                      onClick={handleRotate}
+                      disabled={isRotating || isRemovingBg}
+                    >
+                      {isRotating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Rotate 90° clockwise</TooltipContent>
                 </Tooltip>
               )}
               {onPhotoDeleted && selectedMiniature.miniature_photos.length > 0 && (

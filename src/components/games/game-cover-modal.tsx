@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eraser, Crop, Check, X, RotateCcw, Save, Loader2, Ratio } from "lucide-react";
+import { Eraser, Crop, Check, X, RotateCcw, RotateCw, Save, Loader2, Ratio } from "lucide-react";
 import { toast } from "sonner";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { fetchPhotoBlob } from "@/lib/photos";
+import { rotateImageBlob } from "@/lib/image-transform";
 import {
   getGamePdfCoverUploadUrl,
   savePdfCoverImage,
@@ -54,6 +55,7 @@ export function GameCoverModal({
 
   // Processing states
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
   const [isApplyingCrop, setIsApplyingCrop] = useState(false);
@@ -121,6 +123,29 @@ export function GameCoverModal({
       toast.error(msg);
     } finally {
       setIsRemovingBg(false);
+    }
+  };
+
+  // Handle Rotation (90° clockwise)
+  const handleRotate = async () => {
+    if (isRemovingBg || isCropping || isRotating) return;
+    setIsRotating(true);
+
+    try {
+      const sourceBlob = await ensureBlob();
+      const rotatedBlob = await rotateImageBlob(sourceBlob, 90);
+
+      const newUrl = URL.createObjectURL(rotatedBlob);
+      setCurrentDisplayUrl(newUrl);
+      setEditedBlob(rotatedBlob);
+      setHasUnsavedChanges(true);
+      toast.success("Image rotated 90°");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to rotate image";
+      console.error("Image rotation error:", err);
+      toast.error(msg);
+    } finally {
+      setIsRotating(false);
     }
   };
 
@@ -401,7 +426,7 @@ export function GameCoverModal({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    disabled={isRemovingBg}
+                    disabled={isRemovingBg || isRotating}
                     onClick={handleStartCrop}
                     className={`h-8 w-8 rounded-sm ${
                       isCropping
@@ -415,6 +440,30 @@ export function GameCoverModal({
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs font-semibold">
                   Crop image
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Rotate Image Action */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isRemovingBg || isCropping || isRotating}
+                    onClick={handleRotate}
+                    className="h-8 w-8 text-primary hover:bg-primary/20 hover:text-primary rounded-sm"
+                    aria-label="Rotate 90° clockwise"
+                  >
+                    {isRotating ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                      <RotateCw className="h-4 w-4 text-primary" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs font-semibold">
+                  Rotate 90° clockwise
                 </TooltipContent>
               </Tooltip>
 

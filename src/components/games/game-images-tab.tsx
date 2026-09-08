@@ -37,6 +37,7 @@ import {
   Loader2,
   AlertCircle,
   Eraser,
+  RotateCw,
   ZoomIn,
   ZoomOut,
   ChevronLeft,
@@ -56,6 +57,7 @@ import { isGameImageLink, type GameInfoLink } from "@/lib/games/game-details";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { getPhotoImageUrl, fetchPhotoBlob } from "@/lib/photos";
 import { getR2PublicUrl } from "@/lib/r2";
+import { rotateImageBlob, rotateImageFile } from "@/lib/image-transform";
 
 interface GameImagesTabProps {
   entityType: GameEntityType;
@@ -85,8 +87,10 @@ export function GameImagesTab({
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Background removal state
+  // Background removal and rotation state
   const [removingBgId, setRemovingBgId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [isRotatingUpload, setIsRotatingUpload] = useState(false);
 
   // Lightbox & delete state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -261,6 +265,54 @@ export function GameImagesTab({
     }
   };
 
+  const handleRotateImage = async (imageItem: GameInfoLink) => {
+    setRotatingId(imageItem.id);
+    try {
+      toast.info("Rotating image 90°...", { duration: 2500 });
+      const publicUrl = imageItem.url || getR2PublicUrl(imageItem.storage_path);
+      const blob = await fetchPhotoBlob(publicUrl, imageItem.storage_path || undefined);
+      const rotatedBlob = await rotateImageBlob(blob, 90);
+
+      const formData = new FormData();
+      const ext = rotatedBlob.type === "image/png" ? "png" : "jpg";
+      formData.append("file", rotatedBlob, `image.${ext}`);
+
+      const result = await replaceGameImageWithImage(entityType, entityId, imageItem.id, formData);
+
+      if (result.success) {
+        toast.success("Image rotated 90°");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to rotate image";
+      toast.error(msg);
+    } finally {
+      setRotatingId(null);
+    }
+  };
+
+  const handleRotateUploadPreview = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedFile || isRotatingUpload) return;
+    setIsRotatingUpload(true);
+    try {
+      const rotatedFile = await rotateImageFile(selectedFile, 90);
+      setSelectedFile(rotatedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(rotatedFile);
+      toast.success("Preview rotated 90°");
+    } catch {
+      toast.error("Failed to rotate preview");
+    } finally {
+      setIsRotatingUpload(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!imageToDelete) return;
     setIsDeleting(true);
@@ -350,9 +402,24 @@ export function GameImagesTab({
                   <input {...getInputProps()} />
                   {preview ? (
                     <div className="flex flex-col items-center gap-2">
-                      <div className="relative w-32 h-32 rounded border border-primary/30 overflow-hidden bg-black/40">
+                      <div className="relative w-32 h-32 rounded border border-primary/30 overflow-hidden bg-black/40 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={preview} alt="Preview" className="w-full h-full object-contain" />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          disabled={isRotatingUpload}
+                          onClick={handleRotateUploadPreview}
+                          className="absolute bottom-1 right-1 h-7 w-7 rounded-full bg-black/80 hover:bg-primary hover:text-black border border-primary/40 text-primary shadow-md"
+                          title="Rotate 90° clockwise"
+                        >
+                          {isRotatingUpload ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCw className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
                       </div>
                       <p className="text-xs font-bold text-foreground break-all">
                         {selectedFile?.name}
@@ -533,6 +600,31 @@ export function GameImagesTab({
                         </Tooltip>
                       </TooltipProvider>
 
+                      {/* Rotate button */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7 bg-black/60 hover:bg-primary hover:text-black border border-primary/30"
+                              disabled={isRemovingThisBg || rotatingId === img.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRotateImage(img);
+                              }}
+                            >
+                              {rotatingId === img.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCw className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Rotate 90° clockwise</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
                       {/* Delete button */}
                       <TooltipProvider>
                         <Tooltip>
@@ -673,6 +765,30 @@ export function GameImagesTab({
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remove background</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {/* Rotate 90° Clockwise */}
+                {currentLightboxImage && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-primary/30 hover:border-primary hover:bg-primary/10 text-primary"
+                          disabled={rotatingId === currentLightboxImage.id || removingBgId === currentLightboxImage.id}
+                          onClick={() => handleRotateImage(currentLightboxImage)}
+                        >
+                          {rotatingId === currentLightboxImage.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCw className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Rotate 90° clockwise</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}

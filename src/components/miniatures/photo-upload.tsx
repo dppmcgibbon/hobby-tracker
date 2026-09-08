@@ -18,7 +18,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPresignedUploadUrl, savePhotoRecord, uploadMiniaturePhoto } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
-import { Upload, X, Loader2 } from "lucide-react";
+import { rotateImageFile } from "@/lib/image-transform";
+import { Upload, X, RotateCw, Loader2 } from "lucide-react";
 
 interface PhotoUploadProps {
   miniatureId: string;
@@ -36,6 +37,7 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
   const [caption, setCaption] = useState("");
   const [photoType, setPhotoType] = useState<string>("wip");
   const [removeBackground, setRemoveBackground] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -190,6 +192,24 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
     setError(null);
   };
 
+  const handleRotatePreview = async () => {
+    if (!file || isRotating) return;
+    setIsRotating(true);
+    try {
+      const rotatedFile = await rotateImageFile(file, 90);
+      setFile(rotatedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(rotatedFile);
+    } catch {
+      setError("Failed to rotate preview");
+    } finally {
+      setIsRotating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {error && (
@@ -234,16 +254,34 @@ export function PhotoUpload({ miniatureId, onSuccess, compact }: PhotoUploadProp
               className="object-cover rounded-lg"
               unoptimized
             />
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2"
-              onClick={clearFile}
-              disabled={uploading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="absolute top-2 right-2 flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="h-8 w-8 bg-background/85 backdrop-blur hover:bg-background shadow-md"
+                onClick={handleRotatePreview}
+                disabled={uploading || isRotating}
+                title="Rotate 90° clockwise"
+              >
+                {isRotating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCw className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="h-8 w-8 shadow-md"
+                onClick={clearFile}
+                disabled={uploading || isRotating}
+                title="Remove photo"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {!compact && (
