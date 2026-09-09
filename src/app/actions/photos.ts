@@ -41,7 +41,7 @@ export async function getPresignedUploadUrl(
   key: string;
   publicUrl: string;
 }> {
-  const user = await requireAuth();
+  await requireAuth();
 
   const validTypes = [
     "image/jpeg",
@@ -57,7 +57,7 @@ export async function getPresignedUploadUrl(
 
   const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = Date.now();
-  const key = `${user.id}/${miniatureId}/${timestamp}-${cleanFilename}`;
+  const key = `miniatures/${miniatureId}/${timestamp}-${cleanFilename}`;
 
   const result = await generatePresignedUploadUrl(key, contentType);
   return { success: true, ...result };
@@ -104,7 +104,7 @@ export async function savePhotoRecord(
  * Server upload action (fallback / server-processed uploads).
  */
 export async function uploadMiniaturePhoto(miniatureId: string, formData: FormData) {
-  const user = await requireAuth();
+  await requireAuth();
   const supabase = await createClient();
 
   const file = formData.get("file") as File;
@@ -124,7 +124,7 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
 
   const removeBackground = formData.get("remove_background") === "true";
   const timestamp = Date.now();
-  const basePath = `${user.id}/${miniatureId}/${timestamp}`;
+  const basePath = `miniatures/${miniatureId}/${timestamp}`;
   let uploadBuffer: Buffer;
   let contentType = file.type;
   let finalPath: string;
