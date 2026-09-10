@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/server";
-import {
-  removeBackgroundFromBuffer,
-  isBackgroundRemovalAvailable,
-} from "@/lib/background-removal";
+import { removeBackgroundFromBuffer, isBackgroundRemovalAvailable } from "@/lib/background-removal";
 import {
   generatePresignedUploadUrl,
   deleteR2Object,
@@ -75,6 +72,19 @@ export async function savePhotoRecord(
   const user = await requireAuth();
   const supabase = await createClient();
 
+  // Determine next display_order for miniature
+  const { data: maxOrderPhoto } = await supabase
+    .from("miniature_photos")
+    .select("display_order")
+    .eq("miniature_id", miniatureId)
+    .order("display_order", { ascending: false })
+    .limit(1);
+
+  const nextDisplayOrder =
+    maxOrderPhoto && maxOrderPhoto.length > 0 && maxOrderPhoto[0].display_order != null
+      ? maxOrderPhoto[0].display_order + 1
+      : 0;
+
   const { data: photo, error: dbError } = await supabase
     .from("miniature_photos")
     .insert({
@@ -82,6 +92,7 @@ export async function savePhotoRecord(
       storage_path: storagePath,
       caption: caption || null,
       photo_type: photoType || "wip",
+      display_order: nextDisplayOrder,
     })
     .select()
     .single();
@@ -160,6 +171,19 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
   const caption = formData.get("caption") as string | null;
   const photoType = formData.get("photo_type") as string | null;
 
+  // Determine next display_order for miniature
+  const { data: maxOrderPhoto } = await supabase
+    .from("miniature_photos")
+    .select("display_order")
+    .eq("miniature_id", miniatureId)
+    .order("display_order", { ascending: false })
+    .limit(1);
+
+  const nextDisplayOrder =
+    maxOrderPhoto && maxOrderPhoto.length > 0 && maxOrderPhoto[0].display_order != null
+      ? maxOrderPhoto[0].display_order + 1
+      : 0;
+
   const { data: photo, error: dbError } = await supabase
     .from("miniature_photos")
     .insert({
@@ -167,6 +191,7 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
       storage_path: key,
       caption: caption || null,
       photo_type: photoType || "wip",
+      display_order: nextDisplayOrder,
     })
     .select()
     .single();
@@ -188,10 +213,7 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
   const supabase = await createClient();
 
   // Delete from database
-  const { error: dbError } = await supabase
-    .from("miniature_photos")
-    .delete()
-    .eq("id", photoId);
+  const { error: dbError } = await supabase.from("miniature_photos").delete().eq("id", photoId);
 
   if (dbError) {
     throw new Error(dbError.message);
@@ -209,9 +231,7 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
 }
 
 /** Process one photo: download from R2, remove background, re-upload to R2. */
-async function processRemoveBackgroundForPhoto(
-  storagePath: string
-): Promise<void> {
+async function processRemoveBackgroundForPhoto(storagePath: string): Promise<void> {
   const buffer = await downloadR2Object(storagePath);
   // Estimate mime type from extension or default to jpeg
   const ext = storagePath.split(".").pop()?.toLowerCase();
@@ -266,8 +286,7 @@ export async function removeBackgroundFromPhoto(
 export async function removeBackgroundsForMiniature(
   miniatureId: string
 ): Promise<
-  | { success: true; processed: number }
-  | { success: false; error: string; processed?: number }
+  { success: true; processed: number } | { success: false; error: string; processed?: number }
 > {
   try {
     if (!isBackgroundRemovalAvailable()) {
@@ -360,4 +379,34 @@ export async function replacePhotoWithImage(
     const message = err instanceof Error ? err.message : "Failed to replace photo";
     return { success: false, error: message };
   }
+}
+
+/**
+ * Server action to reorder photos for a miniature.
+ */
+export async function reorderMiniaturePhotos(
+  miniatureId: string,
+  photoIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const updates = photoIds.map((id, index) =>
+    supabase
+      .from("miniature_photos")
+      .update({ display_order: index })
+      .eq("id", id)
+      .eq("miniature_id", miniatureId)
+  );
+
+  const results = await Promise.all(updates);
+  const failedResult = results.find((r) => r.error);
+  if (failedResult?.error) {
+    console.error("Failed to reorder miniature photos:", failedResult.error);
+    return { success: false, error: failedResult.error.message };
+  }
+
+  revalidatePath(`/dashboard/miniatures/${miniatureId}`);
+  revalidatePath("/dashboard/miniatures");
+  return { success: true };
 }

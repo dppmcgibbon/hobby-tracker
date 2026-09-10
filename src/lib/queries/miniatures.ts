@@ -19,11 +19,19 @@ export async function getMiniatures(userId?: string) {
     throw new Error(error.message);
   }
 
-  // Ensure status is a single object, not an array for each miniature
+  // Ensure status is a single object, not an array for each miniature, and sort photos by display_order
   if (data) {
     data.forEach((miniature) => {
       if (Array.isArray(miniature.status)) {
         miniature.status = miniature.status[0] || null;
+      }
+      if (Array.isArray(miniature.photos)) {
+        miniature.photos.sort((a: any, b: any) => {
+          const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+          const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+          if (orderA !== orderB) return orderA - orderB;
+          return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+        });
       }
     });
   }
@@ -68,6 +76,16 @@ export async function getMiniatureById(id: string, userId?: string) {
     data.status = data.status[0] || null;
   }
 
+  // Sort photos by display_order
+  if (Array.isArray(data.photos)) {
+    data.photos.sort((a: any, b: any) => {
+      const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+    });
+  }
+
   // Fetch storage box separately if storage_box_id exists
   if (data.storage_box_id) {
     const { data: storageBox } = await supabase
@@ -75,7 +93,7 @@ export async function getMiniatureById(id: string, userId?: string) {
       .select("*")
       .eq("id", data.storage_box_id)
       .single();
-    
+
     if (storageBox) {
       data.storage_box = storageBox;
     }

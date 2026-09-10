@@ -42,7 +42,14 @@ interface MiniatureData {
   magnetised?: boolean | null;
   based?: boolean | null;
   factions?: { name: string };
-  photos?: Array<{ id: string; storage_path: string; caption?: string; photo_type?: string }>;
+  photos?: Array<{
+    id: string;
+    storage_path: string;
+    caption?: string;
+    photo_type?: string;
+    display_order?: number | null;
+    uploaded_at?: string | null;
+  }>;
   recipes?: Recipe[];
   miniature_status?: {
     status: string;
@@ -66,7 +73,7 @@ export default async function SharedMiniaturePage({ params }: Props) {
         *,
         factions (name),
         miniature_status (status, magnetised, based, completed_at),
-        photos (id, storage_path, caption, photo_type),
+        photos (id, storage_path, caption, photo_type, display_order, uploaded_at),
         recipes (
           id,
           name,
@@ -98,13 +105,18 @@ export default async function SharedMiniaturePage({ params }: Props) {
     .then(() => {});
 
   const miniature = share.miniatures as MiniatureData;
-  const photos = miniature.photos || [];
+  const photos = (miniature.photos || []).slice().sort((a, b) => {
+    const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+    const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+  });
   const recipes = miniature.recipes || [];
   const rawMs = (miniature as { miniature_status?: MiniatureStatus | MiniatureStatus[] | null })
     .miniature_status;
   const statusForBadge: MiniatureStatus | null = Array.isArray(rawMs)
-    ? rawMs[0] ?? null
-    : rawMs ?? (miniature.status ? ({ status: miniature.status } as MiniatureStatus) : null);
+    ? (rawMs[0] ?? null)
+    : (rawMs ?? (miniature.status ? ({ status: miniature.status } as MiniatureStatus) : null));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
