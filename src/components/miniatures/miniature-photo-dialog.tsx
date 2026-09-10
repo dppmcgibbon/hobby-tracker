@@ -5,11 +5,12 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, RotateCw, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Crop, RotateCw, Loader2 } from "lucide-react";
 import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { rotateImageBlob } from "@/lib/image-transform";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -62,6 +63,7 @@ export function MiniaturePhotoDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
   const router = useRouter();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
@@ -223,6 +225,25 @@ export function MiniaturePhotoDialog({
     }
   };
 
+  const handleApplyCrop = async (croppedBlob: Blob) => {
+    const photo = selectedMiniature.miniature_photos[selectedPhotoIndex];
+    if (!photo) return;
+    try {
+      const ext = croppedBlob.type === "image/png" ? "png" : "webp";
+      const formData = new FormData();
+      formData.append("file", croppedBlob, `image.${ext}`);
+      const result = await replacePhotoWithImage(photo.id, formData);
+      if (result.success) {
+        toast.success("Photo cropped");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to crop photo");
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent
@@ -305,6 +326,22 @@ export function MiniaturePhotoDialog({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Remove background</TooltipContent>
+                </Tooltip>
+              )}
+              {selectedMiniature.miniature_photos.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="bg-background/90"
+                      onClick={() => setIsCropDialogOpen(true)}
+                      disabled={isRemovingBg || isRotating}
+                    >
+                      <Crop className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Crop photo</TooltipContent>
                 </Tooltip>
               )}
               {selectedMiniature.miniature_photos.length > 0 && (
@@ -456,6 +493,19 @@ export function MiniaturePhotoDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reusable Image Crop Dialog */}
+      {selectedMiniature.miniature_photos[selectedPhotoIndex] && (
+        <ImageCropDialog
+          open={isCropDialogOpen}
+          onOpenChange={setIsCropDialogOpen}
+          imageUrl={getR2PublicUrl(
+            selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+          )}
+          title="Crop Miniature Photo"
+          onApplyCrop={handleApplyCrop}
+        />
+      )}
     </Dialog>
   );
 }

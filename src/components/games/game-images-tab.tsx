@@ -53,6 +53,7 @@ import {
   Loader2,
   AlertCircle,
   Eraser,
+  Crop,
   RotateCw,
   ZoomIn,
   ZoomOut,
@@ -86,6 +87,7 @@ import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { getPhotoImageUrl, fetchPhotoBlob } from "@/lib/photos";
 import { getR2PublicUrl } from "@/lib/r2";
 import { rotateImageBlob, rotateImageFile } from "@/lib/image-transform";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 interface GameImagesTabProps {
   entityType: GameEntityType;
@@ -183,9 +185,10 @@ export function GameImagesTab({
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Background removal and rotation state
+  // Background removal, rotation and crop state
   const [removingBgId, setRemovingBgId] = useState<string | null>(null);
   const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [imageToCrop, setImageToCrop] = useState<GameInfoLink | null>(null);
   const [isRotatingUpload, setIsRotatingUpload] = useState(false);
 
   // Lightbox & delete state
@@ -488,6 +491,27 @@ export function GameImagesTab({
       toast.error(msg);
     } finally {
       setRotatingId(null);
+    }
+  };
+
+  const handleApplyCrop = async (croppedBlob: Blob) => {
+    if (!imageToCrop) return;
+    try {
+      toast.info("Saving cropped image...", { duration: 2000 });
+      const ext = croppedBlob.type === "image/png" ? "png" : "webp";
+      const formData = new FormData();
+      formData.append("file", croppedBlob, `image.${ext}`);
+
+      const result = await replaceGameImageWithImage(entityType, entityId, imageToCrop.id, formData);
+      if (result.success) {
+        toast.success("Image cropped successfully!");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to crop image";
+      toast.error(msg);
     }
   };
 
@@ -1139,6 +1163,27 @@ export function GameImagesTab({
                         </Tooltip>
                       </TooltipProvider>
 
+                      {/* Crop button */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7 bg-black/60 hover:bg-primary hover:text-black border border-primary/30"
+                              disabled={isRemovingThisBg || rotatingId === img.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImageToCrop(img);
+                              }}
+                            >
+                              <Crop className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Crop image</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
                       {/* Rotate button */}
                       <TooltipProvider>
                         <Tooltip>
@@ -1314,6 +1359,26 @@ export function GameImagesTab({
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remove background</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {/* Crop Image Action */}
+                {currentLightboxImage && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-primary/30 hover:border-primary hover:bg-primary/10 text-primary"
+                          disabled={rotatingId === currentLightboxImage.id || removingBgId === currentLightboxImage.id}
+                          onClick={() => setImageToCrop(currentLightboxImage)}
+                        >
+                          <Crop className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Crop image</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}
@@ -1548,6 +1613,19 @@ export function GameImagesTab({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Reusable Image Crop Dialog */}
+        {imageToCrop && (
+          <ImageCropDialog
+            open={!!imageToCrop}
+            onOpenChange={(open) => {
+              if (!open) setImageToCrop(null);
+            }}
+            imageUrl={imageToCrop.url || getR2PublicUrl(imageToCrop.storage_path)}
+            title="Crop Game Image"
+            onApplyCrop={handleApplyCrop}
+          />
+        )}
       </CardContent>
     </Card>
   );

@@ -15,58 +15,43 @@ export default async function ShortcutsPage() {
   const starredFilters = await getStarredFilters();
 
   const buildShortcutUrl = (filters: Record<string, string>) => {
-    const game = filters.gameId || filters.game;
-    const edition = filters.editionId || filters.edition;
-    const expansion = filters.expansionId || filters.expansion;
-    const universe = filters.universeId || filters.universe;
-
-    const hasGame = Boolean(game && game !== "all" && game !== "");
-    const hasEdition = Boolean(edition && edition !== "all" && edition !== "");
-    const hasExpansion = Boolean(expansion && expansion !== "all" && expansion !== "");
-
-    if (hasGame || hasEdition || hasExpansion) {
-      const params = new URLSearchParams();
-      if (universe && universe !== "all" && universe !== "") {
-        params.set("universe", universe);
-      }
-      if (hasGame) {
-        params.set("game", game);
-      }
-      if (hasEdition) {
-        params.set("edition", edition);
-      }
-      if (hasExpansion) {
-        params.set("expansion", expansion);
-      }
-      return `/dashboard/games/detail?${params.toString()}`;
-    }
-
-    // Fallback to miniatures if no game, edition, or expansion is specified
     const params = new URLSearchParams();
     const keyMap: Record<string, string> = {
       search: "search",
       factionId: "faction",
+      faction: "faction",
       status: "status",
       tagId: "tag",
+      tag: "tag",
       storageBoxId: "storage",
+      storage: "storage",
       universeId: "universe",
+      universe: "universe",
       gameId: "game",
+      game: "game",
       editionId: "edition",
+      edition: "edition",
       expansionId: "expansion",
+      expansion: "expansion",
       unitType: "unit",
+      unit: "unit",
       baseSize: "base_size",
+      base_size: "base_size",
       hasPhotos: "photos",
+      photos: "photos",
       magnetised: "magnetised",
       based: "based",
     };
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && value !== "all" && value !== "") {
+
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value && value !== "all" && value !== "" && value !== "none") {
         const paramName = keyMap[key] || key;
         params.set(paramName, value);
       }
     });
-    return `/dashboard/miniatures?${params.toString()}`;
+
+    const queryString = params.toString();
+    return queryString ? `/dashboard/miniatures?${queryString}` : "/dashboard/miniatures";
   };
 
   return (
