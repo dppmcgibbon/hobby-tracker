@@ -164,7 +164,7 @@ export function MiniaturePhotoDialog({
 
     setIsDeleting(true);
     try {
-      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path);
+      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path, selectedMiniature.id);
       toast.success("Photo deleted successfully");
       setPhotoToDelete(null);
       onPhotoDeleted?.(selectedMiniatureIndex, selectedPhotoIndex);
@@ -425,7 +425,6 @@ export function MiniaturePhotoDialog({
                       sizes="(max-width: 1024px) 100vw, 896px"
                       className="object-contain"
                       loading="eager"
-                      crossOrigin="anonymous"
                       unoptimized
                       draggable={false}
                     />

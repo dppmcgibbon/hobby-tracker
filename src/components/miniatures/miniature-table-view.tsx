@@ -621,9 +621,11 @@ export function MiniatureTableView({
                       </div>
                       {miniature.miniature_photos && miniature.miniature_photos.length > 0 && (
                         <div>
-                          <p className="text-xs font-bold text-primary mb-2">Photos</p>
+                          <p className="text-xs font-bold text-primary mb-2">
+                            Photos ({miniature.miniature_photos.length})
+                          </p>
                           <div className="flex gap-5 justify-center items-center flex-wrap">
-                            {miniature.miniature_photos.slice(0, 3).map((photo, index) => {
+                            {miniature.miniature_photos.map((photo, index) => {
                             const publicUrl = getR2PublicUrl(photo.storage_path);
                             const imageUrl = getPhotoImageUrl(publicUrl, photo.image_updated_at);
                             return (
