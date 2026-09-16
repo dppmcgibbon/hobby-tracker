@@ -58,7 +58,7 @@ export default async function CollectionDetailPage({ params }: Props) {
         created_at,
         factions (name),
         miniature_status (status, completed_at, based, magnetised),
-        miniature_photos (id, storage_path, image_updated_at)
+        miniature_photos (id, storage_path, image_updated_at, display_order, uploaded_at)
       )
     `
     )
@@ -74,7 +74,14 @@ export default async function CollectionDetailPage({ params }: Props) {
         ...m,
         factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
         miniature_status: Array.isArray(m.miniature_status) ? m.miniature_status[0] : m.miniature_status,
-        miniature_photos: Array.isArray(m.miniature_photos) ? m.miniature_photos : [],
+        miniature_photos: (Array.isArray(m.miniature_photos) ? m.miniature_photos : []).sort(
+          (a: any, b: any) => {
+            const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+            const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+            if (orderA !== orderB) return orderA - orderB;
+            return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+          }
+        ),
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

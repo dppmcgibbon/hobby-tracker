@@ -208,9 +208,26 @@ export async function uploadMiniaturePhoto(miniatureId: string, formData: FormDa
 /**
  * Server action to delete a photo from PostgreSQL database and Cloudflare R2 storage.
  */
-export async function deleteMiniaturePhoto(photoId: string, storagePath: string) {
+export async function deleteMiniaturePhoto(
+  photoId: string,
+  storagePath: string,
+  miniatureId?: string
+) {
   const user = await requireAuth();
   const supabase = await createClient();
+
+  // If miniatureId is not provided, look it up before deletion so we can revalidate the detail page
+  let targetMiniatureId = miniatureId;
+  if (!targetMiniatureId) {
+    const { data: existingPhoto } = await supabase
+      .from("miniature_photos")
+      .select("miniature_id")
+      .eq("id", photoId)
+      .single();
+    if (existingPhoto?.miniature_id) {
+      targetMiniatureId = existingPhoto.miniature_id;
+    }
+  }
 
   // Delete from database
   const { error: dbError } = await supabase.from("miniature_photos").delete().eq("id", photoId);
@@ -227,6 +244,9 @@ export async function deleteMiniaturePhoto(photoId: string, storagePath: string)
   }
 
   revalidatePath("/dashboard/miniatures");
+  if (targetMiniatureId) {
+    revalidatePath(`/dashboard/miniatures/${targetMiniatureId}`);
+  }
   return { success: true };
 }
 

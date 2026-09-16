@@ -226,7 +226,7 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         unit_type,
         factions (id, name),
         miniature_status (status, completed_at, based, magnetised),
-        miniature_photos (id, storage_path, image_updated_at),
+        miniature_photos (id, storage_path, image_updated_at, display_order, uploaded_at),
         storage_boxes (id, name, location)
       `
       )
@@ -250,7 +250,12 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
           based?: boolean | null;
           magnetised?: boolean | null;
         } | null,
-        miniature_photos: (m.miniature_photos || []) as {
+        miniature_photos: ((m.miniature_photos || []) as any[]).sort((a: any, b: any) => {
+          const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+          const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+          if (orderA !== orderB) return orderA - orderB;
+          return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+        }) as {
           storage_path: string;
           image_updated_at?: string | null;
         }[],

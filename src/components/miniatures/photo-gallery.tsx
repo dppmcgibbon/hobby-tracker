@@ -238,7 +238,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
 
     setIsDeleting(true);
     try {
-      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path);
+      await deleteMiniaturePhoto(photoToDelete.id, photoToDelete.storage_path, miniatureId);
       toast.success("Photo deleted successfully");
       setItems((prev) => prev.filter((p) => p.id !== photoToDelete.id));
       setPhotoToDelete(null);
@@ -430,7 +430,6 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                   sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
-                  crossOrigin="anonymous"
                   unoptimized={isLocalSupabase}
                   draggable={false}
                 />
@@ -676,7 +675,6 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                       sizes="(max-width: 1024px) 100vw, 896px"
                       className="object-contain"
                       priority
-                      crossOrigin="anonymous"
                       unoptimized
                       draggable={false}
                     />
