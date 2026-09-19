@@ -525,7 +525,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
         console.warn("Direct R2 presigned upload failed, trying server fallback:", directErr);
       }
 
-      // 3. Fallback to server-side action if direct PUT failed
+      // 3. Fallback to server-side action only for small files (<= 4MB) if direct PUT failed
       if (uploadedToR2 && r2Key) {
         setUploadProgress("Saving PDF record...");
         await saveGamePdf(entityType, entityId, {
@@ -536,8 +536,8 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           coverImageKey,
           pdfCategory: uploadCategory,
         });
-      } else {
-        setUploadProgress("Uploading via server fallback...");
+      } else if (selectedFile.size <= 4 * 1024 * 1024) {
+        setUploadProgress("Uploading via server fallback (<= 4MB)...");
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("title", pdfTitle.trim());
@@ -549,6 +549,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
           formData.append("coverFile", coverBlob, "cover.webp");
         }
         await uploadGamePdfServerSide(entityType, entityId, formData);
+      } else {
+        throw new Error(
+          "Direct upload to Cloudflare R2 failed. For large PDF files, please ensure CORS is enabled on your Cloudflare R2 bucket (see r2-cors.json)."
+        );
       }
 
       toast.success("PDF uploaded successfully with cover image!");
@@ -1542,8 +1546,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                   aria-label="Download PDF"
                                 >
                                   <a
-                                    href={`/api/pdf-proxy?url=${encodeURIComponent(pdf.url)}&download=true&filename=${encodeURIComponent(pdf.title)}`}
+                                    href={pdf.url}
                                     download={`${pdf.title}.pdf`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <Download className="h-3.5 w-3.5" />
@@ -1718,8 +1724,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                             aria-label="Download PDF"
                           >
                             <a
-                              href={`/api/pdf-proxy?url=${encodeURIComponent(pdf.url)}&download=true&filename=${encodeURIComponent(pdf.title)}`}
+                              href={pdf.url}
                               download={`${pdf.title}.pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Download className="h-3 w-3" />
@@ -1846,8 +1854,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                       className="h-7 text-xs font-bold uppercase tracking-wider hover:text-primary text-muted-foreground"
                     >
                       <a
-                        href={`/api/pdf-proxy?url=${encodeURIComponent(activePreviewPdf.url)}&download=true&filename=${encodeURIComponent(activePreviewPdf.title)}`}
+                        href={activePreviewPdf.url}
                         download={`${activePreviewPdf.title}.pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         <Download className="h-3 w-3 mr-1" />
                         Download
@@ -1866,7 +1876,7 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
 
                 <div className="w-full h-[650px] bg-neutral-900">
                   <iframe
-                    src={`/api/pdf-proxy?url=${encodeURIComponent(activePreviewPdf.url)}#view=FitH`}
+                    src={`${activePreviewPdf.url}#view=FitH`}
                     className="w-full h-full border-none"
                     title={activePreviewPdf.title}
                   />

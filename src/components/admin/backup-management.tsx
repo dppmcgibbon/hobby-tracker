@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Database,
   Download,
@@ -402,6 +403,13 @@ export function BackupManagement({ initialStats }: BackupManagementProps) {
             </CardHeader>
 
             <CardContent className="space-y-6">
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-500">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Bandwidth notice:</strong> Downloading Cloudflare R2 binary archives streams through Vercel and counts against Vercel Fast Origin Transfer (10 GB/month on Hobby tier). For large media collections, download individual parts or run <code className="bg-muted px-1 py-0.5 rounded text-[11px]">npm run backup</code> locally.
+                </AlertDescription>
+              </Alert>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {stats.miniatures.parts.map((p) => (
                   <div
@@ -487,6 +495,13 @@ export function BackupManagement({ initialStats }: BackupManagementProps) {
             </CardHeader>
 
             <CardContent className="space-y-4">
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-500">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Bandwidth notice:</strong> Streaming game rulebooks and PDFs counts against Vercel Fast Origin Transfer. For large game libraries, download individual games or run <code className="bg-muted px-1 py-0.5 rounded text-[11px]">npm run backup</code> locally.
+                </AlertDescription>
+              </Alert>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {stats.games.groups.map((grp) => (
                   <div

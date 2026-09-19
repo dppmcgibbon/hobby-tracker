@@ -62,6 +62,12 @@ export async function GET(request: NextRequest) {
       responseHeaders.set("ETag", upstreamRes.headers.get("ETag")!);
     }
 
+    // Edge and browser caching to avoid repeated origin transfers
+    responseHeaders.set(
+      "Cache-Control",
+      "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+    );
+
     // Set disposition: attachment if download is requested, or inline so browsers render inside iframes
     const isDownload = searchParams.get("download") === "true";
     const customFilename = searchParams.get("filename") || parsed.pathname.split("/").pop() || "document.pdf";

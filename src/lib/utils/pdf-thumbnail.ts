@@ -130,12 +130,12 @@ export async function getPdfFirstPageDataUrl(
 
   const pdfjsLib = await loadPdfJs();
 
-  // If the URL is external (e.g. Cloudflare R2 or another domain),
-  // route through our same-origin PDF proxy so HTTP Range headers are fully exposed to PDF.js.
+  // Prefer fetching directly from origin (e.g. Cloudflare R2) with HTTP byte-range requests
+  // to prevent consuming Vercel Fast Origin Transfer bandwidth.
+  // Fall back to same-origin proxy only if direct fetch is blocked by CORS/network.
   const isExternal = pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://");
-
   const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
-  const urlsToTry = isExternal ? [proxyUrl, pdfUrl] : [pdfUrl];
+  const urlsToTry = isExternal ? [pdfUrl, proxyUrl] : [pdfUrl];
 
   let pdfDoc: PdfJsDocument | null = null;
   let lastError: unknown = null;
@@ -223,7 +223,7 @@ export async function renderPdfFirstPageToBlob(
   if (typeof source === "string") {
     const isExternal = source.startsWith("http://") || source.startsWith("https://");
     const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(source)}`;
-    const urlsToTry = isExternal ? [proxyUrl, source] : [source];
+    const urlsToTry = isExternal ? [source, proxyUrl] : [source];
 
     for (const targetUrl of urlsToTry) {
       try {

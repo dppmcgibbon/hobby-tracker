@@ -415,8 +415,8 @@ export function GameImagesTab({
           caption: caption.trim() || null,
           album: uploadAlbum,
         });
-      } else {
-        setUploadProgress("Uploading via server fallback...");
+      } else if (fileToUpload.size <= 4 * 1024 * 1024) {
+        setUploadProgress("Uploading via server fallback (<= 4MB)...");
         const formData = new FormData();
         formData.append("file", fileToUpload);
         if (caption.trim()) {
@@ -424,6 +424,10 @@ export function GameImagesTab({
         }
         formData.append("album", uploadAlbum);
         await uploadGameImageServerSide(entityType, entityId, formData);
+      } else {
+        throw new Error(
+          "Direct upload to Cloudflare R2 failed. For large images, please ensure CORS is enabled on your Cloudflare R2 bucket (see r2-cors.json)."
+        );
       }
 
       toast.success("Image uploaded successfully!");

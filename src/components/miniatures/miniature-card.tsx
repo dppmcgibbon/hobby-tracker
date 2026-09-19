@@ -103,7 +103,7 @@ export function MiniatureCard({
           showLabel={false}
         />
       </div>
-      <Link href={`/dashboard/miniatures/${miniature.id}`}>
+      <Link href={`/dashboard/miniatures/${miniature.id}`} prefetch={false}>
         <div className="relative aspect-square p-4">
           <div className="relative w-full h-full">
             <Image

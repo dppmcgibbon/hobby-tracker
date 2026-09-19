@@ -176,11 +176,17 @@ export function GameEditDialog({
             console.warn("Direct R2 upload failed, trying server fallback:", directErr);
           }
 
-          // Fallback to server action if direct PUT failed
+          // Fallback to server action only for small files (<= 4MB) if direct PUT failed
           if (!uploaded) {
-            const formData = new FormData();
-            formData.append("file", coverFile);
-            await uploadGameCoverServerSide(entityType, entityId, formData);
+            if (coverFile.size <= 4 * 1024 * 1024) {
+              const formData = new FormData();
+              formData.append("file", coverFile);
+              await uploadGameCoverServerSide(entityType, entityId, formData);
+            } else {
+              throw new Error(
+                "Direct cover upload to Cloudflare R2 failed. For large files, please ensure CORS is enabled on your Cloudflare R2 bucket (see r2-cors.json)."
+              );
+            }
           }
         } else if (markRemoveCover && currentCoverImage) {
           // Remove existing cover
