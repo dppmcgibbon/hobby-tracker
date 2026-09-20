@@ -77,83 +77,9 @@ if (!is_array($rawLinks)) {
     $rawLinks = [];
 }
 
-// Handle Form Submissions (Add Link, Delete Link, Edit Description)
+// Read-only page state
 $notice = null;
 $error = null;
-
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $csrf = $_POST['csrf_token'] ?? '';
-    
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf)) {
-        $error = 'Security token mismatch. Please try again.';
-    } else {
-        if ($action === 'update_description') {
-            $newDesc = trim($_POST['description'] ?? '');
-            $updateRes = supabase_update_entity($targetEntityType, $targetEntityId, ['description' => $newDesc], $bearerToken);
-            if ($updateRes['status'] < 400) {
-                header("Location: detail.php?universe={$resolvedUniverseId}&game={$game['id']}" . 
-                    ($edition ? "&edition={$edition['id']}" : "") . 
-                    ($expansion ? "&expansion={$expansion['id']}" : "") . 
-                    "&tab=about&msg=desc_updated");
-                exit;
-            } else {
-                $error = 'Failed to update description: ' . ($updateRes['error'] ?? 'API Error');
-            }
-        } elseif ($action === 'add_link') {
-            $title = trim($_POST['title'] ?? '');
-            $url = trim($_POST['url'] ?? '');
-            $category = $_POST['category'] ?? 'resource';
-            $pdfCat = trim($_POST['pdf_category'] ?? 'Rules');
-            $linkDesc = trim($_POST['description'] ?? '');
-            
-            if (!empty($title) && !empty($url)) {
-                $newLink = [
-                    'id' => bin2hex(random_bytes(8)),
-                    'title' => $title,
-                    'url' => $url,
-                    'category' => $category,
-                    'pdf_category' => ($category === 'pdf') ? $pdfCat : null,
-                    'description' => $linkDesc ?: null,
-                    'uploaded_at' => date('c')
-                ];
-                $updatedLinks = $rawLinks;
-                $updatedLinks[] = $newLink;
-                
-                $updateRes = supabase_update_entity($targetEntityType, $targetEntityId, ['links' => $updatedLinks], $bearerToken);
-                if ($updateRes['status'] < 400) {
-                    $tabToRedirect = ($category === 'pdf') ? 'pdfs' : (($category === 'image') ? 'images' : 'about');
-                    header("Location: detail.php?universe={$resolvedUniverseId}&game={$game['id']}" . 
-                        ($edition ? "&edition={$edition['id']}" : "") . 
-                        ($expansion ? "&expansion={$expansion['id']}" : "") . 
-                        "&tab={$tabToRedirect}&msg=link_added");
-                    exit;
-                } else {
-                    $error = 'Failed to add link: ' . ($updateRes['error'] ?? 'API Error');
-                }
-            } else {
-                $error = 'Please provide both a title and URL.';
-            }
-        } elseif ($action === 'delete_link') {
-            $linkId = $_POST['link_id'] ?? '';
-            if (!empty($linkId)) {
-                $updatedLinks = array_values(array_filter($rawLinks, function($l) use ($linkId) {
-                    return ($l['id'] ?? '') !== $linkId;
-                }));
-                $updateRes = supabase_update_entity($targetEntityType, $targetEntityId, ['links' => $updatedLinks], $bearerToken);
-                if ($updateRes['status'] < 400) {
-                    header("Location: detail.php?universe={$resolvedUniverseId}&game={$game['id']}" . 
-                        ($edition ? "&edition={$edition['id']}" : "") . 
-                        ($expansion ? "&expansion={$expansion['id']}" : "") . 
-                        "&tab={$activeTab}&msg=link_deleted");
-                    exit;
-                } else {
-                    $error = 'Failed to delete link: ' . ($updateRes['error'] ?? 'API Error');
-                }
-            }
-        }
-    }
-}
 
 // Flash messages
 if (isset($_GET['msg'])) {
@@ -220,7 +146,7 @@ if (empty($_SESSION['csrf_token'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($displayTitle) ?> &mdash; Hobby Tracker</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=<?= @filemtime(__DIR__ . '/style.css') ?: time() ?>">
 </head>
 <body>
     <div class="container-wide">
@@ -379,11 +305,8 @@ if (empty($_SESSION['csrf_token'])) {
                                 <div class="section-title">About The Game</div>
                                 <div class="section-desc">Background lore and game overview</div>
                             </div>
-                            <button class="btn btn-secondary btn-sm" onclick="openEditLoreModal()">Edit Lore</button>
                         </div>
-                        <div class="lore-body">
-                            <?= htmlspecialchars($metadata['description']) ?>
-                        </div>
+                        <div class="lore-body"><?= htmlspecialchars(trim($metadata['description'] ?? '')) ?></div>
                     </div>
 
                     <!-- Info & Resources Section -->
@@ -393,7 +316,6 @@ if (empty($_SESSION['csrf_token'])) {
                                 <div class="section-title">Info &amp; Resources</div>
                                 <div class="section-desc">Community databases, rules wikis, and official references</div>
                             </div>
-                            <button class="btn btn-primary btn-sm" onclick="openAddLinkModal('resource')">+ Add Link</button>
                         </div>
 
                         <?php if (empty($resourceLinks)): ?>
@@ -408,7 +330,7 @@ if (empty($_SESSION['csrf_token'])) {
                                             <svg class="link-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <circle cx="12" cy="12" r="10"></circle>
                                                 <line x1="2" y1="12" x2="22" y2="12"></line>
-                                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                                             </svg>
                                             <div>
                                                 <a href="<?= htmlspecialchars($l['url']) ?>" target="_blank" rel="noopener noreferrer" class="link-title">
@@ -423,19 +345,6 @@ if (empty($_SESSION['csrf_token'])) {
                                                     <div class="link-desc"><?= htmlspecialchars($l['description']) ?></div>
                                                 <?php endif; ?>
                                             </div>
-                                        </div>
-                                        <div class="link-actions">
-                                            <form method="POST" onsubmit="return confirm('Remove this link?');" style="display: inline;">
-                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                                                <input type="hidden" name="action" value="delete_link">
-                                                <input type="hidden" name="link_id" value="<?= htmlspecialchars($l['id'] ?? '') ?>">
-                                                <button type="submit" class="btn-icon btn-icon-danger" title="Delete">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                    </svg>
-                                                </button>
-                                            </form>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -452,7 +361,6 @@ if (empty($_SESSION['csrf_token'])) {
                                 <div class="section-title">PDF Documents</div>
                                 <div class="section-desc">Rules, reference sheets, errata, and game supplements</div>
                             </div>
-                            <button class="btn btn-primary btn-sm" onclick="openAddLinkModal('pdf')">+ Add PDF Link</button>
                         </div>
 
                         <?php if (empty($pdfLinks)): ?>
@@ -464,39 +372,88 @@ if (empty($_SESSION['csrf_token'])) {
                                 <p>No PDF documents registered for this game.</p>
                             </div>
                         <?php else: ?>
-                            <div class="pdf-grid">
-                                <?php foreach ($pdfLinks as $pdf): 
-                                    $cat = $pdf['pdf_category'] ?? 'Rules';
-                                    $pdfKey = !empty($pdf['url']) ? $pdf['url'] : ($pdf['storage_path'] ?? $pdf['r2_key'] ?? '');
-                                    $pdfUrl = get_r2_url($pdfKey);
-                                ?>
-                                    <div class="pdf-card">
-                                        <div>
-                                            <span class="pdf-category"><?= htmlspecialchars($cat) ?></span>
-                                            <div class="pdf-title"><?= htmlspecialchars($pdf['title']) ?></div>
-                                            <?php if (!empty($pdf['description'])): ?>
-                                                <div class="pdf-meta"><?= htmlspecialchars($pdf['description']) ?></div>
-                                            <?php endif; ?>
+                            <?php
+                            $groupedPdfs = [];
+                            foreach ($pdfLinks as $pdf) {
+                                $cat = !empty($pdf['pdf_category']) ? trim($pdf['pdf_category']) : 'Rules';
+                                if (!isset($groupedPdfs[$cat])) {
+                                    $groupedPdfs[$cat] = [];
+                                }
+                                $groupedPdfs[$cat][] = $pdf;
+                            }
+
+                            uksort($groupedPdfs, function($a, $b) {
+                                $isRulesA = (stripos($a, 'rule') !== false);
+                                $isRulesB = (stripos($b, 'rule') !== false);
+                                if ($isRulesA && !$isRulesB) return -1;
+                                if (!$isRulesA && $isRulesB) return 1;
+
+                                $isOtherA = (stripos($a, 'other') !== false);
+                                $isOtherB = (stripos($b, 'other') !== false);
+                                if ($isOtherA && !$isOtherB) return 1;
+                                if (!$isOtherA && $isOtherB) return -1;
+
+                                return strcasecmp($a, $b);
+                            });
+                            ?>
+
+                            <?php foreach ($groupedPdfs as $catTitle => $catPdfs): ?>
+                                <div class="faction-group-section">
+                                    <div class="faction-separator">
+                                        <div class="faction-separator-title">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                            <span><?= htmlspecialchars($catTitle) ?></span>
                                         </div>
-                                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                            <a href="<?= htmlspecialchars($pdfUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center;">
-                                                Open PDF
-                                            </a>
-                                            <form method="POST" onsubmit="return confirm('Remove this PDF link?');">
-                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                                                <input type="hidden" name="action" value="delete_link">
-                                                <input type="hidden" name="link_id" value="<?= htmlspecialchars($pdf['id'] ?? '') ?>">
-                                                <button type="submit" class="btn-icon btn-icon-danger" title="Delete">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                    </svg>
-                                                </button>
-                                            </form>
-                                        </div>
+                                        <span class="faction-count-badge"><?= count($catPdfs) ?> <?= count($catPdfs) === 1 ? 'document' : 'documents' ?></span>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
+
+                                    <div class="pdf-grid">
+                                        <?php foreach ($catPdfs as $pdf): 
+                                            $pdfKey = !empty($pdf['url']) ? $pdf['url'] : ($pdf['storage_path'] ?? $pdf['r2_key'] ?? '');
+                                            $pdfUrl = get_r2_url($pdfKey);
+                                            $pdfCover = !empty($pdf['cover_image']) ? get_r2_url($pdf['cover_image']) : null;
+                                        ?>
+                                            <div class="pdf-card">
+                                                <a href="<?= htmlspecialchars($pdfUrl) ?>" target="_blank" rel="noopener noreferrer" class="pdf-cover-wrap" title="Open <?= htmlspecialchars($pdf['title']) ?>">
+                                                    <?php if ($pdfCover): ?>
+                                                        <img src="<?= htmlspecialchars($pdfCover) ?>" alt="<?= htmlspecialchars($pdf['title']) ?>" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                    <?php endif; ?>
+                                                    <div class="pdf-cover-fallback" style="<?= $pdfCover ? 'display: none;' : 'display: flex;' ?>">
+                                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                                        </svg>
+                                                        <span>PDF Document</span>
+                                                    </div>
+                                                    <div class="pdf-cover-overlay">
+                                                        <span class="pdf-open-hint">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                                                <polyline points="15 3 21 3 21 9"></polyline>
+                                                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                                                            </svg>
+                                                            Open PDF
+                                                        </span>
+                                                    </div>
+                                                </a>
+                                                <div class="pdf-info">
+                                                    <a href="<?= htmlspecialchars($pdfUrl) ?>" target="_blank" rel="noopener noreferrer" class="pdf-title-link">
+                                                        <div class="pdf-title"><?= htmlspecialchars($pdf['title']) ?></div>
+                                                    </a>
+                                                    <?php if (!empty($pdf['description'])): ?>
+                                                        <div class="pdf-meta"><?= htmlspecialchars($pdf['description']) ?></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -509,7 +466,6 @@ if (empty($_SESSION['csrf_token'])) {
                                 <div class="section-title">Images &amp; Art Gallery</div>
                                 <div class="section-desc">Box art, miniatures photos, and promotional graphics</div>
                             </div>
-                            <button class="btn btn-primary btn-sm" onclick="openAddLinkModal('image')">+ Add Image Link</button>
                         </div>
 
                         <?php if (empty($imageLinks)): ?>
@@ -522,17 +478,56 @@ if (empty($_SESSION['csrf_token'])) {
                                 <p>No images added to the gallery yet.</p>
                             </div>
                         <?php else: ?>
-                            <div class="gallery-grid">
-                                <?php foreach ($imageLinks as $img): 
-                                    $imgKey = !empty($img['url']) ? $img['url'] : ($img['storage_path'] ?? $img['r2_key'] ?? '');
-                                    $imgUrl = get_r2_url($imgKey);
-                                ?>
-                                    <div class="gallery-item" onclick="openLightbox('<?= htmlspecialchars($imgUrl) ?>')">
-                                        <img src="<?= htmlspecialchars($imgUrl) ?>" alt="<?= htmlspecialchars($img['title'] ?? 'Game image') ?>" loading="lazy">
-                                        <div class="gallery-caption"><?= htmlspecialchars($img['title'] ?? '') ?></div>
+                            <?php
+                            $groupedImages = [];
+                            foreach ($imageLinks as $img) {
+                                $albumName = !empty($img['album']) ? trim($img['album']) : (!empty($img['category']) && strtolower($img['category']) !== 'image' ? trim($img['category']) : 'Games');
+                                if (!isset($groupedImages[$albumName])) {
+                                    $groupedImages[$albumName] = [];
+                                }
+                                $groupedImages[$albumName][] = $img;
+                            }
+
+                            uksort($groupedImages, function($a, $b) {
+                                $isGamesA = (strcasecmp($a, 'games') === 0);
+                                $isGamesB = (strcasecmp($b, 'games') === 0);
+                                if ($isGamesA && !$isGamesB) return -1;
+                                if (!$isGamesA && $isGamesB) return 1;
+
+                                $isOtherA = (stripos($a, 'other') !== false);
+                                $isOtherB = (stripos($b, 'other') !== false);
+                                if ($isOtherA && !$isOtherB) return 1;
+                                if (!$isOtherA && $isOtherB) return -1;
+
+                                return strcasecmp($a, $b);
+                            });
+                            ?>
+
+                            <?php foreach ($groupedImages as $albumTitle => $albumImages): ?>
+                                <div class="faction-group-section">
+                                    <div class="faction-separator">
+                                        <div class="faction-separator-title">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                            <span><?= htmlspecialchars($albumTitle) ?></span>
+                                        </div>
+                                        <span class="faction-count-badge"><?= count($albumImages) ?> <?= count($albumImages) === 1 ? 'image' : 'images' ?></span>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
+
+                                    <div class="gallery-grid">
+                                        <?php foreach ($albumImages as $img): 
+                                            $imgKey = !empty($img['url']) ? $img['url'] : ($img['storage_path'] ?? $img['r2_key'] ?? '');
+                                            $imgUrl = get_r2_url($imgKey);
+                                        ?>
+                                            <div class="gallery-item" onclick="openLightbox('<?= htmlspecialchars($imgUrl) ?>')">
+                                                <img src="<?= htmlspecialchars($imgUrl) ?>" alt="<?= htmlspecialchars($img['title'] ?? 'Game image') ?>" loading="lazy">
+                                                <div class="gallery-caption"><?= htmlspecialchars($img['title'] ?? '') ?></div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -666,74 +661,6 @@ if (empty($_SESSION['csrf_token'])) {
         </div>
     </div>
 
-    <!-- Edit Lore Modal -->
-    <div id="editLoreModal" class="modal-backdrop">
-        <div class="modal-box">
-            <div class="modal-header">
-                <div class="modal-title">Edit Game Lore &amp; Overview</div>
-                <button class="modal-close" onclick="closeModal('editLoreModal')">&times;</button>
-            </div>
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                <input type="hidden" name="action" value="update_description">
-                <div class="form-group">
-                    <label for="loreText">Description / Lore</label>
-                    <textarea id="loreText" name="description" class="input-control" rows="8" style="resize: vertical; font-family: inherit;"><?= htmlspecialchars($rawDescription ?? '') ?></textarea>
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('editLoreModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Save Description</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Add Link Modal -->
-    <div id="addLinkModal" class="modal-backdrop">
-        <div class="modal-box">
-            <div class="modal-header">
-                <div class="modal-title" id="addLinkModalTitle">Add New Link</div>
-                <button class="modal-close" onclick="closeModal('addLinkModal')">&times;</button>
-            </div>
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                <input type="hidden" name="action" value="add_link">
-                <input type="hidden" name="category" id="linkCategoryInput" value="resource">
-                
-                <div class="form-group">
-                    <label for="linkTitle">Title</label>
-                    <input type="text" id="linkTitle" name="title" class="input-control" placeholder="e.g. Core Rules 2024" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="linkUrl">URL or R2 Key</label>
-                    <input type="text" id="linkUrl" name="url" class="input-control" placeholder="https://... or key/path" required>
-                </div>
-
-                <div class="form-group" id="pdfCatGroup" style="display: none;">
-                    <label for="pdfCatSelect">PDF Category</label>
-                    <select id="pdfCatSelect" name="pdf_category" class="filter-select" style="width: 100%;">
-                        <option value="Rules">Rules</option>
-                        <option value="Reference">Reference</option>
-                        <option value="Errata">Errata</option>
-                        <option value="Lore">Lore</option>
-                        <option value="House Rules">House Rules</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="linkDescription">Description (optional)</label>
-                    <input type="text" id="linkDescription" name="description" class="input-control" placeholder="Brief note or description">
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('addLinkModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Add Link</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Lightbox Modal -->
     <div id="lightboxModal" class="modal-backdrop" onclick="closeModal('lightboxModal')">
         <img id="lightboxImg" class="lightbox-img" src="" alt="Enlarged preview" onclick="event.stopPropagation()">
@@ -753,28 +680,6 @@ if (empty($_SESSION['csrf_token'])) {
             const url = new URL(window.location);
             url.searchParams.set('tab', tabName);
             window.history.replaceState({}, '', url);
-        }
-
-        function openEditLoreModal() {
-            document.getElementById('editLoreModal').classList.add('open');
-        }
-
-        function openAddLinkModal(category) {
-            document.getElementById('linkCategoryInput').value = category;
-            const titleEl = document.getElementById('addLinkModalTitle');
-            const pdfCatGroup = document.getElementById('pdfCatGroup');
-            
-            if (category === 'pdf') {
-                titleEl.innerText = 'Add PDF Document';
-                pdfCatGroup.style.display = 'block';
-            } else if (category === 'image') {
-                titleEl.innerText = 'Add Image Link';
-                pdfCatGroup.style.display = 'none';
-            } else {
-                titleEl.innerText = 'Add Resource Link';
-                pdfCatGroup.style.display = 'none';
-            }
-            document.getElementById('addLinkModal').classList.add('open');
         }
 
         function closeModal(id) {

@@ -817,8 +817,8 @@ label {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding-bottom: 0.85rem;
-    margin-bottom: 1rem;
+    padding-bottom: 0.65rem;
+    margin-bottom: 0.65rem;
 }
 
 .section-title {
@@ -840,6 +840,8 @@ label {
     line-height: 1.7;
     color: #e2e8f0;
     white-space: pre-line;
+    margin-top: 0;
+    padding-top: 0;
 }
 
 /* Resources & Links list */
@@ -924,49 +926,143 @@ label {
 /* PDFs list */
 .pdf-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
 }
 
 .pdf-card {
     background-color: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 1rem;
+    border-radius: var(--radius-md);
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     transition: var(--transition);
+    position: relative;
 }
 
 .pdf-card:hover {
-    border-color: #a855f7;
+    border-color: #38bdf8;
     transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
 }
 
-.pdf-category {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.7rem;
+.pdf-cover-wrap {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    background: radial-gradient(circle at center, #1e293b 0%, #0b1120 100%);
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.pdf-cover-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.25s ease;
+}
+
+.pdf-card:hover .pdf-cover-wrap img {
+    transform: scale(1.04);
+}
+
+.pdf-cover-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1rem;
+    text-align: center;
+}
+
+.pdf-cover-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+}
+
+.pdf-card:hover .pdf-cover-overlay {
+    opacity: 1;
+}
+
+.pdf-open-hint {
+    background: rgba(56, 189, 248, 0.95);
+    color: #04131f;
+    font-size: 0.75rem;
     font-weight: 700;
-    background: rgba(168, 85, 247, 0.15);
-    color: #d8b4fe;
-    margin-bottom: 0.5rem;
-    align-self: flex-start;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: translateY(4px);
+    transition: transform 0.2s ease;
+}
+
+.pdf-card:hover .pdf-open-hint {
+    transform: translateY(0);
+}
+
+.pdf-info {
+    background-color: var(--bg-surface);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.65rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    text-align: center;
+    transition: background-color 0.2s ease;
+}
+
+.pdf-card:hover .pdf-info {
+    background-color: #24344d;
+}
+
+.pdf-title-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    text-align: center;
+}
+
+.pdf-title-link:hover .pdf-title {
+    color: #38bdf8;
 }
 
 .pdf-title {
-    font-weight: 600;
-    font-size: 0.9375rem;
+    font-weight: 400;
+    font-size: 0.75rem;
     color: var(--text-primary);
-    margin-bottom: 0.35rem;
+    line-height: 1.35;
+    text-align: center;
+    transition: color 0.15s ease;
 }
 
 .pdf-meta {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
-    margin-bottom: 0.75rem;
+    line-height: 1.35;
+    text-align: center;
 }
 
 /* Images Gallery */
@@ -1011,15 +1107,18 @@ label {
     text-overflow: ellipsis;
 }
 
-/* Miniatures Grid & Faction Groups */
+/* Section Grouping & Separators (Miniatures Factions, PDF Categories, Image Albums) */
+.category-group-section,
 .faction-group-section {
     margin-bottom: 2.25rem;
 }
 
+.category-group-section:last-child,
 .faction-group-section:last-child {
     margin-bottom: 0.5rem;
 }
 
+.category-separator,
 .faction-separator {
     display: flex;
     align-items: center;
@@ -1030,6 +1129,7 @@ label {
     border-bottom: 1px solid var(--border-color);
 }
 
+.category-separator-title,
 .faction-separator-title {
     display: flex;
     align-items: center;
@@ -1041,11 +1141,13 @@ label {
     text-transform: uppercase;
 }
 
+.category-separator-title svg,
 .faction-separator-title svg {
     color: #38bdf8;
     flex-shrink: 0;
 }
 
+.category-count-badge,
 .faction-count-badge {
     font-size: 0.75rem;
     font-weight: 600;

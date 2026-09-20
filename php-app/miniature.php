@@ -22,51 +22,6 @@ $notice = $_SESSION['flash_notice'] ?? null;
 $error = $_SESSION['flash_error'] ?? null;
 unset($_SESSION['flash_notice'], $_SESSION['flash_error']);
 
-// Handle Quick Edit POST action
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action'])) {
-    $csrf = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf)) {
-        $_SESSION['flash_error'] = 'Invalid session token. Please try again.';
-        header("Location: miniature.php?id=" . urlencode($miniatureId) . "&back=" . urlencode($backUrl) . "&tab=edit");
-        exit;
-    }
-
-    $action = $_POST['action'];
-
-    if ($action === 'update_miniature') {
-        $quantity = max(0, (int)($_POST['quantity'] ?? 0));
-        $notes = trim($_POST['notes'] ?? '');
-        $statusVal = trim($_POST['status'] ?? 'backlog');
-        $basedVal = !empty($_POST['based']);
-        $magnetisedVal = !empty($_POST['magnetised']);
-
-        $minData = [
-            'quantity' => $quantity,
-            'notes' => $notes,
-            'updated_at' => date('c'),
-        ];
-
-        $statusData = [
-            'status' => $statusVal,
-            'based' => $basedVal,
-            'magnetised' => $magnetisedVal,
-        ];
-        if ($statusVal === 'complete' || $statusVal === 'completed') {
-            $statusData['completed_at'] = date('c');
-        }
-
-        $res = supabase_update_miniature($miniatureId, $minData, $statusData, $bearerToken);
-        if ($res['status'] >= 400) {
-            $_SESSION['flash_error'] = 'Failed to update miniature: ' . ($res['error'] ?? 'Unknown error');
-        } else {
-            $_SESSION['flash_notice'] = 'Miniature details updated successfully!';
-        }
-
-        header("Location: miniature.php?id=" . urlencode($miniatureId) . "&back=" . urlencode($backUrl) . "&tab=edit");
-        exit;
-    }
-}
-
 // Fetch miniature details
 $miniature = supabase_get_miniature_detail($miniatureId, $bearerToken);
 
@@ -74,15 +29,7 @@ if (!$miniature) {
     http_response_code(404);
 }
 
-// Fetch dynamic statuses from miniature_statuses table
-$allStatuses = supabase_get_miniature_statuses($bearerToken);
-
-// CSRF token
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-$activeTab = $_GET['tab'] ?? 'photos';
+$activeTab = ($_GET['tab'] ?? '') === 'recipes' ? 'recipes' : 'photos';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -397,9 +344,6 @@ $activeTab = $_GET['tab'] ?? 'photos';
                         <button class="tab-btn <?= $activeTab === 'recipes' ? 'active' : '' ?>" onclick="switchTab('recipes')">
                             Painting Recipes (<?= count($mRecipes) ?>)
                         </button>
-                        <button class="tab-btn <?= $activeTab === 'edit' ? 'active' : '' ?>" onclick="switchTab('edit')">
-                            Quick Edit
-                        </button>
                     </div>
 
                     <!-- Tab 1: Photos Gallery -->
@@ -539,64 +483,6 @@ $activeTab = $_GET['tab'] ?? 'photos';
                                     <?php endforeach; ?>
                                 </div>
                             <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- Tab 3: Quick Edit -->
-                    <div id="tab-edit" class="tab-content <?= $activeTab === 'edit' ? 'active' : '' ?>">
-                        <div class="section-card">
-                            <div class="section-header">
-                                <div>
-                                    <div class="section-title">Quick Update</div>
-                                    <div class="section-desc">Update miniature painting status, assembly, and notes</div>
-                                </div>
-                            </div>
-
-                            <form method="POST">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                                <input type="hidden" name="action" value="update_miniature">
-
-                                <div class="form-group">
-                                    <label for="minStatus">Painting Status</label>
-                                    <select id="minStatus" name="status" class="input-control">
-                                        <?php foreach ($allStatuses as $st): 
-                                            $sName = $st['name'];
-                                            $sLabel = get_miniature_status_label($sName);
-                                            $isSelected = (strtolower((string)$currStatus) === strtolower($sName));
-                                        ?>
-                                            <option value="<?= htmlspecialchars($sName) ?>" <?= $isSelected ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($sLabel) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="minQuantity">Quantity</label>
-                                    <input type="number" id="minQuantity" name="quantity" class="input-control" value="<?= isset($miniature['quantity']) ? (int)$miniature['quantity'] : 0 ?>" min="0" max="500">
-                                </div>
-
-                                <div style="display: flex; gap: 1.5rem; margin: 1.25rem 0;">
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem;">
-                                        <input type="checkbox" name="magnetised" value="1" <?= $isMagnetised ? 'checked' : '' ?> style="accent-color: #38bdf8; width: 18px; height: 18px;">
-                                        <span>🧲 Magnetised</span>
-                                    </label>
-
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem;">
-                                        <input type="checkbox" name="based" value="1" <?= $isBased ? 'checked' : '' ?> style="accent-color: #38bdf8; width: 18px; height: 18px;">
-                                        <span>✓ Based</span>
-                                    </label>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="minNotes">Notes</label>
-                                    <textarea id="minNotes" name="notes" class="input-control" rows="5" placeholder="Add conversion notes, basing recipes, thoughts..."><?= htmlspecialchars($miniature['notes'] ?? '') ?></textarea>
-                                </div>
-
-                                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
-                                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 </div>
