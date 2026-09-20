@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { BACKUP_IMPORTS_BUCKET } from "@/lib/backup-imports";
 import { uploadR2Object, downloadR2Object, deleteR2Object } from "@/lib/r2";
+import { sanitizeBackupRow } from "@/lib/backup/database-backup";
 
 // Helper function to convert array of objects to CSV
 function convertToCSV(data: any[], tableName: string): string {
@@ -576,8 +577,9 @@ export async function importDatabaseBackup(
 
     for (const tableName of REFERENCE_INSERT_ORDER) {
       if (!backupData[tableName]) continue;
-      const rows = parseCSV(backupData[tableName]);
-      if (rows.length === 0) continue;
+      const rawRows = parseCSV(backupData[tableName]);
+      if (rawRows.length === 0) continue;
+      const rows = rawRows.map((r) => sanitizeBackupRow(tableName, r));
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH);
         let error;
@@ -694,11 +696,8 @@ export async function importDatabaseBackup(
       if (!backupData[tableName]) continue;
       const rows = parseCSV(backupData[tableName]);
       if (rows.length === 0) continue;
-      // Strip any legacy user_id column from backup CSVs before inserting
-      let toInsert = rows.map((row) => {
-        const { user_id, ...rest } = row;
-        return rest;
-      });
+      // Strip any legacy user_id and unmapped columns from backup CSVs before inserting
+      let toInsert = rows.map((row) => sanitizeBackupRow(tableName, row) as any);
 
       // Sanitize foreign keys before inserting to avoid constraint violations and track IDs
       if (tableName === "tags") {

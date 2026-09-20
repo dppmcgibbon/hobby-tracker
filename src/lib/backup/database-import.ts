@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { revalidatePath } from "next/cache";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { BACKUP_TABLES, BackupTableName } from "@/lib/backup/database-backup";
+import { BACKUP_TABLES, BackupTableName, sanitizeBackupRow } from "@/lib/backup/database-backup";
 
 /**
  * Parses RFC 4180 CSV string into array of object records.
@@ -271,12 +271,8 @@ export async function importDatabaseTablesFromZipBuffer(
     const rows = parseCSV(backupData[tableName]);
     if (rows.length === 0) continue;
 
-    // Strip legacy user_id columns if any exist in the backup CSV
-    const sanitizedRows = rows.map((row) => {
-      const copy = { ...row };
-      delete copy.user_id;
-      return copy;
-    });
+    // Sanitize rows by stripping legacy user_id and any unmapped/deprecated columns
+    const sanitizedRows = rows.map((row) => sanitizeBackupRow(tableName, row));
 
     const conflictTarget = COMPOSITE_KEY_MAP[tableName];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

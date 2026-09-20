@@ -46,6 +46,57 @@ const TABLE_PRIMARY_KEYS: Record<string, string[]> = {
   miniature_recipes: ["miniature_id", "recipe_id"],
 };
 
+export const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
+  army_types: new Set(["id", "name", "description", "created_at"]),
+  base_shapes: new Set(["id", "name", "created_at"]),
+  base_types: new Set(["id", "name", "created_at"]),
+  bases: new Set(["id", "name", "created_at"]),
+  boardgames: new Set(["id", "name", "game", "status", "type", "boxset", "amount"]),
+  collect_apps: new Set(["id", "table_name", "app", "initial_sort_key"]),
+  collect_config: new Set(["id", "table_name", "column_name", "column_type", "display", "filter", "sequence", "initial_sort_key"]),
+  collection_miniatures: new Set(["collection_id", "miniature_id", "display_order", "created_at"]),
+  collections: new Set(["id", "name", "description", "color", "is_default", "created_at", "updated_at"]),
+  editions: new Set(["id", "game_id", "name", "year", "description", "sequence", "cover_image", "links", "created_at", "updated_at"]),
+  expansions: new Set(["id", "edition_id", "name", "year", "description", "sequence", "cover_image", "links", "created_at", "updated_at"]),
+  factions: new Set(["id", "name", "description", "color_hex", "army_type", "army_type_id", "created_at"]),
+  games: new Set(["id", "universe_id", "name", "publisher", "description", "sequence", "cover_image", "links", "created_at", "updated_at"]),
+  magazines: new Set(["id", "issue", "received", "built", "primed", "painted", "complete", "miniature", "magazine", "image", "faction", "magnetised"]),
+  miniature_games: new Set(["miniature_id", "game_id", "edition_id", "expansion_id", "created_at"]),
+  miniature_photos: new Set(["id", "miniature_id", "storage_path", "display_order", "photo_type", "caption", "uploaded_at", "image_updated_at"]),
+  miniature_recipes: new Set(["miniature_id", "recipe_id", "created_at"]),
+  miniature_status: new Set(["id", "miniature_id", "status", "status_id", "based", "magnetised", "started_at", "completed_at", "created_at", "updated_at"]),
+  miniature_statuses: new Set(["id", "name", "display_order", "created_at"]),
+  miniature_tags: new Set(["miniature_id", "tag_id", "created_at"]),
+  miniatures: new Set(["id", "name", "quantity", "unit_type", "faction_id", "storage_box_id", "base_id", "base_shape_id", "base_type_id", "base_size", "material", "sculptor", "year", "notes", "created_at", "updated_at"]),
+  paint_equivalents: new Set(["id", "paint_id", "equivalent_paint_id", "created_at"]),
+  painting_recipes: new Set(["id", "name", "description", "faction_id", "is_public", "created_at", "updated_at"]),
+  paints: new Set(["id", "name", "brand", "color_hex", "type", "created_at"]),
+  profiles: new Set(["id", "email", "display_name", "avatar_url", "created_at", "updated_at"]),
+  recipe_steps: new Set(["id", "recipe_id", "paint_id", "step_order", "technique", "notes", "created_at"]),
+  records: new Set(["id", "title", "artist", "label", "sequence", "cover", "vinyl", "cd", "cassette", "digital", "bandcamp", "discogs", "catalog"]),
+  saved_filters: new Set(["id", "name", "filters", "is_starred", "logo_url", "created_at", "updated_at"]),
+  shared_miniatures: new Set(["id", "miniature_id", "share_token", "is_public", "view_count", "created_at", "expires_at"]),
+  storage_boxes: new Set(["id", "name", "description", "location", "completed", "created_at", "updated_at"]),
+  stories: new Set(["id", "series", "story", "book", "author", "complete", "novel", "sequence", "date", "wiki"]),
+  tags: new Set(["id", "name", "color", "created_at"]),
+  universes: new Set(["id", "name", "created_at"]),
+  user_paints: new Set(["id", "paint_id", "quantity", "notes", "created_at", "updated_at"]),
+};
+
+/**
+ * Sanitizes a row by stripping unknown or deprecated columns (e.g. legacy user_id or bgg_api_token)
+ */
+export function sanitizeBackupRow(tableName: string, row: Record<string, unknown>): Record<string, unknown> {
+  const allowed = TABLE_ALLOWED_COLUMNS[tableName];
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(row)) {
+    if (key === "user_id") continue;
+    if (allowed && !allowed.has(key)) continue;
+    sanitized[key] = val;
+  }
+  return sanitized;
+}
+
 /**
  * Converts an array of objects into RFC 4180 compliant CSV format.
  * Escapes quotes, handles commas, newlines, and serializes JSON objects/arrays.
