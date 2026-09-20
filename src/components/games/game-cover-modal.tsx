@@ -24,7 +24,10 @@ interface GameCoverModalProps {
   title: string;
   entityType?: GameEntityType;
   entityId?: string;
+  pdfId?: string | null;
   firstPdfId?: string | null;
+  isEntityCover?: boolean;
+  startWithCrop?: boolean;
 }
 
 interface CropRect {
@@ -43,7 +46,10 @@ export function GameCoverModal({
   title,
   entityType,
   entityId,
+  pdfId,
   firstPdfId,
+  isEntityCover,
+  startWithCrop,
 }: GameCoverModalProps) {
   const router = useRouter();
 
@@ -57,7 +63,7 @@ export function GameCoverModal({
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isCropping, setIsCropping] = useState(false);
+  const [isCropping, setIsCropping] = useState(Boolean(startWithCrop));
   const [isApplyingCrop, setIsApplyingCrop] = useState(false);
   const [lockAspect, setLockAspect] = useState<"free" | "3:4">("3:4");
 
@@ -79,10 +85,10 @@ export function GameCoverModal({
       setOriginalBlob(null);
       setEditedBlob(null);
       setHasUnsavedChanges(false);
-      setIsCropping(false);
+      setIsCropping(Boolean(startWithCrop));
       setCropRect({ x: 5, y: 5, width: 90, height: 90 });
     }
-  }, [open, imageUrl]);
+  }, [open, imageUrl, startWithCrop]);
 
   // Clean up any blob URLs created
   useEffect(() => {
@@ -273,13 +279,17 @@ export function GameCoverModal({
         throw new Error(`Failed to upload to storage (HTTP ${uploadRes.status})`);
       }
 
-      // If this cover is from the first PDF, update the PDF record's cover_image
-      if (firstPdfId) {
-        await savePdfCoverImage(entityType, entityId, firstPdfId, presigned.key);
+      const targetPdfId = pdfId || firstPdfId;
+
+      // If a specific PDF is targeted, update that PDF record's cover_image
+      if (targetPdfId) {
+        await savePdfCoverImage(entityType, entityId, targetPdfId, presigned.key);
       }
 
-      // Also persist to the entity's cover_image
-      await saveGameCover(entityType, entityId, presigned.key);
+      // If explicitly marked as entity cover, or if no targetPdfId was specified (direct entity cover edit)
+      if (isEntityCover || (!targetPdfId && entityId)) {
+        await saveGameCover(entityType, entityId, presigned.key);
+      }
 
       toast.success("Cover image saved!");
       setHasUnsavedChanges(false);

@@ -234,6 +234,7 @@ export function GameCover({
           entityType={entityType}
           entityId={entityId}
           firstPdfId={firstPdfId}
+          isEntityCover={true}
         />
       )}
     </>

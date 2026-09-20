@@ -74,6 +74,7 @@ import {
   Pencil,
   X,
   BookOpen,
+  Crop,
 } from "lucide-react";
 import {
   getGamePdfUploadUrl,
@@ -99,7 +100,8 @@ import {
   getFirstRulesPdf,
 } from "@/lib/games/game-details";
 import { getR2PublicUrl } from "@/lib/r2";
-import { renderPdfFirstPageToBlob } from "@/lib/utils/pdf-thumbnail";
+import { renderPdfFirstPageToBlob, getPdfFirstPageDataUrl } from "@/lib/utils/pdf-thumbnail";
+import { GameCoverModal } from "@/components/games/game-cover-modal";
 
 interface GamePdfsTabProps {
   entityType: GameEntityType;
@@ -229,6 +231,13 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPdfId, setPreviewPdfId] = useState<string | null>(null);
   const [generatingCoverId, setGeneratingCoverId] = useState<string | null>(null);
+
+  // State for cropping PDF covers
+  const [cropTarget, setCropTarget] = useState<{
+    pdf: GameInfoLink;
+    imageUrl: string;
+  } | null>(null);
+  const [isExtractingForCrop, setIsExtractingForCrop] = useState<string | null>(null);
 
   const handleMovePdf = async (pdfId: string, targetCategory: string) => {
     const targetPdf = pdfItems.find((p) => p.id === pdfId);
@@ -620,6 +629,41 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
       toast.error(msg);
     } finally {
       setGeneratingCoverId(null);
+    }
+  };
+
+  // Open the crop & cover editor dialog for any PDF (extracting page 1 on-demand if no cover exists yet)
+  const handleOpenCropModal = async (e: React.MouseEvent, pdf: GameInfoLink) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // If the PDF already has an R2 precomputed cover image, open immediately
+    if (pdf.cover_image) {
+      setCropTarget({
+        pdf,
+        imageUrl: getR2PublicUrl(pdf.cover_image),
+      });
+      return;
+    }
+
+    // Otherwise extract page 1 on the fly
+    setIsExtractingForCrop(pdf.id);
+    try {
+      toast.info("Extracting cover page from PDF for cropping...");
+      const dataUrl = await getPdfFirstPageDataUrl(pdf.url, {
+        scale: 1.5,
+        format: "image/webp",
+        quality: 0.9,
+      });
+      setCropTarget({
+        pdf,
+        imageUrl: dataUrl,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to extract PDF page for cropping";
+      toast.error(msg);
+    } finally {
+      setIsExtractingForCrop(null);
     }
   };
 
@@ -1289,10 +1333,10 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
               <FolderArchive className="h-8 w-8 text-primary/70" />
             </div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-              Category "{activeCategory}" is Empty
+              Category &ldquo;{activeCategory}&rdquo; is Empty
             </h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Drag documents from other categories onto "{activeCategory}" or drop them here, or upload a new PDF directly to this category.
+              Drag documents from other categories onto &ldquo;{activeCategory}&rdquo; or drop them here, or upload a new PDF directly to this category.
             </p>
             <Button
               onClick={() => handleOpenDialog(true)}
@@ -1498,6 +1542,22 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                 )}
 
                                 <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => handleOpenCropModal(e, pdf)}
+                                  disabled={isExtractingForCrop === pdf.id}
+                                  className="h-7 w-7 p-0 border-primary/30 hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary shrink-0"
+                                  title="Crop / Edit PDF Cover"
+                                  aria-label="Crop / Edit PDF Cover"
+                                >
+                                  {isExtractingForCrop === pdf.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                  ) : (
+                                    <Crop className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+
+                                <Button
                                   variant={isPreviewing ? "default" : "outline"}
                                   size="sm"
                                   onClick={(e) => {
@@ -1654,6 +1714,24 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                                 </>
                               )}
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenCropModal(e, pdf)}
+                              disabled={isExtractingForCrop === pdf.id}
+                              className="inline-flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary hover:underline mt-1 font-semibold uppercase tracking-wider disabled:opacity-50"
+                            >
+                              {isExtractingForCrop === pdf.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Extracting...
+                                </>
+                              ) : (
+                                <>
+                                  <Crop className="h-3 w-3" />
+                                  Crop Cover
+                                </>
+                              )}
+                            </button>
                           </div>
                         )}
 
@@ -1674,6 +1752,22 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                               <BookOpen className="h-3 w-3" />
                             </Button>
                           )}
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleOpenCropModal(e, pdf)}
+                            disabled={isExtractingForCrop === pdf.id}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-primary/20"
+                            title="Crop / Edit PDF Cover"
+                            aria-label="Crop / Edit PDF Cover"
+                          >
+                            {isExtractingForCrop === pdf.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                            ) : (
+                              <Crop className="h-3 w-3" />
+                            )}
+                          </Button>
 
                           <Button
                             variant={isPreviewing ? "default" : "ghost"}
@@ -1797,23 +1891,39 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
                               </button>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => togglePreview(pdf.id)}
-                            className={`p-1 rounded transition-colors shrink-0 ${
-                              isPreviewing
-                                ? "text-primary bg-primary/20"
-                                : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                            }`}
-                            title={isPreviewing ? "Close Preview" : "Preview PDF"}
-                            aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
-                          >
-                            {isPreviewing ? (
-                              <EyeOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Eye className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenCropModal(e, pdf)}
+                              disabled={isExtractingForCrop === pdf.id}
+                              className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+                              title="Crop / Edit PDF Cover"
+                              aria-label="Crop / Edit PDF Cover"
+                            >
+                              {isExtractingForCrop === pdf.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                              ) : (
+                                <Crop className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => togglePreview(pdf.id)}
+                              className={`p-1 rounded transition-colors shrink-0 ${
+                                isPreviewing
+                                  ? "text-primary bg-primary/20"
+                                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                              }`}
+                              title={isPreviewing ? "Close Preview" : "Preview PDF"}
+                              aria-label={isPreviewing ? "Close Preview" : "Preview PDF"}
+                            >
+                              {isPreviewing ? (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1984,6 +2094,22 @@ export function GamePdfsTab({ entityType, entityId, links, gameTitle = "Game" }:
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {cropTarget && (
+          <GameCoverModal
+            open={Boolean(cropTarget)}
+            onOpenChange={(open) => {
+              if (!open) setCropTarget(null);
+            }}
+            imageUrl={cropTarget.imageUrl}
+            title={cropTarget.pdf.title || "PDF Cover"}
+            entityType={entityType}
+            entityId={entityId}
+            pdfId={cropTarget.pdf.id}
+            isEntityCover={cropTarget.pdf.id === firstRulesPdfId}
+            startWithCrop={true}
+          />
+        )}
       </CardContent>
     </Card>
   );
