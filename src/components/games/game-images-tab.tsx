@@ -88,6 +88,7 @@ import { getPhotoImageUrl, fetchPhotoBlob } from "@/lib/photos";
 import { getR2PublicUrl } from "@/lib/r2";
 import { rotateImageBlob, rotateImageFile } from "@/lib/image-transform";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { ImageEraserDialog } from "@/components/ui/image-eraser-dialog";
 
 interface GameImagesTabProps {
   entityType: GameEntityType;
@@ -185,10 +186,11 @@ export function GameImagesTab({
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Background removal, rotation and crop state
+  // Background removal, rotation, crop and eraser state
   const [removingBgId, setRemovingBgId] = useState<string | null>(null);
   const [rotatingId, setRotatingId] = useState<string | null>(null);
   const [imageToCrop, setImageToCrop] = useState<GameInfoLink | null>(null);
+  const [imageToErase, setImageToErase] = useState<GameInfoLink | null>(null);
   const [isRotatingUpload, setIsRotatingUpload] = useState(false);
 
   // Lightbox & delete state
@@ -515,6 +517,26 @@ export function GameImagesTab({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to crop image";
+      toast.error(msg);
+    }
+  };
+
+  const handleApplyErase = async (erasedBlob: Blob) => {
+    if (!imageToErase) return;
+    try {
+      toast.info("Saving edited image...", { duration: 2000 });
+      const formData = new FormData();
+      formData.append("file", erasedBlob, "image.png");
+
+      const result = await replaceGameImageWithImage(entityType, entityId, imageToErase.id, formData);
+      if (result.success) {
+        toast.success("Image updated successfully!");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update image";
       toast.error(msg);
     }
   };
@@ -1159,11 +1181,32 @@ export function GameImagesTab({
                               {isRemovingThisBg ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
-                                <Eraser className="h-3.5 w-3.5" />
+                                <Sparkles className="h-3.5 w-3.5" />
                               )}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Remove background</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      {/* Eraser Tool button */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7 bg-black/60 hover:bg-primary hover:text-black border border-primary/30"
+                              disabled={isRemovingThisBg || rotatingId === img.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImageToErase(img);
+                              }}
+                            >
+                              <Eraser className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eraser tool</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
 
@@ -1358,11 +1401,31 @@ export function GameImagesTab({
                           {removingBgId === currentLightboxImage.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <Eraser className="h-3.5 w-3.5" />
+                            <Sparkles className="h-3.5 w-3.5" />
                           )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remove background</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {/* Eraser Tool Action */}
+                {currentLightboxImage && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-primary/30 hover:border-primary hover:bg-primary/10 text-primary"
+                          disabled={rotatingId === currentLightboxImage.id || removingBgId === currentLightboxImage.id}
+                          onClick={() => setImageToErase(currentLightboxImage)}
+                        >
+                          <Eraser className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Eraser tool</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}
@@ -1625,9 +1688,22 @@ export function GameImagesTab({
             onOpenChange={(open) => {
               if (!open) setImageToCrop(null);
             }}
-            imageUrl={imageToCrop.url || getR2PublicUrl(imageToCrop.storage_path)}
+            imageUrl={getPhotoImageUrl(imageToCrop.url || getR2PublicUrl(imageToCrop.storage_path), imageToCrop.image_updated_at)}
             title="Crop Game Image"
             onApplyCrop={handleApplyCrop}
+          />
+        )}
+
+        {/* Reusable Image Eraser Dialog */}
+        {imageToErase && (
+          <ImageEraserDialog
+            open={!!imageToErase}
+            onOpenChange={(open) => {
+              if (!open) setImageToErase(null);
+            }}
+            imageUrl={getPhotoImageUrl(imageToErase.url || getR2PublicUrl(imageToErase.storage_path), imageToErase.image_updated_at)}
+            title="Erase Game Image"
+            onApplyErase={handleApplyErase}
           />
         )}
       </CardContent>

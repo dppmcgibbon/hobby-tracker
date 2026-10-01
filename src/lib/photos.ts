@@ -34,24 +34,20 @@ export async function fetchPhotoBlob(publicUrl: string, storagePath?: string): P
     }
   }
 
-  // 1. Direct fetch with cache-busting and explicit CORS mode
+  // 1. Direct fetch with CORS (uses browser HTTP cache for instant loading)
   try {
-    const sep = publicUrl.includes("?") ? "&" : "?";
-    const directUrl = `${publicUrl}${sep}cors=true&t=${Date.now()}`;
-    const res = await fetch(directUrl, {
+    const res = await fetch(publicUrl, {
       mode: "cors",
-      cache: "no-store",
-      credentials: "omit",
     });
     if (res.ok) {
       return await res.blob();
     }
-  } catch (err) {
-    console.warn("Direct image fetch failed, attempting server proxy fallback:", err);
+  } catch {
+    // Direct fetch failed, fallback to same-origin proxy
   }
 
-  // 2. Fallback to same-origin API route (immune to browser CORS issues)
-  const path = storagePath || extractKeyFromUrl(publicUrl);
+  // 2. Fallback to same-origin API route (immune to browser CORS issues, cached and fast)
+  const path = storagePath || publicUrl;
   if (path) {
     try {
       const proxyUrl = `/api/photos/blob?path=${encodeURIComponent(path)}`;

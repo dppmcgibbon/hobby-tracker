@@ -5,12 +5,13 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Crop, RotateCw, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, Eraser, Crop, RotateCw, Loader2, Sparkles } from "lucide-react";
 import { getR2PublicUrl } from "@/lib/r2";
 import { deleteMiniaturePhoto, replacePhotoWithImage } from "@/app/actions/photos";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { rotateImageBlob } from "@/lib/image-transform";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { ImageEraserDialog } from "@/components/ui/image-eraser-dialog";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -64,6 +65,7 @@ export function MiniaturePhotoDialog({
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [isEraserDialogOpen, setIsEraserDialogOpen] = useState(false);
   const router = useRouter();
 
   const selectedMiniature = selectedMiniatureIndex !== null ? miniatures[selectedMiniatureIndex] : null;
@@ -244,6 +246,24 @@ export function MiniaturePhotoDialog({
     }
   };
 
+  const handleApplyErase = async (erasedBlob: Blob) => {
+    const photo = selectedMiniature.miniature_photos[selectedPhotoIndex];
+    if (!photo) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", erasedBlob, "image.png");
+      const result = await replacePhotoWithImage(photo.id, formData);
+      if (result.success) {
+        toast.success("Photo updated");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update photo");
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent
@@ -322,10 +342,26 @@ export function MiniaturePhotoDialog({
                       onClick={handleRemoveBackground}
                       disabled={isRemovingBg}
                     >
-                      {isRemovingBg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}
+                      {isRemovingBg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Remove background</TooltipContent>
+                </Tooltip>
+              )}
+              {selectedMiniature.miniature_photos.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="bg-background/90"
+                      onClick={() => setIsEraserDialogOpen(true)}
+                      disabled={isRemovingBg || isRotating}
+                    >
+                      <Eraser className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eraser tool</TooltipContent>
                 </Tooltip>
               )}
               {selectedMiniature.miniature_photos.length > 0 && (
@@ -498,11 +534,30 @@ export function MiniaturePhotoDialog({
         <ImageCropDialog
           open={isCropDialogOpen}
           onOpenChange={setIsCropDialogOpen}
-          imageUrl={getR2PublicUrl(
-            selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+          imageUrl={getPhotoImageUrl(
+            getR2PublicUrl(
+              selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+            ),
+            selectedMiniature.miniature_photos[selectedPhotoIndex].image_updated_at
           )}
           title="Crop Miniature Photo"
           onApplyCrop={handleApplyCrop}
+        />
+      )}
+
+      {/* Reusable Image Eraser Dialog */}
+      {selectedMiniature.miniature_photos[selectedPhotoIndex] && (
+        <ImageEraserDialog
+          open={isEraserDialogOpen}
+          onOpenChange={setIsEraserDialogOpen}
+          imageUrl={getPhotoImageUrl(
+            getR2PublicUrl(
+              selectedMiniature.miniature_photos[selectedPhotoIndex].storage_path
+            ),
+            selectedMiniature.miniature_photos[selectedPhotoIndex].image_updated_at
+          )}
+          title="Erase Miniature Photo"
+          onApplyErase={handleApplyErase}
         />
       )}
     </Dialog>

@@ -18,6 +18,7 @@ import {
   Loader2,
   GripVertical,
   Star,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getR2PublicUrl } from "@/lib/r2";
@@ -29,6 +30,7 @@ import {
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { rotateImageBlob } from "@/lib/image-transform";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { ImageEraserDialog } from "@/components/ui/image-eraser-dialog";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +71,7 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
   const [isRotating, setIsRotating] = useState(false);
   const [isRemovingAllBg, setIsRemovingAllBg] = useState(false);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [isEraserDialogOpen, setIsEraserDialogOpen] = useState(false);
   const [lightboxZoomed, setLightboxZoomed] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
@@ -315,6 +318,25 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to crop photo");
+    }
+  };
+
+  const handleApplyErase = async (erasedBlob: Blob) => {
+    if (selectedIndex === null) return;
+    const photo = items[selectedIndex];
+    if (!photo) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", erasedBlob, "image.png");
+      const result = await replacePhotoWithImage(photo.id, formData);
+      if (result.success) {
+        toast.success("Photo updated");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update photo");
     }
   };
 
@@ -582,11 +604,27 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
                           {isRemovingBg ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Eraser className="h-4 w-4" />
+                            <Sparkles className="h-4 w-4" />
                           )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remove background</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {miniatureId && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="bg-background/80 backdrop-blur"
+                          onClick={() => setIsEraserDialogOpen(true)}
+                          disabled={isRotating || isRemovingBg}
+                        >
+                          <Eraser className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Eraser tool</TooltipContent>
                     </Tooltip>
                   )}
                   {miniatureId && (
@@ -747,9 +785,26 @@ export function PhotoGallery({ photos, miniatureName, miniatureId }: PhotoGaller
         <ImageCropDialog
           open={isCropDialogOpen}
           onOpenChange={setIsCropDialogOpen}
-          imageUrl={getR2PublicUrl(items[selectedIndex].storage_path)}
+          imageUrl={getPhotoImageUrl(
+            getR2PublicUrl(items[selectedIndex].storage_path),
+            items[selectedIndex].image_updated_at
+          )}
           title="Crop Miniature Photo"
           onApplyCrop={handleApplyCrop}
+        />
+      )}
+
+      {/* Reusable Image Eraser Dialog */}
+      {selectedIndex !== null && items[selectedIndex] && (
+        <ImageEraserDialog
+          open={isEraserDialogOpen}
+          onOpenChange={setIsEraserDialogOpen}
+          imageUrl={getPhotoImageUrl(
+            getR2PublicUrl(items[selectedIndex].storage_path),
+            items[selectedIndex].image_updated_at
+          )}
+          title="Erase Miniature Photo"
+          onApplyErase={handleApplyErase}
         />
       )}
     </>

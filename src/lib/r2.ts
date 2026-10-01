@@ -86,6 +86,7 @@ export async function deleteR2Object(keyOrUrl: string): Promise<void> {
   } else {
     key = key.replace(/^\/+/, "");
   }
+  key = key.split("?")[0].split("#")[0];
 
   const command = new DeleteObjectCommand({
     Bucket: R2_BUCKET_NAME,
@@ -134,6 +135,7 @@ export async function downloadR2Object(keyOrUrl: string): Promise<Buffer> {
   } else {
     key = key.replace(/^\/+/, "");
   }
+  key = key.split("?")[0].split("#")[0];
 
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,

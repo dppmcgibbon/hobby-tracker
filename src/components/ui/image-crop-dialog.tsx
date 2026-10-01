@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, X, Loader2, Ratio, RotateCcw } from "lucide-react";
+import { Check, X, Loader2, Ratio, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPhotoBlob } from "@/lib/photos";
 import { cropImageBlob, type CropRect } from "@/lib/image-crop";
@@ -50,6 +50,7 @@ export function ImageCropDialog({
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>(defaultAspect);
   const [cropRect, setCropRect] = useState<CropRect>({ x: 10, y: 10, width: 80, height: 80 });
   const [isApplying, setIsApplying] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(true);
   const [loadedBlob, setLoadedBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string>("");
 
@@ -91,6 +92,7 @@ export function ImageCropDialog({
     }
 
     if (open) {
+      setBlobUrl(imageUrl);
       loadCleanImage();
       setAspectRatio(defaultAspect);
       setCropRect({ x: 10, y: 10, width: 80, height: 80 });
@@ -254,7 +256,12 @@ export function ImageCropDialog({
   return (
     <Dialog open={open} onOpenChange={isApplying ? undefined : onOpenChange}>
       <DialogContent
-        className="max-w-4xl p-0 overflow-hidden bg-neutral-950 border border-primary/30 text-white shadow-2xl flex flex-col max-h-[90vh]"
+        className="p-0 overflow-hidden bg-neutral-950 border border-primary/30 text-white shadow-2xl flex flex-col sm:max-w-none max-w-none transition-all duration-150"
+        style={
+          isZoomed
+            ? { width: "95vw", maxWidth: "95vw", height: "92vh", maxHeight: "92vh" }
+            : { width: "min(896px, calc(100vw - 2rem))", maxWidth: "896px", height: "min(750px, 85vh)", maxHeight: "85vh" }
+        }
         showCloseButton={!isApplying}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
@@ -263,8 +270,19 @@ export function ImageCropDialog({
         </DialogDescription>
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-primary/20 bg-neutral-900/60">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-primary/20 bg-neutral-900/60">
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-neutral-300 hover:text-white"
+              onClick={() => setIsZoomed((z) => !z)}
+              title={isZoomed ? "Reduce size" : "Increase size"}
+            >
+              {isZoomed ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+            <div className="h-4 w-px bg-primary/20" />
             <Ratio className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold text-neutral-100">{title}</h3>
           </div>
@@ -289,11 +307,11 @@ export function ImageCropDialog({
         </div>
 
         {/* Interactive Workspace Area */}
-        <div className="relative flex-1 min-h-[350px] max-h-[65vh] flex items-center justify-center p-4 bg-neutral-950/90 overflow-hidden select-none">
+        <div className="relative flex-1 min-h-0 w-full flex items-center justify-center p-3 sm:p-5 bg-neutral-950/90 overflow-hidden select-none">
           {blobUrl ? (
             <div
               ref={imageContainerRef}
-              className="relative inline-block max-w-full max-h-[58vh] overflow-hidden rounded border border-neutral-800"
+              className={`relative inline-block max-w-full ${isZoomed ? "max-h-[78vh]" : "max-h-[65vh]"} overflow-hidden rounded border border-neutral-800`}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
             >
@@ -303,7 +321,7 @@ export function ImageCropDialog({
                 ref={imageElementRef}
                 src={blobUrl}
                 alt="Crop preview"
-                className="max-h-[58vh] w-auto object-contain block pointer-events-none"
+                className={`${isZoomed ? "max-h-[78vh]" : "max-h-[65vh]"} w-auto max-w-full object-contain block pointer-events-none select-none`}
                 draggable={false}
               />
 

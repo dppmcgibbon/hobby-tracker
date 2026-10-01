@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eraser, Crop, Check, X, RotateCcw, RotateCw, Save, Loader2, Ratio } from "lucide-react";
+import { Eraser, Crop, Check, X, RotateCcw, RotateCw, Save, Loader2, Ratio, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { removeBackgroundInBrowser } from "@/lib/background-removal-client";
 import { fetchPhotoBlob } from "@/lib/photos";
 import { rotateImageBlob } from "@/lib/image-transform";
+import { ImageEraserDialog } from "@/components/ui/image-eraser-dialog";
 import {
   getGamePdfCoverUploadUrl,
   savePdfCoverImage,
@@ -65,6 +66,7 @@ export function GameCoverModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isCropping, setIsCropping] = useState(Boolean(startWithCrop));
   const [isApplyingCrop, setIsApplyingCrop] = useState(false);
+  const [isEraserOpen, setIsEraserOpen] = useState(false);
   const [lockAspect, setLockAspect] = useState<"free" | "3:4">("3:4");
 
   // Crop box state (percentages of container image)
@@ -247,6 +249,15 @@ export function GameCoverModal({
     toast.info("Reverted edits");
   };
 
+  // Handle Apply from Image Eraser
+  const handleApplyErase = async (erasedBlob: Blob) => {
+    const newUrl = URL.createObjectURL(erasedBlob);
+    setCurrentDisplayUrl(newUrl);
+    setEditedBlob(erasedBlob);
+    setHasUnsavedChanges(true);
+    toast.success("Erase applied");
+  };
+
   // Save changes to Cloudflare R2 and DB
   const handleSave = async () => {
     if (!editedBlob || !entityType || !entityId) {
@@ -391,17 +402,21 @@ export function GameCoverModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 border-2 border-primary/40 bg-neutral-950 overflow-hidden shadow-2xl rounded-sm"
+        className="p-0 border-2 border-primary/40 bg-neutral-950 overflow-hidden shadow-2xl rounded-sm sm:max-w-none transition-all duration-200"
         style={{
-          width: "min(860px, calc(100vw - 2rem))",
-          maxWidth: "860px",
+          width: isCropping ? "min(1500px, calc(96vw))" : "min(860px, calc(100vw - 2rem))",
+          maxWidth: isCropping ? "1500px" : "860px",
         }}
       >
         <DialogTitle className="sr-only">{title} Cover</DialogTitle>
         <DialogDescription className="sr-only">Cover image viewer and editor</DialogDescription>
 
         {/* Main Solid Opaque Workspace Area */}
-        <div className="relative w-full h-[75vh] max-h-[750px] min-h-[450px] bg-neutral-950 flex items-center justify-center select-none overflow-hidden">
+        <div
+          className={`relative w-full ${
+            isCropping ? "h-[85vh] max-h-[850px]" : "h-[75vh] max-h-[750px] min-h-[450px]"
+          } bg-neutral-950 flex items-center justify-center select-none overflow-hidden transition-all duration-200`}
+        >
           {/* Overlaid Floating Action Icons - Top Right */}
           <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-neutral-900/90 border border-primary/40 rounded-md p-1 shadow-2xl backdrop-blur-sm">
             <TooltipProvider delayDuration={150}>
@@ -420,12 +435,32 @@ export function GameCoverModal({
                     {isRemovingBg ? (
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     ) : (
-                      <Eraser className="h-4 w-4 text-primary" />
+                      <Sparkles className="h-4 w-4 text-primary" />
                     )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs font-semibold">
                   Remove background
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Eraser Tool Action */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={isRemovingBg || isCropping}
+                    onClick={() => setIsEraserOpen(true)}
+                    className="h-8 w-8 text-primary hover:bg-primary/20 hover:text-primary rounded-sm"
+                    aria-label="Eraser tool"
+                  >
+                    <Eraser className="h-4 w-4 text-primary" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs font-semibold">
+                  Eraser tool
                 </TooltipContent>
               </Tooltip>
 
@@ -706,6 +741,15 @@ export function GameCoverModal({
           )}
         </div>
       </DialogContent>
+
+      <ImageEraserDialog
+        open={isEraserOpen}
+        onOpenChange={setIsEraserOpen}
+        imageUrl={currentDisplayUrl}
+        sourceBlob={editedBlob || originalBlob}
+        title={`${title} - Eraser`}
+        onApplyErase={handleApplyErase}
+      />
     </Dialog>
   );
 }
