@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -149,4 +150,43 @@ export async function downloadR2Object(keyOrUrl: string): Promise<Buffer> {
 
   const byteArray = await response.Body.transformToByteArray();
   return Buffer.from(byteArray);
+}
+
+/**
+ * Copies an object within Cloudflare R2 bucket.
+ */
+export async function copyR2Object(
+  sourceKeyOrUrl: string,
+  targetKey: string
+): Promise<{ key: string; publicUrl: string }> {
+  if (!sourceKeyOrUrl) throw new Error("Source key is required");
+  let sourceKey = sourceKeyOrUrl;
+  if (sourceKeyOrUrl.startsWith("http://") || sourceKeyOrUrl.startsWith("https://")) {
+    if (NEXT_PUBLIC_R2_PUBLIC_URL && sourceKeyOrUrl.startsWith(NEXT_PUBLIC_R2_PUBLIC_URL)) {
+      sourceKey = sourceKeyOrUrl.replace(NEXT_PUBLIC_R2_PUBLIC_URL, "").replace(/^\/+/, "");
+    } else {
+      try {
+        const url = new URL(sourceKeyOrUrl);
+        sourceKey = url.pathname.replace(/^\/+/, "");
+      } catch {
+        sourceKey = sourceKeyOrUrl.replace(/^\/+/, "");
+      }
+    }
+  } else {
+    sourceKey = sourceKey.replace(/^\/+/, "");
+  }
+  sourceKey = sourceKey.split("?")[0].split("#")[0];
+
+  const cleanTargetKey = targetKey.replace(/^\/+/, "");
+  const encodedSourceKey = encodeURI(sourceKey);
+  const copySource = `${R2_BUCKET_NAME}/${encodedSourceKey}`;
+
+  const command = new CopyObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    CopySource: copySource,
+    Key: cleanTargetKey,
+  });
+
+  await r2Client.send(command);
+  return { key: cleanTargetKey, publicUrl: getR2PublicUrl(cleanTargetKey) };
 }

@@ -459,6 +459,7 @@ export function MiniatureTableView({
               <TableCell className="text-center">
                 <DuplicateMiniatureButton
                   miniatureId={miniature.id}
+                  miniatureName={miniature.name}
                   variant="ghost"
                   size="icon"
                   showLabel={false}

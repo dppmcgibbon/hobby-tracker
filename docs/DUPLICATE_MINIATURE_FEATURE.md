@@ -2,8 +2,9 @@
 
 ## Overview
 
-Added the ability to duplicate miniatures with a single click. When duplicated, the miniature will have all the same properties except:
-- No photos will be attached (photos are unique to each miniature)
+Added the ability to duplicate miniatures with a single click. When duplicating, a confirmation dialog prompts whether to copy images as well as data (Yes/No):
+- Option to copy photos (Yes) or duplicate data only (No)
+- Retains original name (no "(Copy)" suffix)
 - A new UUID will be generated
 - Status will be copied but completion date will be reset
 
@@ -11,14 +12,14 @@ Added the ability to duplicate miniatures with a single click. When duplicated, 
 
 ### 1. Server Action (`src/app/actions/miniatures.ts`)
 
-Added `duplicateMiniature(id: string)` function:
+Added `duplicateMiniature(id: string, options?: { copyImages?: boolean })` function:
 - Fetches the original miniature data
 - Copies all properties except ID, timestamps, and user_id
 - Retains the original miniature name
 - Creates a new miniature entry
 - Copies the status (backlog, assembled, primed, painting, completed)
-- Does NOT copy photos (intentional design decision)
-- Redirects to the collection page after duplication
+- Optionally copies photos and R2 storage objects when `copyImages: true`
+- Redirects to the edit page after duplication
 
 ### 2. Duplicate Button Component (`src/components/miniatures/duplicate-miniature-button.tsx`)
 
@@ -103,7 +104,7 @@ New client component with:
 
 Potential improvements:
 - [ ] Bulk duplicate with quantity selector
-- [ ] Option to copy photos as well
+- [x] Option to copy photos as well (Added via confirmation dialog)
 - [ ] Duplicate with custom name in a dialog
 - [ ] Duplicate into a specific collection
 - [ ] Template system for common miniature types

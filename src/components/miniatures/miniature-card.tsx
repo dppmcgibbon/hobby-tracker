@@ -98,6 +98,7 @@ export function MiniatureCard({
       >
         <DuplicateMiniatureButton 
           miniatureId={miniature.id} 
+          miniatureName={miniature.name}
           variant="default"
           size="icon"
           showLabel={false}

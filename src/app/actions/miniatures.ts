@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/server";
 import { miniatureSchema, miniatureStatusSchema } from "@/lib/validations/miniature";
 import type { MiniatureInput, MiniatureStatusInput } from "@/lib/validations/miniature";
+import { copyR2Object } from "@/lib/r2";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -346,7 +347,7 @@ export async function getMiniaturesExcludingCollection(collectionId: string) {
   return { success: true, miniatures: availableMiniatures };
 }
 
-export async function duplicateMiniature(id: string) {
+export async function duplicateMiniature(id: string, options?: { copyImages?: boolean }) {
   const user = await requireAuth();
   const supabase = await createClient();
 
@@ -380,8 +381,17 @@ export async function duplicateMiniature(id: string) {
     .select("recipe_id")
     .eq("miniature_id", id);
 
+  // Get original photos if copyImages is requested
+  const { data: originalPhotos } = options?.copyImages
+    ? await supabase
+        .from("miniature_photos")
+        .select("*")
+        .eq("miniature_id", id)
+        .order("display_order", { ascending: true })
+    : { data: null };
+
   // Create duplicate
-  const { id: _, created_at: __, updated_at: ___, ...miniatureData } = original as any;
+  const { id: _id, created_at: _createdAt, updated_at: _updatedAt, ...miniatureData } = original;
   
   const { data: duplicate, error: createError } = await supabase
     .from("miniatures")
@@ -441,6 +451,40 @@ export async function duplicateMiniature(id: string) {
     if (recipesError) {
       console.error("Error copying recipe links:", recipesError);
       // Don't throw - we still want the duplicate to succeed even if recipe links fail
+    }
+  }
+
+  // Copy photos if requested and any exist
+  if (options?.copyImages && originalPhotos && originalPhotos.length > 0) {
+    const photosToInsert = [];
+    for (const photo of originalPhotos) {
+      let finalStoragePath = photo.storage_path;
+      try {
+        const ext = photo.storage_path.split(".").pop() || "jpg";
+        const cleanExt = ext.split("?")[0].split("#")[0];
+        const targetKey = `miniatures/${duplicate.id}/${Date.now()}-${photo.id}.${cleanExt}`;
+        await copyR2Object(photo.storage_path, targetKey);
+        finalStoragePath = targetKey;
+      } catch (copyErr) {
+        console.warn("Could not copy R2 object, referencing existing storage path:", copyErr);
+      }
+      photosToInsert.push({
+        miniature_id: duplicate.id,
+        storage_path: finalStoragePath,
+        caption: photo.caption,
+        photo_type: photo.photo_type,
+        display_order: photo.display_order,
+      });
+    }
+
+    if (photosToInsert.length > 0) {
+      const { error: photosError } = await supabase
+        .from("miniature_photos")
+        .insert(photosToInsert);
+
+      if (photosError) {
+        console.error("Error copying photos:", photosError);
+      }
     }
   }
 
