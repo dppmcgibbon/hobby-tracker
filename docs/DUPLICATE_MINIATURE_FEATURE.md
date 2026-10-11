@@ -3,7 +3,6 @@
 ## Overview
 
 Added the ability to duplicate miniatures with a single click. When duplicated, the miniature will have all the same properties except:
-- Name will have " (Copy)" appended
 - No photos will be attached (photos are unique to each miniature)
 - A new UUID will be generated
 - Status will be copied but completion date will be reset
@@ -15,7 +14,7 @@ Added the ability to duplicate miniatures with a single click. When duplicated, 
 Added `duplicateMiniature(id: string)` function:
 - Fetches the original miniature data
 - Copies all properties except ID, timestamps, and user_id
-- Appends " (Copy)" to the name
+- Retains the original miniature name
 - Creates a new miniature entry
 - Copies the status (backlog, assembled, primed, painting, completed)
 - Does NOT copy photos (intentional design decision)
@@ -63,7 +62,7 @@ New client component with:
 ## Technical Details
 
 ### Data Copied
-- Name (with " (Copy)" suffix)
+- Name
 - Faction ID
 - Unit type
 - Quantity

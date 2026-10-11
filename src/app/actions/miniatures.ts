@@ -380,14 +380,14 @@ export async function duplicateMiniature(id: string) {
     .select("recipe_id")
     .eq("miniature_id", id);
 
-  // Create duplicate with modified name
+  // Create duplicate
   const { id: _, created_at: __, updated_at: ___, ...miniatureData } = original as any;
   
   const { data: duplicate, error: createError } = await supabase
     .from("miniatures")
     .insert({
       ...miniatureData,
-      name: `${original.name} (Copy)`,
+      name: original.name,
     })
     .select()
     .single();
