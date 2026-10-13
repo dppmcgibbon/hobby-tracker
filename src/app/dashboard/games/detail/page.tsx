@@ -4,9 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, BookOpen, Package, FileText, ImageIcon, Box } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { GameCover } from "@/components/games/game-cover";
 import { GameLinksCard } from "@/components/games/game-links-card";
 import { GamePdfsTab } from "@/components/games/game-pdfs-tab";
 import { GameImagesTab } from "@/components/games/game-images-tab";
@@ -19,9 +17,7 @@ import {
   isGamePdfLink,
   isGameResourceLink,
   sortGamePdfLinks,
-  getFirstRulesPdf,
 } from "@/lib/games/game-details";
-import { getR2PublicUrl } from "@/lib/r2";
 import type { GameEntityType } from "@/app/actions/games";
 
 export const dynamic = "force-dynamic";
@@ -183,13 +179,6 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
 
   const sortedPdfLinks = sortGamePdfLinks(pdfLinks);
 
-  // Cover photo resolution is strictly derived from the first PDF in the "Rules" category
-  const firstRulesPdf = getFirstRulesPdf(metadata.links);
-  const firstPdfUrl = firstRulesPdf?.url || null;
-  const firstPdfTitle = firstRulesPdf?.title || null;
-  const firstPdfPrecomputedCover = firstRulesPdf?.cover_image
-    ? getR2PublicUrl(firstRulesPdf.cover_image)
-    : null;
 
   // URL for filtering miniatures of this game/edition/expansion
   const miniatureFilterParams = new URLSearchParams();
@@ -293,16 +282,66 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   }
 
   const { data: rawGameBoxes } = await gameBoxesQuery;
+
+  // Fetch photos for these components if game_component_photos table exists
+  const allComponents = (rawGameBoxes || []).flatMap((b: any) => b.game_components || []);
+  const allComponentIds = allComponents.map((c: any) => c.id).filter(Boolean);
+
+  const photosByComponentId: Record<string, any[]> = {};
+  if (allComponentIds.length > 0) {
+    try {
+      const { data: photosData, error: photosErr } = await supabase
+        .from("game_component_photos")
+        .select("*")
+        .in("component_id", allComponentIds)
+        .order("display_order", { ascending: true })
+        .order("uploaded_at", { ascending: true });
+
+      if (!photosErr && photosData) {
+        for (const p of photosData) {
+          if (!photosByComponentId[p.component_id]) {
+            photosByComponentId[p.component_id] = [];
+          }
+          photosByComponentId[p.component_id].push(p);
+        }
+      }
+    } catch {
+      // Table may not exist yet in schema cache, ignore gracefully
+    }
+  }
+
   const gameBoxes = (rawGameBoxes || []).map((b: any) => ({
     ...b,
-    game_components: (b.game_components || []).sort(
-      (a: any, b: any) =>
-        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-    ),
+    game_components: (b.game_components || [])
+      .map((comp: any) => {
+        let photos = photosByComponentId[comp.id] || [];
+        if (photos.length === 0 && comp.image_storage_path) {
+          photos = [
+            {
+              id: comp.id,
+              component_id: comp.id,
+              storage_path: comp.image_storage_path,
+              image_updated_at: comp.image_updated_at,
+              display_order: 0,
+              uploaded_at: comp.created_at,
+              caption: null,
+            },
+          ];
+        }
+        return {
+          ...comp,
+          photos,
+          game_component_photos: photos,
+        };
+      })
+      .sort(
+        (a: any, b: any) =>
+          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      ),
   }));
 
   return (
-    <Tabs defaultValue={validTab} className="space-y-6 w-full max-w-6xl mx-auto">
+    <Tabs defaultValue={validTab} className="space-y-6 w-full">
       {/* Breadcrumb Navigation */}
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
         <Link href="/dashboard/games" className="hover:text-primary transition-colors">
@@ -345,171 +384,148 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         )}
       </div>
 
-      {/* Top Header & Actions Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-l-4 border-primary pl-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase font-bold tracking-widest text-primary">
-              Game Detail
-            </span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-xs uppercase font-medium text-muted-foreground">
-              {itemSubtitle}
-            </span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow mt-1">
-            {displayTitle}
-          </h1>
+      {/* Top Header */}
+      <div className="flex flex-col gap-2 border-l-4 border-primary pl-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase font-bold tracking-widest text-primary">
+            Game Detail
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-xs uppercase font-medium text-muted-foreground">
+            {itemSubtitle}
+          </span>
         </div>
-
-        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
-          <TabsList className="bg-card/80 border border-primary/30 p-1 h-9">
-            <TabsTrigger
-              value="about"
-              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
-              title="Info"
-              aria-label="Info"
-            >
-              <BookOpen className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="pdfs"
-              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
-              title="PDFs"
-              aria-label="PDFs"
-            >
-              <FileText className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="images"
-              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
-              title="Images"
-              aria-label="Images"
-            >
-              <ImageIcon className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="miniatures"
-              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
-              title="Miniatures"
-              aria-label="Miniatures"
-            >
-              <Package className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="boxes"
-              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
-              title="Game Boxes & Components"
-              aria-label="Game Boxes & Components"
-            >
-              <Box className="h-4 w-4" />
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-wider text-primary gold-glow mt-1">
+          {displayTitle}
+        </h1>
       </div>
 
-      {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Cover Image Box/Book */}
-        <div className="lg:col-span-4 flex flex-col items-center">
-          <GameCover
-            title={displayTitle}
-            subtitle={itemSubtitle}
-            universeName={universe?.name}
-            coverUrl={metadata.coverUrl}
-            coverImage={targetCoverImage}
-            coverType={metadata.coverType}
-            year={displayYear}
-            pdfCoverUrl={firstPdfUrl}
-            pdfCoverTitle={firstPdfTitle}
-            pdfPrecomputedCoverUrl={firstPdfPrecomputedCover}
-            entityType={targetEntityType}
-            entityId={targetEntityId}
-            firstPdfId={firstRulesPdf?.id || null}
-          />
-        </div>
+      {/* Full-Width Tabs Navigation Bar */}
+      <TabsList className="bg-card/80 border border-primary/30 p-1 w-full justify-start h-auto flex flex-wrap gap-1">
+        <TabsTrigger
+          value="about"
+          className="data-[state=active]:bg-primary data-[state=active]:text-black py-2 px-3 sm:px-4 cursor-pointer font-bold uppercase tracking-wider text-xs gap-2 flex items-center"
+        >
+          <BookOpen className="h-4 w-4" />
+          <span>About</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="pdfs"
+          className="data-[state=active]:bg-primary data-[state=active]:text-black py-2 px-3 sm:px-4 cursor-pointer font-bold uppercase tracking-wider text-xs gap-2 flex items-center"
+        >
+          <FileText className="h-4 w-4" />
+          <span>PDFs</span>
+          {pdfLinks.length > 0 && (
+            <span className="ml-1 text-[11px] opacity-80">({pdfLinks.length})</span>
+          )}
+        </TabsTrigger>
+        <TabsTrigger
+          value="images"
+          className="data-[state=active]:bg-primary data-[state=active]:text-black py-2 px-3 sm:px-4 cursor-pointer font-bold uppercase tracking-wider text-xs gap-2 flex items-center"
+        >
+          <ImageIcon className="h-4 w-4" />
+          <span>Images</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="miniatures"
+          className="data-[state=active]:bg-primary data-[state=active]:text-black py-2 px-3 sm:px-4 cursor-pointer font-bold uppercase tracking-wider text-xs gap-2 flex items-center"
+        >
+          <Package className="h-4 w-4" />
+          <span>Miniatures</span>
+          {gameMiniatures.length > 0 && (
+            <span className="ml-1 text-[11px] opacity-80">({gameMiniatures.length})</span>
+          )}
+        </TabsTrigger>
+        <TabsTrigger
+          value="boxes"
+          className="data-[state=active]:bg-primary data-[state=active]:text-black py-2 px-3 sm:px-4 cursor-pointer font-bold uppercase tracking-wider text-xs gap-2 flex items-center"
+        >
+          <Box className="h-4 w-4" />
+          <span>Game Boxes & Components</span>
+          {gameBoxes.length > 0 && (
+            <span className="ml-1 text-[11px] opacity-80">({gameBoxes.length})</span>
+          )}
+        </TabsTrigger>
+      </TabsList>
 
-        {/* Right Column: Game Information, Text & Links */}
-        <div className="lg:col-span-8">
-          <TabsContent value="about" className="space-y-6 mt-0">
-            {/* About The Game Text */}
-            <Card className="warhammer-card border-primary/30 gap-0">
-              <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
-                <div>
-                  <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                    About The Game
-                  </CardTitle>
-                  <CardDescription className="text-xs uppercase tracking-wide mt-1">
-                    Background lore and game overview
-                  </CardDescription>
-                </div>
+      {/* Tabs Contents - Full Width */}
+      <TabsContent value="about" className="space-y-6 mt-0">
+        {/* About The Game Text */}
+        <Card className="warhammer-card border-primary/30 gap-0">
+          <CardHeader className="pb-3 border-b border-primary/15 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-lg font-black uppercase tracking-wider text-primary flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                About The Game
+              </CardTitle>
+              <CardDescription className="text-xs uppercase tracking-wide mt-1">
+                Background lore and game overview
+              </CardDescription>
+            </div>
 
-                {/* Edit Details button - icon only */}
-                <GameEditDialog
-                  entityType={targetEntityType}
-                  entityId={targetEntityId}
-                  title={displayTitle}
-                  currentCoverImage={targetCoverImage}
-                  currentDescription={rawDescription}
-                  mode="description"
-                  triggerVariant="icon"
-                />
-              </CardHeader>
-              <CardContent className="pt-3">
-                <p className="text-base text-foreground/90 leading-relaxed whitespace-pre-line">
-                  {metadata.description}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Info & Resources Links Section - User Editable & Deletable */}
-            <GameLinksCard
+            {/* Edit Details button - icon only */}
+            <GameEditDialog
               entityType={targetEntityType}
               entityId={targetEntityId}
-              links={resourceLinks}
+              title={displayTitle}
+              currentCoverImage={targetCoverImage}
+              currentDescription={rawDescription}
+              mode="description"
+              triggerVariant="icon"
             />
-          </TabsContent>
+          </CardHeader>
+          <CardContent className="pt-3">
+            <p className="text-base text-foreground/90 leading-relaxed whitespace-pre-line">
+              {metadata.description}
+            </p>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="pdfs" className="mt-0">
-            <GamePdfsTab
-              entityType={targetEntityType}
-              entityId={targetEntityId}
-              links={metadata.links}
-              gameTitle={displayTitle}
-            />
-          </TabsContent>
+        {/* Info & Resources Links Section - User Editable & Deletable */}
+        <GameLinksCard
+          entityType={targetEntityType}
+          entityId={targetEntityId}
+          links={resourceLinks}
+        />
+      </TabsContent>
 
-          <TabsContent value="images" className="mt-0">
-            <GameImagesTab
-              entityType={targetEntityType}
-              entityId={targetEntityId}
-              links={metadata.links}
-              gameTitle={displayTitle}
-            />
-          </TabsContent>
+      <TabsContent value="pdfs" className="mt-0">
+        <GamePdfsTab
+          entityType={targetEntityType}
+          entityId={targetEntityId}
+          links={metadata.links}
+          gameTitle={displayTitle}
+        />
+      </TabsContent>
 
-          <TabsContent value="miniatures" className="mt-0">
-            <GameMiniaturesTab
-              miniatures={gameMiniatures}
-              gameTitle={displayTitle}
-              miniaturesFilterUrl={miniatureFilterUrl}
-            />
-          </TabsContent>
+      <TabsContent value="images" className="mt-0">
+        <GameImagesTab
+          entityType={targetEntityType}
+          entityId={targetEntityId}
+          links={metadata.links}
+          gameTitle={displayTitle}
+        />
+      </TabsContent>
 
-          <TabsContent value="boxes" className="mt-0">
-            <GameBoxesTab
-              gameId={game.id}
-              editionId={edition?.id || null}
-              expansionId={expansion?.id || null}
-              gameTitle={displayTitle}
-              gameBoxes={gameBoxes}
-              availableEditions={availableEditions || []}
-              availableExpansions={availableExpansions || []}
-            />
-          </TabsContent>
-        </div>
-      </div>
+      <TabsContent value="miniatures" className="mt-0">
+        <GameMiniaturesTab
+          miniatures={gameMiniatures}
+          gameTitle={displayTitle}
+          miniaturesFilterUrl={miniatureFilterUrl}
+        />
+      </TabsContent>
+
+      <TabsContent value="boxes" className="mt-0">
+        <GameBoxesTab
+          gameId={game.id}
+          editionId={edition?.id || null}
+          expansionId={expansion?.id || null}
+          gameTitle={displayTitle}
+          gameBoxes={gameBoxes}
+          availableEditions={availableEditions || []}
+          availableExpansions={availableExpansions || []}
+        />
+      </TabsContent>
     </Tabs>
   );
 }

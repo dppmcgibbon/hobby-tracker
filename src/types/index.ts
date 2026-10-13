@@ -29,3 +29,9 @@ export type Universe = Tables<"universes">;
 export type MiniatureStatusRow = Tables<"miniature_statuses">;
 export type GameBox = Tables<"game_boxes">;
 export type GameComponent = Tables<"game_components">;
+export type GameComponentPhoto = Tables<"game_component_photos">;
+
+export interface GameComponentWithPhotos extends GameComponent {
+  photos?: GameComponentPhoto[];
+  game_component_photos?: GameComponentPhoto[];
+}

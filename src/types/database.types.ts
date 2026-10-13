@@ -508,6 +508,44 @@ export type Database = {
           },
         ];
       };
+      game_component_photos: {
+        Row: {
+          caption: string | null;
+          component_id: string;
+          display_order: number | null;
+          id: string;
+          image_updated_at: string | null;
+          storage_path: string;
+          uploaded_at: string | null;
+        };
+        Insert: {
+          caption?: string | null;
+          component_id: string;
+          display_order?: number | null;
+          id?: string;
+          image_updated_at?: string | null;
+          storage_path: string;
+          uploaded_at?: string | null;
+        };
+        Update: {
+          caption?: string | null;
+          component_id?: string;
+          display_order?: number | null;
+          id?: string;
+          image_updated_at?: string | null;
+          storage_path?: string;
+          uploaded_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "game_component_photos_component_id_fkey";
+            columns: ["component_id"];
+            isOneToOne: false;
+            referencedRelation: "game_components";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       games: {
         Row: {
           cover_image: string | null;
