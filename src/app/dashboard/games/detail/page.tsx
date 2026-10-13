@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, BookOpen, Package, FileText, ImageIcon } from "lucide-react";
+import { ChevronRight, BookOpen, Package, FileText, ImageIcon, Box } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,6 +11,7 @@ import { GameLinksCard } from "@/components/games/game-links-card";
 import { GamePdfsTab } from "@/components/games/game-pdfs-tab";
 import { GameImagesTab } from "@/components/games/game-images-tab";
 import { GameMiniaturesTab, type GameMiniatureItem } from "@/components/games/game-miniatures-tab";
+import { GameBoxesTab } from "@/components/games/game-boxes-tab";
 import { GameEditDialog } from "@/components/games/game-edit-dialog";
 import {
   getGameDetails,
@@ -47,7 +48,9 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
   } = await searchParams;
 
   const validTab =
-    tabParam && ["about", "pdfs", "images", "miniatures"].includes(tabParam) ? tabParam : "about";
+    tabParam && ["about", "pdfs", "images", "miniatures", "boxes"].includes(tabParam)
+      ? tabParam
+      : "about";
 
   const validExpansionId = expansionId && expansionId !== "all" ? expansionId : undefined;
   const validEditionId = editionId && editionId !== "all" ? editionId : undefined;
@@ -268,6 +271,36 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
     });
   }
 
+  // Fetch available editions & expansions for this game
+  const [{ data: availableEditions }, { data: availableExpansions }] = await Promise.all([
+    supabase.from("editions").select("*").eq("game_id", game.id).order("sequence"),
+    edition
+      ? supabase.from("expansions").select("*").eq("edition_id", edition.id).order("sequence")
+      : { data: [] },
+  ]);
+
+  // Fetch game boxes and components for this entity
+  let gameBoxesQuery = supabase
+    .from("game_boxes")
+    .select("*, game_components(*)")
+    .eq("game_id", game.id)
+    .order("created_at", { ascending: true });
+
+  if (expansion) {
+    gameBoxesQuery = gameBoxesQuery.eq("expansion_id", expansion.id);
+  } else if (edition) {
+    gameBoxesQuery = gameBoxesQuery.eq("edition_id", edition.id);
+  }
+
+  const { data: rawGameBoxes } = await gameBoxesQuery;
+  const gameBoxes = (rawGameBoxes || []).map((b: any) => ({
+    ...b,
+    game_components: (b.game_components || []).sort(
+      (a: any, b: any) =>
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    ),
+  }));
+
   return (
     <Tabs defaultValue={validTab} className="space-y-6 w-full max-w-6xl mx-auto">
       {/* Breadcrumb Navigation */}
@@ -363,6 +396,14 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
             >
               <Package className="h-4 w-4" />
             </TabsTrigger>
+            <TabsTrigger
+              value="boxes"
+              className="data-[state=active]:bg-primary data-[state=active]:text-black py-1.5 px-2.5 cursor-pointer h-7"
+              title="Game Boxes & Components"
+              aria-label="Game Boxes & Components"
+            >
+              <Box className="h-4 w-4" />
+            </TabsTrigger>
           </TabsList>
         </div>
       </div>
@@ -453,6 +494,18 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
               miniatures={gameMiniatures}
               gameTitle={displayTitle}
               miniaturesFilterUrl={miniatureFilterUrl}
+            />
+          </TabsContent>
+
+          <TabsContent value="boxes" className="mt-0">
+            <GameBoxesTab
+              gameId={game.id}
+              editionId={edition?.id || null}
+              expansionId={expansion?.id || null}
+              gameTitle={displayTitle}
+              gameBoxes={gameBoxes}
+              availableEditions={availableEditions || []}
+              availableExpansions={availableExpansions || []}
             />
           </TabsContent>
         </div>

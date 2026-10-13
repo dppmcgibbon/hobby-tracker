@@ -13,6 +13,7 @@ import {
   Bookmark,
   FolderArchive,
   CheckCircle2,
+  Box,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,20 @@ export default async function AdminPage() {
       icon: Gamepad2,
       href: "/dashboard/admin/games",
       color: "text-blue-500",
+    },
+    {
+      title: "Game Boxes",
+      description: "Manage physical game boxes and edition/expansion hierarchy links",
+      icon: Box,
+      href: "/dashboard/admin/game-boxes",
+      color: "text-amber-500",
+    },
+    {
+      title: "Game Components",
+      description: "Manage game components, quantities, tokens, and component photos",
+      icon: Layers,
+      href: "/dashboard/admin/game-components",
+      color: "text-teal-500",
     },
     {
       title: "Shortcuts Management",
