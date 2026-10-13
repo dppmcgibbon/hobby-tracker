@@ -12,6 +12,7 @@ import {
   Palette,
   Bookmark,
   FolderArchive,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,13 @@ export default async function AdminPage() {
       icon: Archive,
       href: "/dashboard/storage",
       color: "text-purple-500",
+    },
+    {
+      title: "Status Management",
+      description: "Manage miniature painting and build workflow statuses",
+      icon: CheckCircle2,
+      href: "/dashboard/admin/statuses",
+      color: "text-amber-500",
     },
     {
       title: "Faction Management",

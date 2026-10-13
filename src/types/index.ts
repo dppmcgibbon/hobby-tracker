@@ -26,3 +26,4 @@ export type Edition = Tables<"editions">;
 export type Expansion = Tables<"expansions">;
 export type MiniatureGame = Tables<"miniature_games">;
 export type Universe = Tables<"universes">;
+export type MiniatureStatusRow = Tables<"miniature_statuses">;

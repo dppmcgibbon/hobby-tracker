@@ -16,7 +16,7 @@ export const STATUS_LABELS: Record<string, string> = {
   missing_leg: "Missing Leg",
   missing_head: "Missing Head",
   complete: "Complete",
-  
+
   // Legacy mappings for backward compatibility
   assembled: "Built",
   painting: "Painting Started",
@@ -38,14 +38,14 @@ export const STATUS_COLORS: Record<string, string> = {
   missing_leg: "hsl(0, 60%, 45%)", // Dark red
   missing_head: "hsl(0, 60%, 45%)", // Dark red
   complete: "hsl(120, 60%, 40%)", // Green
-  
+
   // Legacy mappings
   assembled: "hsl(43, 96%, 56%)",
   painting: "hsl(200, 70%, 50%)",
   completed: "hsl(120, 60%, 40%)",
 };
 
-export type MiniatureStatusValue = 
+export type MiniatureStatusValue =
   | "unknown"
   | "missing"
   | "needs_stripped"
@@ -63,12 +63,23 @@ export type MiniatureStatusValue =
 
 /** Label for a `miniature_statuses.name` / `miniature_status.status` value (DB-driven statuses). */
 export function getMiniatureStatusDisplayLabel(name: string): string {
+  if (!name) return "";
   if (STATUS_LABELS[name]) return STATUS_LABELS[name];
   return name
-    .split("_")
+    .replace(/[-]+/g, "_")
+    .split(/[_\s]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
+}
+
+/** Normalize status name to snake_case identifier (e.g. "Ready to Paint" -> "ready_to_paint") */
+export function normalizeStatusKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
 }
 
 /** Status groups used for filtering (e.g. "In Progress" = multiple statuses). */
