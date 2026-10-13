@@ -439,3 +439,59 @@ export async function deleteComponentPhoto(photoId: string, componentId: string)
 export async function deleteComponentImage(componentId: string) {
   return await deleteComponentPhoto(componentId, componentId);
 }
+
+export interface ComponentReorderItem {
+  id: string;
+  display_order: number;
+  component_type?: string;
+  game_box_id?: string;
+}
+
+export async function reorderGameComponents(items: ComponentReorderItem[]) {
+  const supabase = await getAdminSupabase();
+
+  if (!items || items.length === 0) {
+    return { success: true };
+  }
+
+  const now = new Date().toISOString();
+
+  for (const item of items) {
+    const payload: Record<string, unknown> = {
+      display_order: item.display_order,
+      updated_at: now,
+    };
+    if (item.component_type !== undefined) {
+      payload.component_type = item.component_type;
+    }
+    if (item.game_box_id !== undefined) {
+      payload.game_box_id = item.game_box_id;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("game_components")
+        .update(payload)
+        .eq("id", item.id);
+
+      if (error) {
+        // If display_order column doesn't exist yet, try without display_order
+        if (item.component_type) {
+          await supabase
+            .from("game_components")
+            .update({ component_type: item.component_type, updated_at: now })
+            .eq("id", item.id);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not reorder component:", err);
+    }
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/admin/game-components");
+
+  return { success: true };
+}
+

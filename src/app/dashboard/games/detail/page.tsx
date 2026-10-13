@@ -334,10 +334,12 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
           game_component_photos: photos,
         };
       })
-      .sort(
-        (a: any, b: any) =>
-          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-      ),
+      .sort((a: any, b: any) => {
+        const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      }),
   }));
 
   return (

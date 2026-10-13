@@ -457,6 +457,7 @@ export type Database = {
           component_type: string;
           created_at: string | null;
           description: string | null;
+          display_order: number | null;
           game_box_id: string;
           id: string;
           image_storage_path: string | null;
@@ -472,6 +473,7 @@ export type Database = {
           component_type?: string;
           created_at?: string | null;
           description?: string | null;
+          display_order?: number | null;
           game_box_id: string;
           id?: string;
           image_storage_path?: string | null;
@@ -487,6 +489,7 @@ export type Database = {
           component_type?: string;
           created_at?: string | null;
           description?: string | null;
+          display_order?: number | null;
           game_box_id?: string;
           id?: string;
           image_storage_path?: string | null;

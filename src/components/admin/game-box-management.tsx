@@ -48,8 +48,9 @@ import {
   AlertTriangle,
   FolderOpen,
   Filter,
+  Copy,
 } from "lucide-react";
-import { createGameBox, updateGameBox, deleteGameBox } from "@/app/actions/game-boxes";
+import { createGameBox, updateGameBox, deleteGameBox, duplicateGameBox } from "@/app/actions/game-boxes";
 import type { GameBox } from "@/types";
 import { toast } from "sonner";
 
@@ -132,6 +133,29 @@ export function GameBoxManagement({
   const [deleteBoxName, setDeleteBoxName] = useState<string>("");
   const [deleteComponentCount, setDeleteComponentCount] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Duplicate dialog state
+  const [boxToDuplicate, setBoxToDuplicate] = useState<AdminGameBoxItem | null>(null);
+  const [duplicateNewName, setDuplicateNewName] = useState("");
+  const [isDuplicating, setIsDuplicating] = useState(false);
+
+  const handleConfirmDuplicate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!boxToDuplicate || !duplicateNewName.trim()) return;
+
+    setIsDuplicating(true);
+    try {
+      await duplicateGameBox(boxToDuplicate.id, duplicateNewName.trim());
+      toast.success(`Game box "${duplicateNewName.trim()}" duplicated successfully!`);
+      setBoxToDuplicate(null);
+      setDuplicateNewName("");
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to duplicate game box");
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
 
   // Available games based on selected universe in filter
   const filteredGamesForFilter = useMemo(() => {
@@ -487,6 +511,18 @@ export function GameBoxManagement({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => {
+                          setBoxToDuplicate(box);
+                          setDuplicateNewName(`${box.name} (Copy)`);
+                        }}
+                        title="Duplicate Game Box"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
                         onClick={() => handleOpenEdit(box)}
                         title="Edit Game Box"
                       >
@@ -767,6 +803,91 @@ export function GameBoxManagement({
               >
                 {isSubmitting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 {editingBox ? "Save Changes" : "Create Game Box"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Game Box Dialog */}
+      <Dialog
+        open={!!boxToDuplicate}
+        onOpenChange={(open) => {
+          if (!open && !isDuplicating) {
+            setBoxToDuplicate(null);
+            setDuplicateNewName("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md warhammer-card border-primary/30">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-wider text-primary gold-glow flex items-center gap-2">
+              <Copy className="h-5 w-5" />
+              Duplicate Game Box
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wide">
+              Create an independent duplicate with all components and photos
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleConfirmDuplicate} className="space-y-4 py-2">
+            <div className="space-y-1.5 p-3 rounded-lg border border-border/60 bg-muted/30 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Original Box:</span>
+                <span className="font-bold text-foreground">{boxToDuplicate?.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Components to copy:</span>
+                <span className="font-bold text-primary font-mono">
+                  {boxToDuplicate?.component_count || 0}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="admin-duplicate-box-name" className="text-xs font-bold uppercase tracking-wider">
+                New Box Name
+              </Label>
+              <Input
+                id="admin-duplicate-box-name"
+                value={duplicateNewName}
+                onChange={(e) => setDuplicateNewName(e.target.value)}
+                placeholder="Enter name for the new game box..."
+                className="bg-background/50 border-primary/30 text-sm font-semibold"
+                autoFocus
+                disabled={isDuplicating}
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setBoxToDuplicate(null);
+                  setDuplicateNewName("");
+                }}
+                disabled={isDuplicating}
+                className="border-border/60"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isDuplicating || !duplicateNewName.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+              >
+                {isDuplicating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Duplicating Box & Photos...
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate Box
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>

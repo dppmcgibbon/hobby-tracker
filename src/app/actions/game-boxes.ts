@@ -138,3 +138,187 @@ export async function deleteGameBox(id: string) {
 
   return { success: true };
 }
+
+export async function duplicateGameBox(sourceBoxId: string, newName: string) {
+  const supabase = await getAdminSupabase();
+
+  if (!newName?.trim()) {
+    throw new Error("New box name is required");
+  }
+
+  // 1. Fetch the source box
+  const { data: sourceBox, error: fetchBoxErr } = await supabase
+    .from("game_boxes")
+    .select("*")
+    .eq("id", sourceBoxId)
+    .single();
+
+  if (fetchBoxErr || !sourceBox) {
+    throw new Error("Source game box not found");
+  }
+
+  // 2. Insert new box
+  const newBoxPayload = {
+    name: newName.trim(),
+    game_id: sourceBox.game_id,
+    edition_id: sourceBox.edition_id,
+    expansion_id: sourceBox.expansion_id,
+    box_type: sourceBox.box_type,
+    condition: sourceBox.condition,
+    location: sourceBox.location,
+    barcode: sourceBox.barcode,
+    notes: sourceBox.notes,
+  };
+
+  const { data: newBox, error: insertBoxErr } = await supabase
+    .from("game_boxes")
+    .insert(newBoxPayload)
+    .select()
+    .single();
+
+  if (insertBoxErr || !newBox) {
+    throw new Error(`Failed to duplicate game box: ${insertBoxErr?.message}`);
+  }
+
+  // 3. Fetch all components belonging to the source box
+  const { data: sourceComponents, error: fetchComponentsErr } = await supabase
+    .from("game_components")
+    .select("*")
+    .eq("game_box_id", sourceBoxId);
+
+  if (fetchComponentsErr) {
+    console.warn("Failed to fetch source components:", fetchComponentsErr);
+  }
+
+  if (sourceComponents && sourceComponents.length > 0) {
+    const { copyR2Object } = await import("@/lib/r2");
+
+    for (const comp of sourceComponents) {
+      // 4. Create new component record in database
+      const newCompPayload = {
+        game_box_id: newBox.id,
+        name: comp.name,
+        component_type: comp.component_type,
+        quantity_expected: comp.quantity_expected,
+        quantity_actual: comp.quantity_actual,
+        status: comp.status,
+        description: comp.description,
+        notes: comp.notes,
+        image_storage_path: null as string | null,
+        image_updated_at: comp.image_updated_at,
+      };
+
+      const { data: newComp, error: insertCompErr } = await supabase
+        .from("game_components")
+        .insert(newCompPayload)
+        .select()
+        .single();
+
+      if (insertCompErr || !newComp) {
+        console.warn(`Failed to duplicate component ${comp.name}:`, insertCompErr);
+        continue;
+      }
+
+      // 5. Duplicate photos
+      let sourcePhotos: any[] = [];
+      try {
+        const { data: photos, error: photosErr } = await supabase
+          .from("game_component_photos")
+          .select("*")
+          .eq("component_id", comp.id)
+          .order("display_order", { ascending: true })
+          .order("uploaded_at", { ascending: true });
+
+        if (!photosErr && photos) {
+          sourcePhotos = photos;
+        }
+      } catch {
+        // Table may not exist yet in schema cache
+      }
+
+      let primaryCopiedPath: string | null = null;
+      const now = new Date().toISOString();
+
+      if (sourcePhotos.length > 0) {
+        for (let i = 0; i < sourcePhotos.length; i++) {
+          const photo = sourcePhotos[i];
+          if (!photo.storage_path) continue;
+
+          try {
+            // Generate clean target R2 key
+            const cleanPath = photo.storage_path.split("/").pop() || `photo-${i}.jpg`;
+            const cleanFilename = cleanPath.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const targetKey = `components/${newComp.id}/${Date.now()}-${i}-${cleanFilename}`;
+
+            await copyR2Object(photo.storage_path, targetKey);
+
+            if (!primaryCopiedPath) {
+              primaryCopiedPath = targetKey;
+            }
+
+            // Insert into game_component_photos
+            try {
+              await supabase.from("game_component_photos").insert({
+                component_id: newComp.id,
+                storage_path: targetKey,
+                caption: photo.caption,
+                display_order: photo.display_order ?? i,
+                uploaded_at: now,
+                image_updated_at: now,
+              });
+            } catch (err) {
+              console.warn("Could not insert duplicated photo row:", err);
+            }
+          } catch (err) {
+            console.warn(`Failed to copy photo ${photo.storage_path} to R2:`, err);
+          }
+        }
+      } else if (comp.image_storage_path) {
+        // Legacy single photo
+        try {
+          const cleanPath = comp.image_storage_path.split("/").pop() || "image.jpg";
+          const cleanFilename = cleanPath.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const targetKey = `components/${newComp.id}/${Date.now()}-${cleanFilename}`;
+
+          await copyR2Object(comp.image_storage_path, targetKey);
+          primaryCopiedPath = targetKey;
+
+          // Also try inserting into game_component_photos if table exists
+          try {
+            await supabase.from("game_component_photos").insert({
+              component_id: newComp.id,
+              storage_path: targetKey,
+              display_order: 0,
+              uploaded_at: now,
+              image_updated_at: now,
+            });
+          } catch {
+            // Ignore if table does not exist
+          }
+        } catch (err) {
+          console.warn(`Failed to copy component image ${comp.image_storage_path} to R2:`, err);
+        }
+      }
+
+      // Update new component with primaryCopiedPath if any was copied
+      if (primaryCopiedPath) {
+        await supabase
+          .from("game_components")
+          .update({
+            image_storage_path: primaryCopiedPath,
+            image_updated_at: now,
+            updated_at: now,
+          })
+          .eq("id", newComp.id);
+      }
+    }
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/admin/game-boxes");
+  revalidatePath("/dashboard/admin/game-components");
+  revalidatePath("/dashboard/admin");
+
+  return { success: true, box: newBox };
+}
