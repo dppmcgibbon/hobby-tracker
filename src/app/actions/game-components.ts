@@ -3,7 +3,8 @@
 import { requireAuth } from "@/lib/auth/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { uploadR2Object, deleteR2Object } from "@/lib/r2";
+import { uploadR2Object, deleteR2Object, copyR2Object } from "@/lib/r2";
+import type { GameComponentPhoto } from "@/types";
 
 async function getAdminSupabase() {
   await requireAuth();
@@ -39,9 +40,9 @@ export async function createGameComponent(data: GameComponentInput) {
     name: data.name.trim(),
     component_type: data.component_type?.trim() || "other",
     quantity_expected:
-      typeof data.quantity_expected === "number" ? Math.max(1, data.quantity_expected) : 1,
+      typeof data.quantity_expected === "number" ? Math.max(0, data.quantity_expected) : 0,
     quantity_actual:
-      typeof data.quantity_actual === "number" ? Math.max(0, data.quantity_actual) : 1,
+      typeof data.quantity_actual === "number" ? Math.max(0, data.quantity_actual) : 0,
     status: data.status?.trim() || "complete",
     description: data.description?.trim() || null,
     notes: data.notes?.trim() || null,
@@ -59,6 +60,7 @@ export async function createGameComponent(data: GameComponentInput) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
@@ -79,7 +81,7 @@ export async function updateGameComponent(id: string, data: Partial<GameComponen
   if (data.component_type !== undefined)
     payload.component_type = data.component_type.trim() || "other";
   if (data.quantity_expected !== undefined)
-    payload.quantity_expected = Math.max(1, data.quantity_expected);
+    payload.quantity_expected = Math.max(0, data.quantity_expected);
   if (data.quantity_actual !== undefined)
     payload.quantity_actual = Math.max(0, data.quantity_actual);
   if (data.status !== undefined) payload.status = data.status.trim() || "complete";
@@ -100,6 +102,7 @@ export async function updateGameComponent(id: string, data: Partial<GameComponen
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
@@ -154,12 +157,42 @@ export async function deleteGameComponent(id: string) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
 
   return { success: true };
 }
+
+export async function resetGameBoxActualQuantities(gameBoxId: string) {
+  const supabase = await getAdminSupabase();
+
+  if (!gameBoxId) {
+    throw new Error("Game box ID is required");
+  }
+
+  const { error } = await supabase
+    .from("game_components")
+    .update({ quantity_actual: 0, updated_at: new Date().toISOString() })
+    .eq("game_box_id", gameBoxId);
+
+  if (error) {
+    throw new Error(`Failed to reset actual quantities: ${error.message}`);
+  }
+
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
+  revalidatePath("/dashboard/admin/game-components");
+  revalidatePath("/dashboard/admin/game-boxes");
+  revalidatePath("/dashboard/admin");
+
+  return { success: true };
+}
+
+// Deprecated alias kept for compatibility
+export const resetGameBoxExpectedQuantities = resetGameBoxActualQuantities;
 
 export async function getComponentPhotos(componentId: string) {
   const supabase = await getAdminSupabase();
@@ -276,6 +309,7 @@ export async function uploadComponentPhoto(componentId: string, formData: FormDa
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
 
   return { success: true, photo: createdPhoto, storagePath };
@@ -341,7 +375,11 @@ export async function replaceComponentPhotoWithBuffer(
     .eq("id", componentId)
     .single();
 
-  if (!comp?.image_storage_path || comp.image_storage_path === storagePath || photoId === componentId) {
+  if (
+    !comp?.image_storage_path ||
+    comp.image_storage_path === storagePath ||
+    photoId === componentId
+  ) {
     await supabase
       .from("game_components")
       .update({
@@ -354,6 +392,7 @@ export async function replaceComponentPhotoWithBuffer(
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
 
   return { success: true };
@@ -431,6 +470,7 @@ export async function deleteComponentPhoto(photoId: string, componentId: string)
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
 
   return { success: true };
@@ -469,10 +509,7 @@ export async function reorderGameComponents(items: ComponentReorderItem[]) {
     }
 
     try {
-      const { error } = await supabase
-        .from("game_components")
-        .update(payload)
-        .eq("id", item.id);
+      const { error } = await supabase.from("game_components").update(payload).eq("id", item.id);
 
       if (error) {
         // If display_order column doesn't exist yet, try without display_order
@@ -490,8 +527,215 @@ export async function reorderGameComponents(items: ComponentReorderItem[]) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-components");
 
   return { success: true };
 }
 
+export interface DuplicateGameComponentOptions {
+  name?: string;
+  game_box_id?: string;
+  copyPhotos?: boolean;
+}
+
+export async function duplicateGameComponent(
+  sourceComponentId: string,
+  options?: DuplicateGameComponentOptions
+) {
+  const supabase = await getAdminSupabase();
+
+  if (!sourceComponentId) {
+    throw new Error("Source component ID is required");
+  }
+
+  // 1. Fetch source component
+  const { data: sourceComponent, error: fetchErr } = await supabase
+    .from("game_components")
+    .select("*")
+    .eq("id", sourceComponentId)
+    .single();
+
+  if (fetchErr || !sourceComponent) {
+    throw new Error("Source game component not found");
+  }
+
+  const targetBoxId = options?.game_box_id || sourceComponent.game_box_id;
+  const newName = options?.name?.trim() || sourceComponent.name;
+  const shouldCopyPhotos = options?.copyPhotos !== false;
+
+  // 2. Determine display order in target box
+  let nextOrder = 0;
+  try {
+    const { data: maxOrderData } = await supabase
+      .from("game_components")
+      .select("display_order")
+      .eq("game_box_id", targetBoxId)
+      .order("display_order", { ascending: false })
+      .limit(1);
+
+    if (maxOrderData && maxOrderData.length > 0 && maxOrderData[0].display_order != null) {
+      nextOrder = maxOrderData[0].display_order + 1;
+    } else if (sourceComponent.display_order != null) {
+      nextOrder = sourceComponent.display_order + 1;
+    }
+  } catch {
+    // If display_order query fails, fallback to 0
+  }
+
+  // 3. Insert duplicate component row
+  const now = new Date().toISOString();
+  const newCompPayload = {
+    game_box_id: targetBoxId,
+    name: newName,
+    component_type: sourceComponent.component_type || "other",
+    quantity_expected: sourceComponent.quantity_expected ?? 0,
+    quantity_actual: sourceComponent.quantity_actual ?? 0,
+    status: sourceComponent.status || "complete",
+    description: sourceComponent.description ?? null,
+    notes: sourceComponent.notes ?? null,
+    display_order: nextOrder,
+    image_storage_path: null as string | null,
+    image_updated_at: sourceComponent.image_updated_at,
+  };
+
+  const { data: newComponent, error: insertErr } = await supabase
+    .from("game_components")
+    .insert(newCompPayload)
+    .select()
+    .single();
+
+  if (insertErr || !newComponent) {
+    throw new Error(`Failed to duplicate game component: ${insertErr?.message}`);
+  }
+
+  // 4. Duplicate photos if requested
+  const copiedPhotos: GameComponentPhoto[] = [];
+  if (shouldCopyPhotos) {
+    let sourcePhotos: GameComponentPhoto[] = [];
+    try {
+      const { data: photos, error: photosErr } = await supabase
+        .from("game_component_photos")
+        .select("*")
+        .eq("component_id", sourceComponentId)
+        .order("display_order", { ascending: true })
+        .order("uploaded_at", { ascending: true });
+
+      if (!photosErr && photos && photos.length > 0) {
+        sourcePhotos = photos;
+      }
+    } catch {
+      // Table may not exist or query error
+    }
+
+    let primaryCopiedPath: string | null = null;
+
+    if (sourcePhotos.length > 0) {
+      for (let i = 0; i < sourcePhotos.length; i++) {
+        const photo = sourcePhotos[i];
+        if (!photo.storage_path) continue;
+
+        try {
+          const cleanPath = photo.storage_path.split("/").pop() || `photo-${i}.jpg`;
+          const cleanFilename = cleanPath.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const targetKey = `components/${newComponent.id}/${Date.now()}-${i}-${cleanFilename}`;
+
+          await copyR2Object(photo.storage_path, targetKey);
+
+          if (!primaryCopiedPath) {
+            primaryCopiedPath = targetKey;
+          }
+
+          try {
+            const { data: insertedPhoto } = await supabase
+              .from("game_component_photos")
+              .insert({
+                component_id: newComponent.id,
+                storage_path: targetKey,
+                caption: photo.caption,
+                display_order: photo.display_order ?? i,
+                uploaded_at: now,
+                image_updated_at: now,
+              })
+              .select()
+              .single();
+
+            if (insertedPhoto) {
+              copiedPhotos.push(insertedPhoto);
+            }
+          } catch (err) {
+            console.warn("Could not insert duplicated photo row:", err);
+          }
+        } catch (err) {
+          console.warn(`Failed to copy photo ${photo.storage_path} to R2:`, err);
+        }
+      }
+    } else if (sourceComponent.image_storage_path) {
+      // Legacy single image
+      try {
+        const cleanPath = sourceComponent.image_storage_path.split("/").pop() || "image.jpg";
+        const cleanFilename = cleanPath.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const targetKey = `components/${newComponent.id}/${Date.now()}-${cleanFilename}`;
+
+        await copyR2Object(sourceComponent.image_storage_path, targetKey);
+        primaryCopiedPath = targetKey;
+
+        try {
+          const { data: insertedPhoto } = await supabase
+            .from("game_component_photos")
+            .insert({
+              component_id: newComponent.id,
+              storage_path: targetKey,
+              display_order: 0,
+              uploaded_at: now,
+              image_updated_at: now,
+            })
+            .select()
+            .single();
+
+          if (insertedPhoto) {
+            copiedPhotos.push(insertedPhoto);
+          }
+        } catch {
+          // Ignore
+        }
+      } catch (err) {
+        console.warn(
+          `Failed to copy component image ${sourceComponent.image_storage_path} to R2:`,
+          err
+        );
+      }
+    }
+
+    if (primaryCopiedPath) {
+      await supabase
+        .from("game_components")
+        .update({
+          image_storage_path: primaryCopiedPath,
+          image_updated_at: now,
+          updated_at: now,
+        })
+        .eq("id", newComponent.id);
+
+      newComponent.image_storage_path = primaryCopiedPath;
+      newComponent.image_updated_at = now;
+    }
+  }
+
+  // 5. Revalidate cache
+  revalidatePath("/dashboard/games");
+  revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
+  revalidatePath("/dashboard/admin/game-components");
+  revalidatePath("/dashboard/admin/game-boxes");
+  revalidatePath("/dashboard/admin");
+
+  return {
+    success: true,
+    component: {
+      ...newComponent,
+      photos: copiedPhotos,
+      game_component_photos: copiedPhotos,
+    },
+  };
+}

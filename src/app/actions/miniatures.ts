@@ -198,6 +198,36 @@ export async function bulkUpdateStorageBox(miniatureIds: string[], storageBoxId:
   }
 
   revalidatePath("/dashboard/miniatures");
+  return { success: true };
+}
+
+export async function bulkUpdateGameBox(miniatureIds: string[], gameBoxId: string | null) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // If gameBoxId is provided, verify it exists
+  if (gameBoxId) {
+    const { data: gameBox } = await supabase
+      .from("game_boxes")
+      .select("id")
+      .eq("id", gameBoxId)
+      .single();
+
+    if (!gameBox) {
+      throw new Error("Game box not found");
+    }
+  }
+
+  // Update game_box_id in miniatures table
+  const { error } = await supabase
+    .from("miniatures")
+    .update({ game_box_id: gameBoxId })
+    .in("id", miniatureIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   revalidatePath("/dashboard/miniatures");
   return { success: true };
 }
@@ -288,6 +318,72 @@ export async function bulkUpdateMetadata(
   }
 
   revalidatePath("/dashboard/miniatures");
+  revalidatePath("/dashboard/miniatures");
+  return { success: true };
+}
+
+export async function bulkAppendNotes(miniatureIds: string[], notesToAppend: string) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const trimmedAppend = notesToAppend.trim();
+  if (!trimmedAppend) {
+    throw new Error("Note content cannot be empty");
+  }
+
+  const uniqueIds = Array.from(new Set(miniatureIds));
+  if (uniqueIds.length === 0) {
+    return { success: true };
+  }
+
+  // Fetch current notes for the selected miniatures
+  const { data: miniatures, error: fetchError } = await supabase
+    .from("miniatures")
+    .select("id, notes")
+    .in("id", uniqueIds);
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+
+  // Update each miniature with appended notes
+  const updates = (miniatures || []).map((m) => {
+    const existingNotes = m.notes?.trim() || "";
+    const newNotes = existingNotes ? `${existingNotes}\n${trimmedAppend}` : trimmedAppend;
+    return supabase
+      .from("miniatures")
+      .update({ notes: newNotes })
+      .eq("id", m.id);
+  });
+
+  const results = await Promise.all(updates);
+  const updateError = results.find((r) => r.error);
+  if (updateError && updateError.error) {
+    throw new Error(updateError.error.message);
+  }
+
+  revalidatePath("/dashboard/miniatures");
+  return { success: true };
+}
+
+export async function bulkClearNotes(miniatureIds: string[]) {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const uniqueIds = Array.from(new Set(miniatureIds));
+  if (uniqueIds.length === 0) {
+    return { success: true };
+  }
+
+  const { error } = await supabase
+    .from("miniatures")
+    .update({ notes: null })
+    .in("id", uniqueIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   revalidatePath("/dashboard/miniatures");
   return { success: true };
 }

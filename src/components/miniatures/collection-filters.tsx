@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, X, SlidersHorizontal } from "lucide-react";
+import { Search, X, SlidersHorizontal, Box } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { SaveFilterDialog } from "./save-filter-dialog";
 import { SavedFiltersSheet } from "./saved-filters-sheet";
@@ -27,17 +27,34 @@ import {
 } from "@/components/ui/sheet";
 import { getMiniatureStatusDisplayLabel } from "@/lib/constants/miniature-status";
 
+export interface FilterMiniatureItem {
+  id?: string;
+  storage_box_id?: string | null;
+  storage_box?: { id: string; name?: string; location?: string | null } | null;
+  storage_boxes?: { id: string; name?: string; location?: string | null } | null;
+  faction_id?: string | null;
+  factions?: { id: string; name: string } | null;
+  unit_type?: string | null;
+  miniature_status?: { status?: string | null } | null;
+  miniature_games?: Array<{
+    game_id?: string | null;
+    edition_id?: string | null;
+    expansion_id?: string | null;
+  }> | null;
+}
+
 interface CollectionFiltersProps {
   factions: { id: string; name: string }[];
   tags: { id: string; name: string; color: string | null }[];
   storageBoxes: { id: string; name: string; location?: string | null }[];
+  gameBoxes?: { id: string; name: string }[];
   universes: { id: string; name: string }[];
   games: { id: string; name: string; universe_id?: string | null }[];
   editions: { id: string; name: string; year: number | null }[];
   expansions: { id: string; name: string; year: number | null }[];
   unitTypes: string[];
   bases: { id: string; name: string }[];
-  miniatures: any[]; // The miniatures to determine available options
+  miniatures: FilterMiniatureItem[]; // The miniatures to determine available options
   miniatureStatusRows: { name: string; display_order?: number | null }[];
   onFiltersChange: (filters: FilterState) => void;
   initialFilters?: FilterState;
@@ -56,6 +73,7 @@ export interface FilterState {
   status: string;
   tagId: string;
   storageBoxId: string;
+  gameBoxId: string;
   universeId: string;
   gameId: string;
   editionId: string;
@@ -71,6 +89,7 @@ export function CollectionFilters({
   factions,
   tags,
   storageBoxes,
+  gameBoxes = [],
   universes,
   games,
   editions,
@@ -107,6 +126,7 @@ export function CollectionFilters({
     status: searchParams.get("status") || initialFilters?.status || "all",
     tagId: searchParams.get("tag") || initialFilters?.tagId || "all",
     storageBoxId: searchParams.get("storage") || initialFilters?.storageBoxId || "all",
+    gameBoxId: searchParams.get("box") || searchParams.get("gameBoxId") || initialFilters?.gameBoxId || "all",
     universeId: searchParams.get("universe") || initialFilters?.universeId || "all",
     gameId: searchParams.get("game") || initialFilters?.gameId || "all",
     editionId: searchParams.get("edition") || initialFilters?.editionId || "all",
@@ -129,6 +149,7 @@ export function CollectionFilters({
       status: searchParams.get("status") || "all",
       tagId: searchParams.get("tag") || "all",
       storageBoxId: searchParams.get("storage") || "all",
+      gameBoxId: searchParams.get("box") || searchParams.get("gameBoxId") || "all",
       universeId: searchParams.get("universe") || "all",
       gameId: searchParams.get("game") || "all",
       editionId: searchParams.get("edition") || "all",
@@ -150,6 +171,7 @@ export function CollectionFilters({
     if (filters.status !== "all") params.set("status", filters.status);
     if (filters.tagId !== "all") params.set("tag", filters.tagId);
     if (filters.storageBoxId !== "all") params.set("storage", filters.storageBoxId);
+    if (filters.gameBoxId && filters.gameBoxId !== "all") params.set("box", filters.gameBoxId);
     if (filters.universeId !== "all") params.set("universe", filters.universeId);
     if (filters.gameId !== "all") params.set("game", filters.gameId);
     if (filters.editionId !== "all") params.set("edition", filters.editionId);
@@ -162,10 +184,10 @@ export function CollectionFilters({
 
     // Note: We intentionally reset to page 1 when filters change
     // The miniature-table-view will preserve page when data updates happen
-    
+
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
-    const currentUrl = `${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const currentUrl = `${pathname}${searchParams.toString() ? "?" + searchParams.toString() : ""}`;
 
     // Only update if URL actually changed
     if (newUrl !== currentUrl) {
@@ -186,6 +208,7 @@ export function CollectionFilters({
     filters.status,
     filters.tagId,
     filters.storageBoxId,
+    filters.gameBoxId,
     filters.universeId,
     filters.gameId,
     filters.editionId,
@@ -208,6 +231,7 @@ export function CollectionFilters({
       status: "all",
       tagId: "all",
       storageBoxId: "all",
+      gameBoxId: "all",
       universeId: "all",
       gameId: "all",
       editionId: "all",
@@ -227,6 +251,7 @@ export function CollectionFilters({
     filters.status !== "all" ||
     filters.tagId !== "all" ||
     filters.storageBoxId !== "all" ||
+    (filters.gameBoxId && filters.gameBoxId !== "all") ||
     filters.universeId !== "all" ||
     filters.gameId !== "all" ||
     filters.editionId !== "all" ||
@@ -243,6 +268,7 @@ export function CollectionFilters({
     filters.status !== "all",
     filters.tagId !== "all",
     filters.storageBoxId !== "all",
+    filters.gameBoxId && filters.gameBoxId !== "all",
     filters.universeId !== "all",
     filters.gameId !== "all",
     filters.editionId !== "all",
@@ -255,31 +281,46 @@ export function CollectionFilters({
   ].filter(Boolean).length;
 
   // Filter games based on selected universe (client-side)
-  const filteredGames = filters.universeId === "all" 
-    ? games 
-    : games.filter(game => game.universe_id === filters.universeId);
+  const filteredGames =
+    filters.universeId === "all"
+      ? games
+      : games.filter((game) => game.universe_id === filters.universeId);
 
   // Filter miniatures based on universe and game to determine available factions/units
   let relevantMiniatures = miniatures;
-  
+
   // First filter by universe (via games)
   if (filters.universeId !== "all") {
-    const universeGameIds = new Set(filteredGames.map(g => g.id));
-    relevantMiniatures = relevantMiniatures.filter((m: any) => {
+    const universeGameIds = new Set(filteredGames.map((g) => g.id));
+    relevantMiniatures = relevantMiniatures.filter((m) => {
       // Check if miniature has any game links to games in this universe
-      return m.miniature_games?.some((mg: any) => universeGameIds.has(mg.game_id));
+      return m.miniature_games?.some((mg) => mg.game_id && universeGameIds.has(mg.game_id));
     });
   }
-  
+
   // Then filter by specific game
   if (filters.gameId !== "all" && filters.gameId !== "none") {
-    relevantMiniatures = relevantMiniatures.filter((m: any) => {
-      return m.miniature_games?.some((mg: any) => mg.game_id === filters.gameId);
+    relevantMiniatures = relevantMiniatures.filter((m) => {
+      return m.miniature_games?.some((mg) => mg.game_id === filters.gameId);
     });
   } else if (filters.gameId === "none") {
     // Show miniatures with no game links
-    relevantMiniatures = relevantMiniatures.filter((m: any) => {
+    relevantMiniatures = relevantMiniatures.filter((m) => {
       return !m.miniature_games || m.miniature_games.length === 0;
+    });
+  }
+
+  // Then filter by edition
+  if (filters.editionId !== "all") {
+    relevantMiniatures = relevantMiniatures.filter((m) => {
+      return m.miniature_games?.some((mg) => mg.edition_id === filters.editionId);
+    });
+  }
+
+  // Then filter by expansion
+  if (filters.expansionId !== "all") {
+    relevantMiniatures = relevantMiniatures.filter((m) => {
+      return m.miniature_games?.some((mg) => mg.expansion_id === filters.expansionId);
     });
   }
 
@@ -287,27 +328,25 @@ export function CollectionFilters({
   // Only filter factions when universe or game filters are active
   // Otherwise show all factions to avoid 1000-row limit issues
   let filteredFactions = factions;
-  
+
   if (filters.universeId !== "all" || filters.gameId !== "all") {
     const availableFactionIds = new Set(
       relevantMiniatures
         .map((m: any) => m.faction_id || m.factions?.id)
         .filter((id: any) => id != null)
     );
-    filteredFactions = factions.filter(f => availableFactionIds.has(f.id));
+    filteredFactions = factions.filter((f) => availableFactionIds.has(f.id));
   }
 
   // Get available unit types from relevant miniatures
   // Only filter unit types when universe or game filters are active
   // Otherwise show all unit types to avoid 1000-row limit issues
   let availableUnitTypes: string[] = [];
-  
+
   if (filters.universeId !== "all" || filters.gameId !== "all") {
     availableUnitTypes = Array.from(
       new Set(
-        relevantMiniatures
-          .map((m: any) => m.unit_type)
-          .filter((ut: any) => ut != null && ut !== "")
+        relevantMiniatures.map((m: any) => m.unit_type).filter((ut: any) => ut != null && ut !== "")
       )
     ).sort();
   } else {
@@ -319,7 +358,7 @@ export function CollectionFilters({
   // Only filter statuses when universe or game filters are active
   // Otherwise show all statuses to avoid 1000-row limit issues
   let availableStatuses = new Set<string>();
-  
+
   if (filters.universeId !== "all" || filters.gameId !== "all") {
     availableStatuses = new Set(
       relevantMiniatures
@@ -335,10 +374,65 @@ export function CollectionFilters({
     ]);
   }
 
-  // Always show all storage boxes regardless of filters
-  // This ensures users can always select any storage box even if it's empty
-  // or contains miniatures that don't match current filters
-  const filteredStorageBoxes = storageBoxes;
+  // Check if any of the storage constraint filters are active
+  const isAnyStorageFilterActive =
+    filters.universeId !== "all" ||
+    filters.gameId !== "all" ||
+    filters.editionId !== "all" ||
+    filters.expansionId !== "all" ||
+    filters.factionId !== "all";
+
+  // Filter storage boxes based on relevant miniatures when universe/game/edition/expansion/faction filters are active
+  const filteredStorageBoxes = useMemo(() => {
+    if (!isAnyStorageFilterActive) {
+      return storageBoxes;
+    }
+
+    // When storage is "all", compute available storage boxes from matching miniatures
+    if (filters.storageBoxId === "all") {
+      let matchingMiniatures = relevantMiniatures;
+      if (filters.factionId !== "all") {
+        if (filters.factionId === "none") {
+          matchingMiniatures = matchingMiniatures.filter((m) => !m.faction_id && !m.factions?.id);
+        } else {
+          matchingMiniatures = matchingMiniatures.filter(
+            (m) => (m.faction_id || m.factions?.id) === filters.factionId
+          );
+        }
+      }
+
+      const availableStorageBoxIds = new Set(
+        matchingMiniatures
+          .map((m) => m.storage_box_id || m.storage_box?.id || m.storage_boxes?.id)
+          .filter((id): id is string => Boolean(id))
+      );
+
+      return storageBoxes.filter((box) => availableStorageBoxIds.has(box.id));
+    }
+
+    // When a storage box is selected, storageBoxes prop from server is already constrained to the active filters
+    return storageBoxes;
+  }, [
+    isAnyStorageFilterActive,
+    filters.storageBoxId,
+    filters.factionId,
+    relevantMiniatures,
+    storageBoxes,
+  ]);
+
+  // If the selected storage box is no longer available under the current filters, reset to "all"
+  useEffect(() => {
+    if (
+      storageBoxes.length > 0 &&
+      filters.storageBoxId !== "all" &&
+      filters.storageBoxId !== "none"
+    ) {
+      const isStillAvailable = filteredStorageBoxes.some((box) => box.id === filters.storageBoxId);
+      if (!isStillAvailable) {
+        updateFilter("storageBoxId", "all");
+      }
+    }
+  }, [filteredStorageBoxes, filters.storageBoxId, storageBoxes.length]);
 
   return (
     <div className="space-y-4">
@@ -360,6 +454,7 @@ export function CollectionFilters({
                   updateFilter("factionId", "all");
                   updateFilter("unitType", "all");
                   updateFilter("status", "all");
+                  updateFilter("storageBoxId", "all");
                 }}
               >
                 <SelectTrigger id="universe" className="w-full">
@@ -390,6 +485,7 @@ export function CollectionFilters({
                   updateFilter("factionId", "all");
                   updateFilter("unitType", "all");
                   updateFilter("status", "all");
+                  updateFilter("storageBoxId", "all");
                 }}
               >
                 <SelectTrigger id="game" className="w-full">
@@ -524,17 +620,19 @@ export function CollectionFilters({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {statusFilterOptions.filter(
-                  (option) =>
-                    option.value === "all" ||
-                    option.value === "in_progress" ||
-                    option.value === "not_started" ||
-                    availableStatuses.has(option.value)
-                ).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                {statusFilterOptions
+                  .filter(
+                    (option) =>
+                      option.value === "all" ||
+                      option.value === "in_progress" ||
+                      option.value === "not_started" ||
+                      availableStatuses.has(option.value)
+                  )
+                  .map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -609,10 +707,12 @@ export function CollectionFilters({
                 updateFilter("gameId", "all");
                 updateFilter("editionId", "all");
                 updateFilter("expansionId", "all");
+                updateFilter("storageBoxId", "all");
               } else {
                 updateFilter("gameId", "none");
                 updateFilter("editionId", "all");
                 updateFilter("expansionId", "all");
+                updateFilter("storageBoxId", "all");
               }
             }}
             className="whitespace-nowrap"
@@ -711,6 +811,7 @@ export function CollectionFilters({
                       updateFilter("factionId", "all");
                       updateFilter("unitType", "all");
                       updateFilter("status", "all");
+                      updateFilter("storageBoxId", "all");
                     }}
                   >
                     <SelectTrigger id="mobile-universe">
@@ -740,6 +841,7 @@ export function CollectionFilters({
                       updateFilter("factionId", "all");
                       updateFilter("unitType", "all");
                       updateFilter("status", "all");
+                      updateFilter("storageBoxId", "all");
                     }}
                   >
                     <SelectTrigger id="mobile-game">
@@ -834,7 +936,10 @@ export function CollectionFilters({
                 {availableUnitTypes.length > 0 && (
                   <div>
                     <Label htmlFor="mobile-unit">Unit</Label>
-                    <Select value={filters.unitType} onValueChange={(v) => updateFilter("unitType", v)}>
+                    <Select
+                      value={filters.unitType}
+                      onValueChange={(v) => updateFilter("unitType", v)}
+                    >
                       <SelectTrigger id="mobile-unit">
                         <SelectValue />
                       </SelectTrigger>
@@ -854,7 +959,10 @@ export function CollectionFilters({
                 {bases.length > 0 && (
                   <div>
                     <Label htmlFor="mobile-baseSize">Base Size</Label>
-                    <Select value={filters.baseSize} onValueChange={(v) => updateFilter("baseSize", v)}>
+                    <Select
+                      value={filters.baseSize}
+                      onValueChange={(v) => updateFilter("baseSize", v)}
+                    >
                       <SelectTrigger id="mobile-baseSize">
                         <SelectValue />
                       </SelectTrigger>
@@ -874,7 +982,10 @@ export function CollectionFilters({
                 {/* Photos */}
                 <div>
                   <Label htmlFor="mobile-photos">Photos</Label>
-                  <Select value={filters.hasPhotos} onValueChange={(v) => updateFilter("hasPhotos", v)}>
+                  <Select
+                    value={filters.hasPhotos}
+                    onValueChange={(v) => updateFilter("hasPhotos", v)}
+                  >
                     <SelectTrigger id="mobile-photos">
                       <SelectValue />
                     </SelectTrigger>
@@ -894,17 +1005,19 @@ export function CollectionFilters({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {statusFilterOptions.filter(
-                        (option) =>
-                          option.value === "all" ||
-                          option.value === "in_progress" ||
-                          option.value === "not_started" ||
-                          availableStatuses.has(option.value)
-                      ).map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      {statusFilterOptions
+                        .filter(
+                          (option) =>
+                            option.value === "all" ||
+                            option.value === "in_progress" ||
+                            option.value === "not_started" ||
+                            availableStatuses.has(option.value)
+                        )
+                        .map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -992,7 +1105,10 @@ export function CollectionFilters({
           )}
           {filters.factionId !== "all" && (
             <Badge variant="secondary">
-              Faction: {filters.factionId === "none" ? "No Faction" : factions.find((f) => f.id === filters.factionId)?.name || filters.factionId}
+              Faction:{" "}
+              {filters.factionId === "none"
+                ? "No Faction"
+                : factions.find((f) => f.id === filters.factionId)?.name || filters.factionId}
               <button
                 onClick={() => updateFilter("factionId", "all")}
                 className="ml-1 hover:text-destructive"
@@ -1075,15 +1191,34 @@ export function CollectionFilters({
               </button>
             </Badge>
           )}
+          {filters.gameBoxId && filters.gameBoxId !== "all" && (
+            <Badge variant="secondary" className="border-primary/40 bg-primary/10 text-primary">
+              <Box className="h-3 w-3 mr-1 text-primary" />
+              Box:{" "}
+              {gameBoxes?.find(
+                (b) =>
+                  b.id.toLowerCase() === filters.gameBoxId.toLowerCase() ||
+                  b.name.toLowerCase() === filters.gameBoxId.toLowerCase()
+              )?.name || filters.gameBoxId}
+              <button
+                onClick={() => updateFilter("gameBoxId", "all")}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
           {filters.universeId !== "all" && (
             <Badge variant="secondary">
-              Universe: {universes.find((u) => u.id === filters.universeId)?.name || filters.universeId}
+              Universe:{" "}
+              {universes.find((u) => u.id === filters.universeId)?.name || filters.universeId}
               <button
                 onClick={() => {
                   updateFilter("universeId", "all");
                   updateFilter("gameId", "all");
                   updateFilter("editionId", "all");
                   updateFilter("expansionId", "all");
+                  updateFilter("storageBoxId", "all");
                 }}
                 className="ml-1 hover:text-destructive"
               >
@@ -1102,6 +1237,7 @@ export function CollectionFilters({
                   updateFilter("gameId", "all");
                   updateFilter("editionId", "all");
                   updateFilter("expansionId", "all");
+                  updateFilter("storageBoxId", "all");
                 }}
                 className="ml-1 hover:text-destructive"
               >

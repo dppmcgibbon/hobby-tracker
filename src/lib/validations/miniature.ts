@@ -20,6 +20,7 @@ export const miniatureSchema = z.object({
     .nullable(),
   notes: z.string().max(1000).optional().nullable(),
   storage_box_id: z.string().uuid("Invalid storage box").optional().nullable(),
+  game_box_id: z.string().uuid("Invalid game box").optional().nullable(),
   // Status fields (edit/add pages; stored in miniature_status; names come from miniature_statuses)
   status: z.string().min(1).max(100).optional(),
   magnetised: z.boolean().optional(),

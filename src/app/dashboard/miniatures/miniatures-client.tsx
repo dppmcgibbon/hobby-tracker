@@ -46,6 +46,8 @@ interface MiniatureWithRelations {
   quantity: number;
   created_at: string;
   faction_id?: string | null;
+  storage_box_id?: string | null;
+  game_box_id?: string | null;
   unit_type?: string | null;
   factions: { id: string; name: string } | null;
   miniature_status: { status: string; completed_at?: string | null } | null;
@@ -88,6 +90,8 @@ interface CollectionClientProps {
   collections: Collection[];
   universes: { id: string; name: string }[];
   storageBoxes: StorageBox[];
+  availableStorageBoxes?: StorageBox[];
+  gameBoxes?: { id: string; name: string }[];
   recipes: Recipe[];
   games: { id: string; name: string }[];
   editions: { id: string; name: string; year: number | null }[];
@@ -114,6 +118,8 @@ export function CollectionClient({
   collections,
   universes,
   storageBoxes,
+  availableStorageBoxes,
+  gameBoxes = [],
   recipes,
   games,
   editions,
@@ -135,6 +141,21 @@ export function CollectionClient({
   const [gridSortDirection, setGridSortDirection] = useState<SortDirection>("desc");
   const [savedFilter, setSavedFilter] = useState<string | null>(null);
   const [hasSavedFilter, setHasSavedFilter] = useState(false);
+
+  // Check if all currently selected miniatures have storage of "IN BOX"
+  const isAllSelectedInBox = useMemo(() => {
+    if (selectedIds.length === 0) return false;
+    const inBoxStorage = storageBoxes.find(
+      (b) => b.name?.trim().toUpperCase() === "IN BOX"
+    );
+    if (!inBoxStorage) return false;
+
+    const minMap = new Map(miniatures.map((m) => [m.id, m]));
+    return selectedIds.every((id) => {
+      const min = minMap.get(id);
+      return min?.storage_box_id === inBoxStorage.id;
+    });
+  }, [selectedIds, miniatures, storageBoxes]);
 
   // Load saved view mode, grid sort preferences, and saved filter from localStorage on mount
   useEffect(() => {
@@ -433,7 +454,8 @@ export function CollectionClient({
       <CollectionFilters
         factions={factions}
         tags={tags}
-        storageBoxes={storageBoxes}
+        storageBoxes={availableStorageBoxes || storageBoxes}
+        gameBoxes={gameBoxes}
         universes={universes}
         games={games}
         editions={editions}
@@ -554,6 +576,8 @@ export function CollectionClient({
         tags={tags}
         collections={collections}
         storageBoxes={storageBoxes}
+        gameBoxes={gameBoxes}
+        allSelectedInBox={isAllSelectedInBox}
         recipes={recipes}
         games={games}
         editions={editions}

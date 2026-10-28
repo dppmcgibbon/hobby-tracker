@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
-import { Edit, Image as ImageIcon, Magnet, Sprout, Plus } from "lucide-react";
+import { Edit, Image as ImageIcon, Magnet, Sprout, Plus, Box } from "lucide-react";
 import { PhotoUpload } from "./photo-upload";
 import { StatusIcon } from "./status-icon";
 import { getR2PublicUrl } from "@/lib/r2";
@@ -42,6 +42,8 @@ interface MiniatureWithRelations {
   } | null;
   miniature_photos: { id: string; storage_path: string; image_updated_at?: string | null }[];
   storage_box?: { id: string; name: string; location?: string | null } | null;
+  linked_game_box?: { id: string; name: string; location?: string | null } | null;
+  clean_notes?: string | null;
   bases?: { id: string; name: string } | null;
   base_shapes?: { id: string; name: string } | null;
   base_types?: { id: string; name: string } | null;
@@ -556,17 +558,38 @@ export function MiniatureTableView({
                       </div>
 
                       {/* Storage Box */}
-                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
+                      <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5 items-center">
                         <div className="text-sm font-bold text-primary">Storage Box:</div>
-                        <div className="text-sm">
+                        <div className="text-sm flex flex-wrap items-center gap-2">
                           {miniature.storage_box ? (
-                            <Link
-                              href={`/dashboard/storage/${miniature.storage_box.id}`}
-                              className="hover:text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {miniature.storage_box.name}
-                            </Link>
+                            <>
+                              <Link
+                                href={`/dashboard/storage/${miniature.storage_box.id}`}
+                                className="hover:text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {miniature.storage_box.name}
+                              </Link>
+                              {miniature.linked_game_box && (
+                                <>
+                                  <span className="text-muted-foreground text-xs">&rarr;</span>
+                                  <Link
+                                    href={`/dashboard/boxes?search=${encodeURIComponent(miniature.linked_game_box.name)}`}
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold border border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={`In Game Box: ${miniature.linked_game_box.name}${miniature.linked_game_box.location ? ` (${miniature.linked_game_box.location})` : ""}`}
+                                  >
+                                    <Box className="h-3 w-3 text-primary shrink-0" />
+                                    <span>{miniature.linked_game_box.name}</span>
+                                    {miniature.linked_game_box.location && (
+                                      <span className="text-[10px] font-normal text-muted-foreground">
+                                        ({miniature.linked_game_box.location})
+                                      </span>
+                                    )}
+                                  </Link>
+                                </>
+                              )}
+                            </>
                           ) : (
                             "-"
                           )}
@@ -609,7 +632,9 @@ export function MiniatureTableView({
                       <div className="grid grid-cols-[140px_1fr] gap-4 py-1.5">
                         <div className="text-sm font-bold text-primary">Notes:</div>
                         <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {(miniature as any).notes || "-"}
+                          {miniature.clean_notes !== undefined
+                            ? miniature.clean_notes || "-"
+                            : (miniature as any).notes || "-"}
                         </div>
                       </div>
                     </div>

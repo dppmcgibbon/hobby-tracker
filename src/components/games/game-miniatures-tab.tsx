@@ -22,6 +22,7 @@ export interface GameMiniatureItem {
   } | null;
   miniature_photos: { storage_path: string; image_updated_at?: string | null }[];
   storage_box?: { id: string; name: string; location?: string | null } | null;
+  linked_game_box?: { id: string; name: string; location?: string | null } | null;
 }
 
 interface GameMiniaturesTabProps {

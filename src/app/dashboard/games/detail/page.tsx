@@ -19,6 +19,7 @@ import {
   sortGamePdfLinks,
 } from "@/lib/games/game-details";
 import type { GameEntityType } from "@/app/actions/games";
+import { resolveMiniatureGameBox } from "@/lib/game-box-resolver";
 
 export const dynamic = "force-dynamic";
 
@@ -179,7 +180,6 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
 
   const sortedPdfLinks = sortGamePdfLinks(pdfLinks);
 
-
   // URL for filtering miniatures of this game/edition/expansion
   const miniatureFilterParams = new URLSearchParams();
   if (resolvedUniverseId) miniatureFilterParams.set("universe", resolvedUniverseId);
@@ -216,10 +216,12 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         quantity,
         created_at,
         unit_type,
+        notes,
         factions (id, name),
         miniature_status (status, completed_at, based, magnetised),
         miniature_photos (id, storage_path, image_updated_at, display_order, uploaded_at),
-        storage_boxes (id, name, location)
+        storage_boxes (id, name, location),
+        game_box_id
       `
       )
       .in("id", linkedMiniatureIds)
@@ -235,6 +237,8 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         quantity: m.quantity,
         created_at: m.created_at,
         unit_type: m.unit_type,
+        notes: m.notes,
+        game_box_id: m.game_box_id,
         factions: (faction || null) as { name: string } | null,
         miniature_status: (status || null) as {
           status: string;
@@ -310,8 +314,42 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
     }
   }
 
+  // Attach resolved game boxes to game miniatures
+  if (gameMiniatures.length > 0 && (rawGameBoxes || []).length > 0) {
+    gameMiniatures = gameMiniatures.map((m: any) => {
+      const resolvedBoxInfo = resolveMiniatureGameBox(
+        {
+          game_box_id: m.game_box_id,
+          storage_box: m.storage_box,
+          notes: m.notes,
+          miniature_games: [
+            {
+              game_id: game.id,
+              edition_id: edition?.id || null,
+              expansion_id: expansion?.id || null,
+            },
+          ],
+        },
+        rawGameBoxes || []
+      );
+      return {
+        ...m,
+        linked_game_box: resolvedBoxInfo?.box || null,
+      };
+    });
+  }
+
+  const miniaturesCountByBoxId: Record<string, number> = {};
+  for (const m of gameMiniatures) {
+    if (m.linked_game_box?.id) {
+      miniaturesCountByBoxId[m.linked_game_box.id] =
+        (miniaturesCountByBoxId[m.linked_game_box.id] || 0) + (m.quantity || 1);
+    }
+  }
+
   const gameBoxes = (rawGameBoxes || []).map((b: any) => ({
     ...b,
+    linked_miniatures_count: miniaturesCountByBoxId[b.id] || 0,
     game_components: (b.game_components || [])
       .map((comp: any) => {
         let photos = photosByComponentId[comp.id] || [];
@@ -338,6 +376,11 @@ export default async function GameDetailPage({ searchParams }: GameDetailPagePro
         const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
         const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
         if (orderA !== orderB) return orderA - orderB;
+        const nameCmp = (a.name || "").localeCompare(b.name || "", undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (nameCmp !== 0) return nameCmp;
         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
       }),
   }));

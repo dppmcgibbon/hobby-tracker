@@ -41,11 +41,11 @@ import {
   Search,
   Edit,
   Trash2,
+  Copy,
   ExternalLink,
   Layers,
   Camera,
   AlertTriangle,
-  CheckCircle2,
   FileText,
   CreditCard,
   Dice5,
@@ -61,6 +61,7 @@ import {
   deleteGameComponent,
 } from "@/app/actions/game-components";
 import { GameComponentPhotoDialog } from "@/components/games/game-component-photo-dialog";
+import { DuplicateGameComponentDialog } from "@/components/games/duplicate-game-component-dialog";
 import { COMPONENT_TYPES, COMPONENT_STATUSES } from "@/components/games/game-component-form-dialog";
 import { getR2PublicUrl } from "@/lib/r2";
 import { getPhotoImageUrl } from "@/lib/photos";
@@ -122,13 +123,48 @@ export function GameComponentManagement({
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
-  // Form Dialog state
+  // Duplicate Component state
+  const [componentToDuplicate, setComponentToDuplicate] = useState<AdminGameComponentItem | null>(
+    null
+  );
+
+  const handleOpenDuplicate = (comp: AdminGameComponentItem) => {
+    setComponentToDuplicate(comp);
+  };
+
+  const handleComponentDuplicated = (
+    newComp: GameComponent | (GameComponent & { game_box?: AdminGameComponentItem["game_box"] })
+  ) => {
+    if (!newComp) return;
+    const matchedBox = allBoxes.find((b) => b.id === newComp.game_box_id);
+    const itemWithBox: AdminGameComponentItem = {
+      ...newComp,
+      game_box: matchedBox
+        ? {
+            id: matchedBox.id,
+            name: matchedBox.name,
+            game_id: matchedBox.game_id,
+            game: { id: matchedBox.game_id, name: matchedBox.game_name },
+          }
+        : null,
+    };
+    setComponents((prev) => [itemWithBox, ...prev]);
+  };
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingComponent, setEditingComponent] = useState<AdminGameComponentItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Inputs
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    game_box_id: string;
+    name: string;
+    component_type: string;
+    quantity_expected: number | string;
+    quantity_actual: number | string;
+    status: string;
+    description: string;
+    notes: string;
+  }>({
     game_box_id: allBoxes[0]?.id || "",
     name: "",
     component_type: "other",
@@ -208,8 +244,8 @@ export function GameComponentManagement({
       game_box_id: c.game_box_id,
       name: c.name,
       component_type: c.component_type || "other",
-      quantity_expected: c.quantity_expected,
-      quantity_actual: c.quantity_actual,
+      quantity_expected: c.quantity_expected ?? 1,
+      quantity_actual: c.quantity_actual ?? 1,
       status: c.status || "complete",
       description: c.description || "",
       notes: c.notes || "",
@@ -228,6 +264,16 @@ export function GameComponentManagement({
       return;
     }
 
+    const numExpected =
+      typeof formData.quantity_expected === "number"
+        ? Math.max(0, formData.quantity_expected)
+        : Math.max(0, parseInt(String(formData.quantity_expected), 10) || 0);
+
+    const numActual =
+      typeof formData.quantity_actual === "number"
+        ? Math.max(0, formData.quantity_actual)
+        : Math.max(0, parseInt(String(formData.quantity_actual), 10) || 0);
+
     setIsSubmitting(true);
     try {
       if (editingComponent) {
@@ -235,8 +281,8 @@ export function GameComponentManagement({
           game_box_id: formData.game_box_id,
           name: formData.name.trim(),
           component_type: formData.component_type,
-          quantity_expected: Number(formData.quantity_expected),
-          quantity_actual: Number(formData.quantity_actual),
+          quantity_expected: numExpected,
+          quantity_actual: numActual,
           status: formData.status,
           description: formData.description.trim() || null,
           notes: formData.notes.trim() || null,
@@ -247,8 +293,8 @@ export function GameComponentManagement({
           game_box_id: formData.game_box_id,
           name: formData.name.trim(),
           component_type: formData.component_type,
-          quantity_expected: Number(formData.quantity_expected),
-          quantity_actual: Number(formData.quantity_actual),
+          quantity_expected: numExpected,
+          quantity_actual: numActual,
           status: formData.status,
           description: formData.description.trim() || null,
           notes: formData.notes.trim() || null,
@@ -258,8 +304,8 @@ export function GameComponentManagement({
 
       setIsFormOpen(false);
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save game component");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save game component");
     } finally {
       setIsSubmitting(false);
     }
@@ -274,8 +320,8 @@ export function GameComponentManagement({
       setComponents((prev) => prev.filter((c) => c.id !== deleteComponentId));
       setDeleteComponentId(null);
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete game component");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete game component");
     } finally {
       setIsDeleting(false);
     }
@@ -553,6 +599,16 @@ export function GameComponentManagement({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => handleOpenDuplicate(component)}
+                        title="Duplicate Component"
+                        aria-label="Duplicate Component"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
                         onClick={() => handleOpenEdit(component)}
                         title="Edit Component"
                       >
@@ -583,7 +639,7 @@ export function GameComponentManagement({
                     )}
                     {component.notes && (
                       <p className="text-[11px] italic text-muted-foreground line-clamp-2">
-                        "{component.notes}"
+                        &ldquo;{component.notes}&rdquo;
                       </p>
                     )}
                   </div>
@@ -708,36 +764,38 @@ export function GameComponentManagement({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-wider">
-                  Expected Quantity
-                </Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={formData.quantity_expected}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      quantity_expected: parseInt(e.target.value) || 1,
-                    }))
-                  }
-                  className="bg-background/50 border-primary/30 text-sm"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider">
                   Actual Quantity
                 </Label>
                 <Input
                   type="number"
                   min="0"
                   value={formData.quantity_actual}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const val = e.target.value;
                     setFormData((prev) => ({
                       ...prev,
-                      quantity_actual: parseInt(e.target.value) || 0,
-                    }))
-                  }
+                      quantity_actual: val === "" ? "" : Math.max(0, parseInt(val, 10) || 0),
+                    }));
+                  }}
+                  className="bg-background/50 border-primary/30 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider">
+                  Expected Quantity
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.quantity_expected}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      quantity_expected: val === "" ? "" : Math.max(0, parseInt(val, 10) || 0),
+                    }));
+                  }}
                   className="bg-background/50 border-primary/30 text-sm"
                 />
               </div>
@@ -802,8 +860,8 @@ export function GameComponentManagement({
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
               Are you sure you want to delete{" "}
-              <strong className="text-foreground">"{deleteComponentName}"</strong>? This will also
-              remove its associated photo if present.
+              <strong className="text-foreground">&quot;{deleteComponentName}&quot;</strong>? This
+              will also remove its associated photo if present.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -827,6 +885,18 @@ export function GameComponentManagement({
         onSuccess={() => {
           router.refresh();
         }}
+      />
+      {/* Duplicate Component Dialog */}
+      <DuplicateGameComponentDialog
+        component={componentToDuplicate}
+        boxes={allBoxes.map((b) => ({ id: b.id, name: `${b.game_name} - ${b.name}` }))}
+        currentBoxId={componentToDuplicate?.game_box_id}
+        currentBoxName={componentToDuplicate?.game_box?.name}
+        open={!!componentToDuplicate}
+        onOpenChange={(open) => {
+          if (!open) setComponentToDuplicate(null);
+        }}
+        onSuccess={handleComponentDuplicated}
       />
     </div>
   );

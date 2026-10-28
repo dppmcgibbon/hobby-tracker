@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Box,
+  Package,
   Plus,
   Edit,
   Trash2,
   Copy,
+  RotateCcw,
   Layers,
   MapPin,
   Barcode,
   Camera,
   AlertTriangle,
-  CheckCircle2,
   Sparkles,
   FileText,
   Dice5,
@@ -36,7 +38,15 @@ import {
   ShieldAlert,
   Loader2,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   GripVertical,
+  Search,
+  ExternalLink,
+  Gamepad2,
+  ArrowUpDown,
+  ArrowDownAZ,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Dialog,
@@ -46,6 +56,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteGameBox, duplicateGameBox } from "@/app/actions/game-boxes";
@@ -53,6 +70,7 @@ import {
   deleteGameComponent,
   uploadComponentPhoto,
   reorderGameComponents,
+  resetGameBoxActualQuantities,
 } from "@/app/actions/game-components";
 import { GameBoxFormDialog } from "@/components/games/game-box-form-dialog";
 import {
@@ -60,6 +78,7 @@ import {
   COMPONENT_TYPES,
 } from "@/components/games/game-component-form-dialog";
 import { GameComponentPhotoDialog } from "@/components/games/game-component-photo-dialog";
+import { DuplicateGameComponentDialog } from "@/components/games/duplicate-game-component-dialog";
 import { getR2PublicUrl } from "@/lib/r2";
 import { getPhotoImageUrl } from "@/lib/photos";
 import type { GameBox, GameComponent, GameComponentWithPhotos, Edition, Expansion } from "@/types";
@@ -67,16 +86,50 @@ import { toast } from "sonner";
 
 export interface GameBoxWithComponents extends GameBox {
   game_components: GameComponentWithPhotos[];
+  game?: {
+    id: string;
+    name: string;
+    universe_id?: string | null;
+    sequence?: number | null;
+    universe?: { id: string; name: string } | null;
+  } | null;
+  edition?: { id: string; name: string; sequence?: number | null; year?: number | null } | null;
+  expansion?: { id: string; name: string; sequence?: number | null; year?: number | null } | null;
+  linked_miniatures_count?: number;
+}
+
+export type BoxSortOption = "game" | "name-asc" | "name-desc" | "components-desc" | "missing";
+
+export interface GameBoxesGroup {
+  gameId: string;
+  gameName: string;
+  universeName?: string;
+  universeId?: string;
+  game?: {
+    id: string;
+    name: string;
+    universe_id?: string | null;
+    universe?: { id: string; name: string } | null;
+  } | null;
+  boxes: GameBoxWithComponents[];
+  totalComponents: number;
+  totalMissing: number;
 }
 
 interface GameBoxesTabProps {
-  gameId: string;
+  gameId?: string;
   editionId?: string | null;
   expansionId?: string | null;
   gameTitle?: string;
   gameBoxes: GameBoxWithComponents[];
   availableEditions?: Edition[];
   availableExpansions?: Expansion[];
+  universes?: { id: string; name: string }[];
+  showUniverseFilter?: boolean;
+  initialUniverseId?: string;
+  initialSortBy?: BoxSortOption;
+  initialSearchQuery?: string;
+  showGameInfo?: boolean;
 }
 
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -94,6 +147,39 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 
 const TYPE_ORDER = COMPONENT_TYPES.map((t) => t.value);
 
+function getGroupedComponents(components: GameComponentWithPhotos[]) {
+  return Object.entries(
+    components.reduce<Record<string, GameComponentWithPhotos[]>>((acc, comp) => {
+      const typeKey = comp.component_type || "other";
+      if (!acc[typeKey]) acc[typeKey] = [];
+      acc[typeKey].push(comp);
+      return acc;
+    }, {})
+  )
+    .map(([typeKey, items]) => {
+      const sorted = [...items].sort((a, b) => {
+        const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        const nameCmp = a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (nameCmp !== 0) return nameCmp;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+      return [typeKey, sorted] as [string, GameComponentWithPhotos[]];
+    })
+    .sort(([typeA], [typeB]) => {
+      const idxA = TYPE_ORDER.indexOf(typeA);
+      const idxB = TYPE_ORDER.indexOf(typeB);
+      const posA = idxA === -1 ? 999 : idxA;
+      const posB = idxB === -1 ? 999 : idxB;
+      if (posA !== posB) return posA - posB;
+      return typeA.localeCompare(typeB);
+    });
+}
+
 export function GameBoxesTab({
   gameId,
   editionId,
@@ -102,11 +188,37 @@ export function GameBoxesTab({
   gameBoxes,
   availableEditions = [],
   availableExpansions = [],
+  universes = [],
+  showUniverseFilter = false,
+  initialUniverseId = "all",
+  initialSortBy,
+  initialSearchQuery = "",
+  showGameInfo = false,
 }: GameBoxesTabProps) {
   const router = useRouter();
 
   // Local state for game boxes to allow immediate optimistic updates
   const [boxes, setBoxes] = useState<GameBoxWithComponents[]>(gameBoxes);
+
+  // Sorting state: default to "game" on global boxes page, "name-asc" elsewhere
+  const [sortBy, setSortBy] = useState<BoxSortOption>(
+    initialSortBy || (showUniverseFilter ? "game" : "name-asc")
+  );
+
+  // Collapsible game section state: which games are expanded (default to collapsed on initial page open)
+  const [expandedGameIds, setExpandedGameIds] = useState<Set<string>>(new Set());
+
+  const toggleGameExpand = (gameId: string) => {
+    setExpandedGameIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameId)) {
+        next.delete(gameId);
+      } else {
+        next.add(gameId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     setBoxes(gameBoxes);
@@ -129,6 +241,10 @@ export function GameBoxesTab({
   const [duplicateNewName, setDuplicateNewName] = useState("");
   const [isDuplicating, setIsDuplicating] = useState(false);
 
+  // Reset actual quantities state
+  const [boxToResetActual, setBoxToResetActual] = useState<GameBoxWithComponents | null>(null);
+  const [isResettingActual, setIsResettingActual] = useState(false);
+
   const handleConfirmDuplicate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!boxToDuplicate || !duplicateNewName.trim()) return;
@@ -136,7 +252,9 @@ export function GameBoxesTab({
     setIsDuplicating(true);
     try {
       await duplicateGameBox(boxToDuplicate.id, duplicateNewName.trim());
-      toast.success(`Game box "${duplicateNewName.trim()}" duplicated successfully with all components and photos!`);
+      toast.success(
+        `Game box "${duplicateNewName.trim()}" duplicated successfully with all components and photos!`
+      );
       setBoxToDuplicate(null);
       setDuplicateNewName("");
       router.refresh();
@@ -154,11 +272,38 @@ export function GameBoxesTab({
   const [componentToDelete, setComponentToDelete] = useState<GameComponent | null>(null);
   const [isDeletingComponent, setIsDeletingComponent] = useState(false);
 
+  // Duplicate component state
+  const [componentToDuplicate, setComponentToDuplicate] = useState<GameComponentWithPhotos | null>(
+    null
+  );
+  const [componentToDuplicateBoxId, setComponentToDuplicateBoxId] = useState<string>("");
+
+  const handleOpenDuplicateComponent = (comp: GameComponentWithPhotos, boxId: string) => {
+    setComponentToDuplicate(comp);
+    setComponentToDuplicateBoxId(boxId);
+  };
+
+  const handleComponentDuplicated = (newComp: GameComponentWithPhotos) => {
+    if (!newComp) return;
+    setBoxes((prev) =>
+      prev.map((b) => {
+        if (b.id !== newComp.game_box_id) return b;
+        return {
+          ...b,
+          game_components: [...(b.game_components || []), newComp],
+        };
+      })
+    );
+  };
+
   // Photo dialog state
-  const [activePhotoComponent, setActivePhotoComponent] = useState<GameComponentWithPhotos | null>(null);
+  const [activePhotoComponent, setActivePhotoComponent] = useState<GameComponentWithPhotos | null>(
+    null
+  );
   const [uploadingComponentId, setUploadingComponentId] = useState<string | null>(null);
   const rowFileInputRef = useRef<HTMLInputElement>(null);
-  const [targetComponentForUpload, setTargetComponentForUpload] = useState<GameComponentWithPhotos | null>(null);
+  const [targetComponentForUpload, setTargetComponentForUpload] =
+    useState<GameComponentWithPhotos | null>(null);
 
   const handleAddPhotoRowClick = (comp: GameComponentWithPhotos) => {
     setTargetComponentForUpload(comp);
@@ -219,18 +364,170 @@ export function GameBoxesTab({
     });
   };
 
+  // Universe & search filtering (for global boxes view)
+  const [selectedUniverseId, setSelectedUniverseId] = useState<string>(initialUniverseId || "all");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || "");
+
+  const filteredBoxes = useMemo(() => {
+    return boxes.filter((box) => {
+      if (showUniverseFilter && selectedUniverseId !== "all") {
+        const uId = box.game?.universe_id || box.game?.universe?.id;
+        if (uId !== selectedUniverseId) {
+          return false;
+        }
+      }
+      if (showUniverseFilter && searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = box.name.toLowerCase().includes(q);
+        const matchGame = box.game?.name?.toLowerCase().includes(q);
+        const matchUniverse = box.game?.universe?.name?.toLowerCase().includes(q);
+        const matchLoc = box.location?.toLowerCase().includes(q);
+        const matchBarcode = box.barcode?.toLowerCase().includes(q);
+        const matchNotes = box.notes?.toLowerCase().includes(q);
+        const matchComp = (box.game_components || []).some((c) => c.name.toLowerCase().includes(q));
+        return (
+          matchName ||
+          matchGame ||
+          matchUniverse ||
+          matchLoc ||
+          matchBarcode ||
+          matchNotes ||
+          matchComp
+        );
+      }
+      return true;
+    });
+  }, [boxes, showUniverseFilter, selectedUniverseId, searchQuery]);
+
+  const gameGroups = useMemo<GameBoxesGroup[]>(() => {
+    const groupsMap = new Map<string, GameBoxesGroup>();
+
+    for (const box of filteredBoxes) {
+      const gId = box.game?.id || "unassigned";
+      const gName = box.game?.name || "Standalone / Other Boxes";
+      const uName = box.game?.universe?.name;
+      const uId = box.game?.universe_id || box.game?.universe?.id;
+
+      if (!groupsMap.has(gId)) {
+        groupsMap.set(gId, {
+          gameId: gId,
+          gameName: gName,
+          universeName: uName,
+          universeId: uId,
+          game: box.game,
+          boxes: [],
+          totalComponents: 0,
+          totalMissing: 0,
+        });
+      }
+
+      const grp = groupsMap.get(gId)!;
+      grp.boxes.push(box);
+      const comps = box.game_components || [];
+      grp.totalComponents += comps.length;
+      grp.totalMissing += comps.reduce(
+        (acc, c) => acc + Math.max(0, c.quantity_expected - c.quantity_actual),
+        0
+      );
+    }
+
+    for (const grp of groupsMap.values()) {
+      grp.boxes.sort((a, b) => {
+        // 1. Order by edition sequence (lowest sequence first)
+        const editionSeqA = a.edition?.sequence ?? Number.MAX_SAFE_INTEGER;
+        const editionSeqB = b.edition?.sequence ?? Number.MAX_SAFE_INTEGER;
+        if (editionSeqA !== editionSeqB) {
+          return editionSeqA - editionSeqB;
+        }
+
+        // 2. Order by expansion sequence (lowest sequence first: e.g. 1 Core Game before 2 Expansion)
+        const expansionSeqA =
+          a.expansion?.sequence ?? (a.box_type === "core" ? 0 : Number.MAX_SAFE_INTEGER);
+        const expansionSeqB =
+          b.expansion?.sequence ?? (b.box_type === "core" ? 0 : Number.MAX_SAFE_INTEGER);
+        if (expansionSeqA !== expansionSeqB) {
+          return expansionSeqA - expansionSeqB;
+        }
+
+        // 3. If sequences match, 'core' box_type takes precedence
+        if (a.box_type !== b.box_type) {
+          if (a.box_type === "core") return -1;
+          if (b.box_type === "core") return 1;
+        }
+
+        // 4. Natural alphanumeric order by name (e.g. SPACE-HULK-001 before SPACE-HULK-002)
+        const nameComparison = a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (nameComparison !== 0) return nameComparison;
+
+        // 5. Fallback to created_at
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+    }
+
+    return Array.from(groupsMap.values()).sort((a, b) => {
+      if (a.gameId === "unassigned") return 1;
+      if (b.gameId === "unassigned") return -1;
+      return a.gameName.localeCompare(b.gameName);
+    });
+  }, [filteredBoxes]);
+
+  const sortedBoxes = useMemo(() => {
+    const list = [...filteredBoxes];
+    switch (sortBy) {
+      case "name-desc":
+        return list.sort((a, b) => b.name.localeCompare(a.name));
+      case "components-desc":
+        return list.sort(
+          (a, b) => (b.game_components?.length || 0) - (a.game_components?.length || 0)
+        );
+      case "missing":
+        return list.sort((a, b) => {
+          const missA = (a.game_components || []).reduce(
+            (acc, c) => acc + Math.max(0, c.quantity_expected - c.quantity_actual),
+            0
+          );
+          const missB = (b.game_components || []).reduce(
+            (acc, c) => acc + Math.max(0, c.quantity_expected - c.quantity_actual),
+            0
+          );
+          if (missB !== missA) return missB - missA;
+          return a.name.localeCompare(b.name);
+        });
+      case "name-asc":
+      default:
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }, [filteredBoxes, sortBy]);
+
+  const allGamesExpanded =
+    gameGroups.length > 0 && gameGroups.every((g) => expandedGameIds.has(g.gameId));
+
+  const toggleAllGames = () => {
+    if (allGamesExpanded) {
+      setExpandedGameIds(new Set());
+    } else {
+      setExpandedGameIds(new Set(gameGroups.map((g) => g.gameId)));
+    }
+  };
+
   const allExpanded =
-    boxes.length > 0 && boxes.every((b) => expandedBoxIds.has(b.id));
+    filteredBoxes.length > 0 && filteredBoxes.every((b) => expandedBoxIds.has(b.id));
 
   const toggleAllBoxes = () => {
     if (allExpanded) {
       setExpandedBoxIds(new Set());
     } else {
-      setExpandedBoxIds(new Set(boxes.map((b) => b.id)));
+      setExpandedBoxIds(new Set(filteredBoxes.map((b) => b.id)));
     }
   };
 
-  const totalComponents = boxes.reduce((acc, b) => acc + (b.game_components?.length || 0), 0);
+  const totalComponents = filteredBoxes.reduce(
+    (acc, b) => acc + (b.game_components?.length || 0),
+    0
+  );
 
   const handleDeleteBox = async () => {
     if (!boxToDelete) return;
@@ -245,6 +542,33 @@ export function GameBoxesTab({
       toast.error(err instanceof Error ? err.message : "Failed to delete box");
     } finally {
       setIsDeletingBox(false);
+    }
+  };
+
+  const handleResetActualQuantities = async () => {
+    if (!boxToResetActual) return;
+    setIsResettingActual(true);
+    try {
+      await resetGameBoxActualQuantities(boxToResetActual.id);
+      toast.success(`Actual quantities in "${boxToResetActual.name}" set to 0`);
+      setBoxes((prev) =>
+        prev.map((b) => {
+          if (b.id !== boxToResetActual.id) return b;
+          return {
+            ...b,
+            game_components: (b.game_components || []).map((c) => ({
+              ...c,
+              quantity_actual: 0,
+            })),
+          };
+        })
+      );
+      setBoxToResetActual(null);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset actual quantities");
+    } finally {
+      setIsResettingActual(false);
     }
   };
 
@@ -272,11 +596,7 @@ export function GameBoxesTab({
   // Drag and drop handlers for components
   const handleDragStart = (e: React.DragEvent, comp: GameComponentWithPhotos) => {
     const target = e.target as HTMLElement;
-    if (
-      target.closest("button") ||
-      target.closest("input") ||
-      target.closest("[data-no-drag]")
-    ) {
+    if (target.closest("button") || target.closest("input") || target.closest("[data-no-drag]")) {
       e.preventDefault();
       return;
     }
@@ -455,19 +775,13 @@ export function GameBoxesTab({
     } catch (error) {
       console.error("Failed to reorder components:", error);
       setBoxes(previousBoxes);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update component order"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to update component order");
     } finally {
       setIsSavingOrder(false);
     }
   };
 
-  const handleTypeHeaderDrop = async (
-    e: React.DragEvent,
-    boxId: string,
-    targetTypeKey: string
-  ) => {
+  const handleTypeHeaderDrop = async (e: React.DragEvent, boxId: string, targetTypeKey: string) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -576,6 +890,133 @@ export function GameBoxesTab({
     }
   };
 
+  const handleMoveComponent = async (
+    boxId: string,
+    typeKey: string,
+    index: number,
+    direction: "up" | "down"
+  ) => {
+    const targetBox = boxes.find((b) => b.id === boxId);
+    if (!targetBox) return;
+
+    const grouped = getGroupedComponents(targetBox.game_components || []);
+    const groupEntry = grouped.find(([key]) => key === typeKey);
+    if (!groupEntry) return;
+
+    const [, typeItems] = groupEntry;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= typeItems.length) return;
+
+    const updatedTypeItems = [...typeItems];
+    const [moved] = updatedTypeItems.splice(index, 1);
+    updatedTypeItems.splice(targetIndex, 0, moved);
+
+    const allUpdatedComponents: GameComponentWithPhotos[] = [];
+    for (const [key, items] of grouped) {
+      if (key === typeKey) {
+        allUpdatedComponents.push(...updatedTypeItems);
+      } else {
+        allUpdatedComponents.push(...items);
+      }
+    }
+
+    const updatedComponents = allUpdatedComponents.map((comp, idx) => ({
+      ...comp,
+      display_order: idx,
+    }));
+
+    const previousBoxes = [...boxes];
+    const newBoxes = boxes.map((b) =>
+      b.id === boxId ? { ...b, game_components: updatedComponents } : b
+    );
+
+    setBoxes(newBoxes);
+    setIsSavingOrder(true);
+
+    const itemsToPersist = updatedComponents.map((comp, idx) => ({
+      id: comp.id,
+      display_order: idx,
+      component_type: comp.component_type || undefined,
+      game_box_id: boxId,
+    }));
+
+    try {
+      await reorderGameComponents(itemsToPersist);
+      toast.success("Component order updated", { duration: 1500 });
+    } catch (error) {
+      console.error("Failed to reorder component:", error);
+      setBoxes(previousBoxes);
+      toast.error(error instanceof Error ? error.message : "Failed to update component order");
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
+  const handleSortAlphabetically = async (boxId: string, typeKey?: string) => {
+    const targetBox = boxes.find((b) => b.id === boxId);
+    if (!targetBox) return;
+
+    const components = targetBox.game_components || [];
+    if (components.length <= 1) return;
+
+    const grouped = getGroupedComponents(components);
+
+    const sortAlpha = (items: GameComponentWithPhotos[]) =>
+      [...items].sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (cmp !== 0) return cmp;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+
+    const allUpdatedComponents: GameComponentWithPhotos[] = [];
+    for (const [key, items] of grouped) {
+      if (!typeKey || key === typeKey) {
+        allUpdatedComponents.push(...sortAlpha(items));
+      } else {
+        allUpdatedComponents.push(...items);
+      }
+    }
+
+    const updatedComponents = allUpdatedComponents.map((comp, idx) => ({
+      ...comp,
+      display_order: idx,
+    }));
+
+    const previousBoxes = [...boxes];
+    const newBoxes = boxes.map((b) =>
+      b.id === boxId ? { ...b, game_components: updatedComponents } : b
+    );
+
+    setBoxes(newBoxes);
+    setIsSavingOrder(true);
+
+    const itemsToPersist = updatedComponents.map((comp, idx) => ({
+      id: comp.id,
+      display_order: idx,
+      component_type: comp.component_type || undefined,
+      game_box_id: boxId,
+    }));
+
+    try {
+      await reorderGameComponents(itemsToPersist);
+      const msg = typeKey
+        ? "Category sorted alphabetically (A-Z)"
+        : `Components in "${targetBox.name}" sorted alphabetically (A-Z)`;
+      toast.success(msg, { duration: 1500 });
+    } catch (error) {
+      console.error("Failed to sort components alphabetically:", error);
+      setBoxes(previousBoxes);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to sort components alphabetically"
+      );
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Hidden file input for component row add photo button */}
@@ -589,68 +1030,160 @@ export function GameBoxesTab({
 
       {/* Top Header Card */}
       <Card className="warhammer-card border-primary/30">
-        <CardHeader className="pb-3 border-b border-primary/15 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 space-y-0">
+        <CardHeader className="pb-3 border-b border-primary/15 flex flex-col md:flex-row md:items-center md:justify-between gap-4 space-y-0">
           <div>
             <CardTitle className="text-xl font-black uppercase tracking-wider text-primary flex items-center gap-2">
               <Box className="h-5 w-5 text-primary" />
-              Game Boxes & Components
+              {showUniverseFilter ? "BOXES" : "Game Boxes & Components"}
             </CardTitle>
             <CardDescription className="text-xs uppercase tracking-wide mt-1">
-              Physical boxes and component inventory for {gameTitle} ({boxes.length}{" "}
-              {boxes.length === 1 ? "box" : "boxes"}, {totalComponents} components)
+              {showUniverseFilter
+                ? sortBy === "game"
+                  ? `Physical boxes and component inventory across ${gameGroups.length} ${gameGroups.length === 1 ? "game" : "games"} (${filteredBoxes.length} ${filteredBoxes.length === 1 ? "box" : "boxes"}, ${totalComponents} components)`
+                  : `Physical boxes and component inventory across all games (${filteredBoxes.length} ${filteredBoxes.length === 1 ? "box" : "boxes"}, ${totalComponents} components)`
+                : `Physical boxes and component inventory for ${gameTitle} (${boxes.length} ${boxes.length === 1 ? "box" : "boxes"}, ${totalComponents} components)`}
             </CardDescription>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {showUniverseFilter && universes && universes.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Select value={selectedUniverseId} onValueChange={setSelectedUniverseId}>
+                  <SelectTrigger className="w-[180px] sm:w-[200px] h-9 text-xs font-semibold bg-background/50 border-primary/30">
+                    <SelectValue placeholder="All Universes" />
+                  </SelectTrigger>
+                  <SelectContent className="warhammer-card border-primary/30">
+                    <SelectItem value="all">All Universes</SelectItem>
+                    {universes.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {showUniverseFilter && (
+              <div className="relative w-full sm:w-[200px]">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search boxes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-9 text-xs bg-background/50 border-primary/30"
+                />
+              </div>
+            )}
+
+            {showUniverseFilter && (
+              <div className="flex items-center gap-1.5">
+                <Select value={sortBy} onValueChange={(val) => setSortBy(val as BoxSortOption)}>
+                  <SelectTrigger className="w-[160px] sm:w-[175px] h-9 text-xs font-semibold bg-background/50 border-primary/30">
+                    <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-primary shrink-0" />
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent className="warhammer-card border-primary/30">
+                    <SelectItem value="game">Sort by Game</SelectItem>
+                    <SelectItem value="name-asc">Box Name (A-Z)</SelectItem>
+                    <SelectItem value="name-desc">Box Name (Z-A)</SelectItem>
+                    <SelectItem value="components-desc">Most Components</SelectItem>
+                    <SelectItem value="missing">Missing Items First</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {isSavingOrder && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary/15 border border-primary/30 text-xs font-bold text-primary animate-pulse mr-1">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span>Saving order...</span>
               </div>
             )}
-            {boxes.length > 1 && (
+
+            {showUniverseFilter && sortBy === "game" && gameGroups.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleAllGames}
+                className="text-xs border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+              >
+                {allGamesExpanded ? "Collapse Games" : "Expand Games"}
+              </Button>
+            )}
+
+            {filteredBoxes.length > 1 && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={toggleAllBoxes}
                 className="text-xs border-primary/30 text-primary hover:bg-primary/10 shrink-0"
               >
-                {allExpanded ? "Collapse All" : "Expand All"}
+                {sortBy === "game"
+                  ? allExpanded
+                    ? "Collapse Boxes"
+                    : "Expand Boxes"
+                  : allExpanded
+                    ? "Collapse All"
+                    : "Expand All"}
               </Button>
             )}
-            <Button onClick={() => setIsAddBoxOpen(true)} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" />
-              Add Game Box
-            </Button>
+
+            {gameId && (
+              <Button onClick={() => setIsAddBoxOpen(true)} size="sm" className="shrink-0">
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Game Box
+              </Button>
+            )}
           </div>
         </CardHeader>
 
         <CardContent className="pt-4">
-          {boxes.length === 0 ? (
+          {filteredBoxes.length === 0 ? (
             <div className="py-12 px-4 border border-dashed border-primary/30 rounded-lg text-center space-y-3 bg-primary/5">
               <div className="p-3 bg-primary/10 rounded-full border border-primary/20 text-primary inline-flex">
                 <Box className="h-8 w-8" />
               </div>
               <div>
-                <h3 className="font-bold text-base text-foreground">No Game Boxes Recorded</h3>
+                <h3 className="font-bold text-base text-foreground">
+                  {boxes.length === 0 ? "No Game Boxes Recorded" : "No Matching Game Boxes"}
+                </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
-                  Add a physical game box for this game to inventory its rulebooks, dice, cards,
-                  tokens, and tiles.
+                  {boxes.length === 0
+                    ? `No game boxes have been created${gameTitle ? ` for ${gameTitle}` : ""}.`
+                    : "No game boxes match the selected universe or search query."}
                 </p>
               </div>
-              <Button
-                onClick={() => setIsAddBoxOpen(true)}
-                variant="outline"
-                size="sm"
-                className="mt-2 border-primary/40 text-primary hover:bg-primary hover:text-black"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add First Game Box
-              </Button>
+              {boxes.length > 0 && (
+                <Button
+                  onClick={() => {
+                    setSelectedUniverseId("all");
+                    setSearchQuery("");
+                    setSortBy("game");
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 border-primary/40 text-primary hover:bg-primary hover:text-black"
+                >
+                  Clear Filters
+                </Button>
+              )}
+              {gameId && boxes.length === 0 && (
+                <Button
+                  onClick={() => setIsAddBoxOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 border-primary/40 text-primary hover:bg-primary hover:text-black"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add First Game Box
+                </Button>
+              )}
             </div>
           ) : (
-            <div className="space-y-6">
-              {boxes.map((box) => {
+            (() => {
+              const renderBoxCard = (box: GameBoxWithComponents) => {
                 const components = box.game_components || [];
                 const isExpanded = expandedBoxIds.has(box.id);
                 const isQtyMismatchAny = components.some(
@@ -661,31 +1194,34 @@ export function GameBoxesTab({
                   0
                 );
 
-                const groupedComponents = Object.entries(
-                  components.reduce<Record<string, GameComponentWithPhotos[]>>((acc, comp) => {
-                    const typeKey = comp.component_type || "other";
-                    if (!acc[typeKey]) acc[typeKey] = [];
-                    acc[typeKey].push(comp);
-                    return acc;
-                  }, {})
-                )
-                  .map(([typeKey, items]) => {
-                    const sorted = [...items].sort((a, b) => {
-                      const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
-                      const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
-                      if (orderA !== orderB) return orderA - orderB;
-                      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-                    });
-                    return [typeKey, sorted] as [string, GameComponentWithPhotos[]];
-                  })
-                  .sort(([typeA], [typeB]) => {
-                    const idxA = TYPE_ORDER.indexOf(typeA);
-                    const idxB = TYPE_ORDER.indexOf(typeB);
-                    const posA = idxA === -1 ? 999 : idxA;
-                    const posB = idxB === -1 ? 999 : idxB;
-                    if (posA !== posB) return posA - posB;
-                    return typeA.localeCompare(typeB);
-                  });
+                const totalExpectedInBox = components.reduce(
+                  (acc, c) => acc + (c.quantity_expected || 0),
+                  0
+                );
+
+                const totalActualInBox = components.reduce(
+                  (acc, c) => acc + (c.quantity_actual || 0),
+                  0
+                );
+
+                const extrasInBox = components.reduce(
+                  (acc, c) => acc + Math.max(0, c.quantity_actual - c.quantity_expected),
+                  0
+                );
+
+                const isBoxMissing = isQtyMismatchAny || totalMissingCount > 0;
+
+                const isBoxComplete =
+                  components.length > 0 &&
+                  !isBoxMissing &&
+                  components.every((c) => c.quantity_expected === c.quantity_actual);
+
+                const isBoxCompletedWithExtras =
+                  components.length > 0 &&
+                  !isBoxMissing &&
+                  totalActualInBox > totalExpectedInBox;
+
+                const groupedComponents = getGroupedComponents(components);
 
                 return (
                   <div
@@ -738,16 +1274,76 @@ export function GameBoxesTab({
                                 {box.condition.replace(/_/g, " ")}
                               </Badge>
                             )}
-                            {isQtyMismatchAny && (
+                            {isBoxMissing && (
                               <Badge
                                 variant="outline"
                                 className="text-xs border-amber-500/50 text-amber-400 bg-amber-500/10 flex items-center gap-1 font-semibold"
+                                title={`Missing ${totalMissingCount} item${totalMissingCount === 1 ? "" : "s"}`}
                               >
                                 <AlertTriangle className="h-3 w-3" />
-                                {totalMissingCount > 0 ? `${totalMissingCount} Missing` : "Incomplete"}
+                                {totalMissingCount > 0
+                                  ? `Missing ${totalMissingCount}`
+                                  : "Incomplete"}
+                              </Badge>
+                            )}
+                            {isBoxComplete && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-emerald-500/50 text-emerald-400 bg-emerald-500/10 flex items-center gap-1 font-semibold"
+                                title="All components present in expected quantities"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                Complete
+                              </Badge>
+                            )}
+                            {isBoxCompletedWithExtras && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-blue-500/50 text-blue-400 bg-blue-500/10 flex items-center gap-1 font-semibold"
+                                title={
+                                  extrasInBox > 0
+                                    ? `Completed with ${extrasInBox} extra item${extrasInBox === 1 ? "" : "s"}`
+                                    : "Completed with extra items"
+                                }
+                              >
+                                <Sparkles className="h-3 w-3" />
+                                Completed + Extras
                               </Badge>
                             )}
                           </div>
+
+                          {/* Hierarchy (Universe, Game, Edition, Expansion) */}
+                          {showGameInfo && box.game && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-0.5 ml-6">
+                              {box.game.universe?.name && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] uppercase font-bold border-primary/30 text-primary py-0"
+                                >
+                                  {box.game.universe.name}
+                                </Badge>
+                              )}
+                              <Link
+                                href={`/dashboard/games/detail?universe=${box.game.universe_id || ""}&game=${box.game.id}&edition=${box.edition_id || ""}&expansion=${box.expansion_id || ""}&tab=boxes`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-foreground hover:text-primary font-semibold flex items-center gap-1 underline-offset-2 hover:underline"
+                                title="Open game details"
+                              >
+                                <span>{box.game.name}</span>
+                                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                              </Link>
+                              {box.edition?.name && (
+                                <span className="text-muted-foreground/80">
+                                  &bull; {box.edition.name}
+                                </span>
+                              )}
+                              {box.expansion?.name && (
+                                <span className="text-muted-foreground/80">
+                                  &bull; {box.expansion.name}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           {/* Location & Barcode Info */}
                           {(box.location || box.barcode) && (
@@ -777,7 +1373,38 @@ export function GameBoxesTab({
                       </div>
 
                       {/* Box Action Buttons */}
-                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap">
+                        {(box.linked_miniatures_count ?? 0) > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="h-8 gap-1.5 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/10 hover:border-primary/60 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            title={`View ${box.linked_miniatures_count} miniature${box.linked_miniatures_count !== 1 ? "s" : ""} in ${box.name}`}
+                          >
+                            <Link href={`/dashboard/miniatures?box=${encodeURIComponent(box.id)}`}>
+                              <Package className="h-3.5 w-3.5" />
+                              <span>Miniatures</span>
+                              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-primary/20 text-[10px] font-bold">
+                                {box.linked_miniatures_count}
+                              </span>
+                            </Link>
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBoxToResetActual(box);
+                          }}
+                          className="h-8 w-8 hover:text-amber-400 hover:bg-amber-400/10 text-muted-foreground"
+                          title="Reset actual quantities to 0"
+                          aria-label="Reset actual quantities to 0"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -822,20 +1449,44 @@ export function GameBoxesTab({
                     {/* Box Components Content (only displayed when game box is clicked / expanded) */}
                     {isExpanded && (
                       <div className="p-4 bg-muted/10 animate-in fade-in-50 duration-200">
-                        <div className="flex items-center justify-end pb-2 mb-3 border-b border-border/40">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setBoxForNewComponent(box);
-                              setComponentBoxId(box.id);
-                            }}
-                            className="h-7 w-7 text-primary hover:bg-primary/10 hover:text-primary"
-                            title="Add component"
-                            aria-label="Add component"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                        <div className="flex items-center justify-between pb-2 mb-3 border-b border-border/40">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                              Components ({components.length})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {components.length > 1 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isSavingOrder}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSortAlphabetically(box.id);
+                                }}
+                                className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 hover:text-primary gap-1.5 px-2.5 font-medium"
+                                title="Sort all components in this box alphabetically (A-Z)"
+                                aria-label="Sort all components in this box alphabetically (A-Z)"
+                              >
+                                <ArrowDownAZ className="h-3.5 w-3.5" />
+                                <span>Sort A-Z</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setBoxForNewComponent(box);
+                                setComponentBoxId(box.id);
+                              }}
+                              className="h-7 w-7 text-primary hover:bg-primary/10 hover:text-primary"
+                              title="Add component"
+                              aria-label="Add component"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
 
                         {components.length === 0 ? (
@@ -873,6 +1524,28 @@ export function GameBoxesTab({
                                 (acc, c) => acc + (c.quantity_expected || 0),
                                 0
                               );
+
+                              const totalActualInGroup = typeItems.reduce(
+                                (acc, c) => acc + (c.quantity_actual || 0),
+                                0
+                              );
+
+                              const extrasInGroup = typeItems.reduce(
+                                (acc, c) =>
+                                  acc + Math.max(0, c.quantity_actual - c.quantity_expected),
+                                0
+                              );
+
+                              const isComplete =
+                                typeItems.length > 0 &&
+                                typeItems.every(
+                                  (c) => c.quantity_expected === c.quantity_actual
+                                );
+
+                              const isCompletedWithExtras =
+                                typeItems.length > 0 &&
+                                missingInGroup === 0 &&
+                                totalActualInGroup > totalExpectedInGroup;
 
                               return (
                                 <div key={typeKey} className="space-y-2.5">
@@ -923,21 +1596,67 @@ export function GameBoxesTab({
                                       </h4>
                                     </div>
 
-                                    {missingInGroup > 0 && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[11px] border-amber-500/50 text-amber-400 bg-amber-500/10 flex items-center gap-1 font-semibold"
-                                      >
-                                        <AlertTriangle className="h-3 w-3" />
-                                        Missing {missingInGroup}
-                                      </Badge>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {typeItems.length > 1 && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          disabled={isSavingOrder}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSortAlphabetically(box.id, typeKey);
+                                          }}
+                                          className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-primary hover:bg-primary/15 gap-1 shrink-0"
+                                          title={`Sort ${sectionLabel} alphabetically (A-Z)`}
+                                          aria-label={`Sort ${sectionLabel} alphabetically (A-Z)`}
+                                        >
+                                          <ArrowDownAZ className="h-3 w-3" />
+                                          <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wider">
+                                            Sort A-Z
+                                          </span>
+                                        </Button>
+                                      )}
+                                      {missingInGroup > 0 && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[11px] border-amber-500/50 text-amber-400 bg-amber-500/10 flex items-center gap-1 font-semibold"
+                                          title={`Missing ${missingInGroup} item${missingInGroup === 1 ? "" : "s"}`}
+                                        >
+                                          <AlertTriangle className="h-3 w-3" />
+                                          Missing {missingInGroup}
+                                        </Badge>
+                                      )}
+                                      {isComplete && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[11px] border-emerald-500/50 text-emerald-400 bg-emerald-500/10 flex items-center gap-1 font-semibold"
+                                          title="All components present in expected quantities"
+                                        >
+                                          <CheckCircle2 className="h-3 w-3" />
+                                          Complete
+                                        </Badge>
+                                      )}
+                                      {isCompletedWithExtras && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[11px] border-blue-500/50 text-blue-400 bg-blue-500/10 flex items-center gap-1 font-semibold"
+                                          title={
+                                            extrasInGroup > 0
+                                              ? `Completed with ${extrasInGroup} extra item${extrasInGroup === 1 ? "" : "s"}`
+                                              : "Completed with extra items"
+                                          }
+                                        >
+                                          <Sparkles className="h-3 w-3" />
+                                          Completed + Extras
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* Component Rows within this type (hidden behind collapsible type row) */}
                                   {isTypeExpanded && (
                                     <div className="space-y-3 pl-2 sm:pl-3 animate-in fade-in-50 duration-200">
-                                      {typeItems.map((comp) => {
+                                      {typeItems.map((comp, compIdx) => {
                                         const isQtyMismatch =
                                           comp.quantity_actual < comp.quantity_expected;
                                         const isDragging = draggedCompId === comp.id;
@@ -973,15 +1692,63 @@ export function GameBoxesTab({
                                                   : "border border-border/60 hover:border-primary/40 bg-background/50 hover:bg-muted/30"
                                             }`}
                                           >
-                                            {/* Left: Drag Handle, Big Image Thumbnail & Info */}
-                                            <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                                              {/* Drag Handle */}
+                                            {/* Left: Drag Handle & Arrows, Big Image Thumbnail & Info */}
+                                            <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                              {/* Reorder Controls (Drag Handle & Up/Down Arrows) */}
                                               <div
-                                                className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-primary transition-colors p-1 -ml-1 rounded hover:bg-primary/10 shrink-0 self-center"
-                                                title="Drag to reorder"
-                                                aria-label="Drag to reorder"
+                                                data-no-drag="true"
+                                                className="flex items-center gap-0.5 shrink-0 self-center -ml-1"
                                               >
-                                                <GripVertical className="h-5 w-5" />
+                                                <div
+                                                  className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-primary transition-colors p-1 rounded hover:bg-primary/10"
+                                                  title="Drag to reorder"
+                                                  aria-label="Drag to reorder"
+                                                >
+                                                  <GripVertical className="h-5 w-5" />
+                                                </div>
+                                                <div className="flex flex-col -my-1 ml-0.5 opacity-60 sm:opacity-40 group-hover/comp:opacity-100 group-focus-within/comp:opacity-100 transition-opacity">
+                                                  <button
+                                                    type="button"
+                                                    disabled={compIdx === 0 || isSavingOrder}
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      handleMoveComponent(
+                                                        box.id,
+                                                        typeKey,
+                                                        compIdx,
+                                                        "up"
+                                                      );
+                                                    }}
+                                                    className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                                    title="Move up"
+                                                    aria-label={`Move ${comp.name} up`}
+                                                  >
+                                                    <ChevronUp className="h-3.5 w-3.5" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    disabled={
+                                                      compIdx === typeItems.length - 1 ||
+                                                      isSavingOrder
+                                                    }
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      handleMoveComponent(
+                                                        box.id,
+                                                        typeKey,
+                                                        compIdx,
+                                                        "down"
+                                                      );
+                                                    }}
+                                                    className="text-muted-foreground hover:text-primary disabled:opacity-20 disabled:hover:text-muted-foreground p-0.5 leading-none transition-colors"
+                                                    title="Move down"
+                                                    aria-label={`Move ${comp.name} down`}
+                                                  >
+                                                    <ChevronDown className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </div>
                                               </div>
 
                                               {/* Big Component Thumbnail with click-to-edit photo */}
@@ -1034,18 +1801,50 @@ export function GameBoxesTab({
 
                                               {/* Component Info */}
                                               <div className="flex-1 min-w-0 space-y-1">
-                                                {/* Quantity Display above component name */}
+                                                {/* Quantity Display above component name: Actual / Expected */}
                                                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-medium text-muted-foreground">
-                                                  <span>{comp.quantity_actual}</span>
-                                                  <span>/</span>
-                                                  <span>{comp.quantity_expected}</span>
+                                                  <span className="text-muted-foreground/70 text-[10px] uppercase font-sans tracking-wider font-semibold">
+                                                    Qty:
+                                                  </span>
+                                                  <span
+                                                    title="Actual quantity"
+                                                    className={`font-bold ${
+                                                      isQtyMismatch
+                                                        ? "text-destructive"
+                                                        : comp.quantity_actual > comp.quantity_expected
+                                                          ? "text-blue-400"
+                                                          : "text-foreground"
+                                                    }`}
+                                                  >
+                                                    {comp.quantity_actual}
+                                                  </span>
+                                                  <span className="text-muted-foreground/50">
+                                                    /
+                                                  </span>
+                                                  <span
+                                                    title="Expected quantity"
+                                                    className="text-muted-foreground"
+                                                  >
+                                                    {comp.quantity_expected}
+                                                  </span>
                                                   {isQtyMismatch && (
                                                     <span
                                                       title={`Missing ${comp.quantity_expected - comp.quantity_actual} piece(s)`}
                                                       className="flex items-center text-destructive text-[10px] font-bold font-sans ml-1 bg-destructive/10 px-1.5 py-0.5 rounded border border-destructive/20"
                                                     >
                                                       <AlertTriangle className="h-2.5 w-2.5 mr-1" />
-                                                      Missing {comp.quantity_expected - comp.quantity_actual}
+                                                      Missing{" "}
+                                                      {comp.quantity_expected -
+                                                        comp.quantity_actual}
+                                                    </span>
+                                                  )}
+                                                  {comp.quantity_actual > comp.quantity_expected && (
+                                                    <span
+                                                      title={`${comp.quantity_actual - comp.quantity_expected} extra piece(s)`}
+                                                      className="flex items-center text-blue-400 text-[10px] font-bold font-sans ml-1 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20"
+                                                    >
+                                                      <Sparkles className="h-2.5 w-2.5 mr-1" />
+                                                      +{comp.quantity_actual - comp.quantity_expected} Extra
                                                     </span>
                                                   )}
                                                 </div>
@@ -1087,6 +1886,19 @@ export function GameBoxesTab({
                                                 size="icon"
                                                 onClick={(e) => {
                                                   e.stopPropagation();
+                                                  handleOpenDuplicateComponent(comp, box.id);
+                                                }}
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                                title="Duplicate component"
+                                                aria-label="Duplicate component"
+                                              >
+                                                <Copy className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
                                                   setEditingComponent(comp);
                                                   setComponentBoxId(box.id);
                                                 }}
@@ -1113,9 +1925,9 @@ export function GameBoxesTab({
                                         );
                                       })}
                                     </div>
-                                )}
-                              </div>
-                            );
+                                  )}
+                                </div>
+                              );
                             })}
                           </div>
                         )}
@@ -1123,8 +1935,106 @@ export function GameBoxesTab({
                     )}
                   </div>
                 );
-              })}
-            </div>
+              };
+
+              return sortBy === "game" ? (
+                <div className="space-y-6">
+                  {gameGroups.map((group) => {
+                    const isGameExpanded = searchQuery.trim()
+                      ? true
+                      : expandedGameIds.has(group.gameId);
+
+                    return (
+                      <div key={group.gameId} className="space-y-3">
+                        {/* Collapsible Game Header */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isGameExpanded}
+                          onClick={() => toggleGameExpand(group.gameId)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleGameExpand(group.gameId);
+                            }
+                          }}
+                          className={`group/gameheader flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-lg cursor-pointer transition-all border select-none ${
+                            isGameExpanded
+                              ? "bg-card/95 border-primary/50 text-foreground shadow-sm ring-1 ring-primary/20"
+                              : "bg-card/60 hover:bg-card/85 border-primary/25 hover:border-primary/45 text-foreground/90"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="p-1 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+                              <ChevronRight
+                                className={`h-4 w-4 text-primary transition-transform duration-200 ${
+                                  isGameExpanded ? "rotate-90" : ""
+                                }`}
+                              />
+                            </div>
+                            <div className="p-1.5 rounded-md bg-primary/15 text-primary border border-primary/30 shrink-0">
+                              <Gamepad2 className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                              <h3 className="font-black text-base sm:text-lg uppercase tracking-wider text-foreground truncate">
+                                {group.gameName}
+                              </h3>
+                              {group.universeName && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] uppercase font-bold border-primary/30 text-primary py-0"
+                                >
+                                  {group.universeName}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-xs font-mono font-medium">
+                                {group.boxes.length} {group.boxes.length === 1 ? "box" : "boxes"}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground hidden sm:inline">
+                                ({group.totalComponents}{" "}
+                                {group.totalComponents === 1 ? "component" : "components"})
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            {group.totalMissing > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-amber-500/50 text-amber-400 bg-amber-500/10 flex items-center gap-1 font-semibold"
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>{group.totalMissing} Missing</span>
+                              </Badge>
+                            )}
+                            {group.game && (
+                              <Link
+                                href={`/dashboard/games/detail?universe=${group.universeId || ""}&game=${group.gameId}&tab=boxes`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-muted-foreground hover:text-primary font-semibold flex items-center gap-1 px-2.5 py-1 rounded border border-transparent hover:border-primary/30 hover:bg-primary/10 transition-all"
+                                title={`Open ${group.gameName} details`}
+                              >
+                                <span>Game Details</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Game's Boxes */}
+                        {isGameExpanded && (
+                          <div className="space-y-4 pl-2 sm:pl-4 border-l-2 border-primary/20 ml-2 sm:ml-4 animate-in fade-in-50 duration-200">
+                            {group.boxes.map((box) => renderBoxCard(box))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-6">{sortedBoxes.map((box) => renderBoxCard(box))}</div>
+              );
+            })()
           )}
         </CardContent>
       </Card>
@@ -1132,9 +2042,9 @@ export function GameBoxesTab({
       {/* Add / Edit Game Box Dialog */}
       <GameBoxFormDialog
         box={editingBox}
-        gameId={gameId}
-        editionId={editionId}
-        expansionId={expansionId}
+        gameId={editingBox?.game_id || gameId || ""}
+        editionId={editingBox?.edition_id || editionId}
+        expansionId={editingBox?.expansion_id || expansionId}
         availableEditions={availableEditions}
         availableExpansions={availableExpansions}
         open={isAddBoxOpen || !!editingBox}
@@ -1169,6 +2079,22 @@ export function GameBoxesTab({
         }}
       />
 
+      {/* Duplicate Component Dialog */}
+      <DuplicateGameComponentDialog
+        component={componentToDuplicate}
+        boxes={boxes.map((b) => ({ id: b.id, name: b.name }))}
+        currentBoxId={componentToDuplicateBoxId}
+        currentBoxName={boxes.find((b) => b.id === componentToDuplicateBoxId)?.name}
+        open={!!componentToDuplicate}
+        onOpenChange={(open) => {
+          if (!open) {
+            setComponentToDuplicate(null);
+            setComponentToDuplicateBoxId("");
+          }
+        }}
+        onSuccess={handleComponentDuplicated}
+      />
+
       {/* Duplicate Game Box Dialog */}
       <Dialog
         open={!!boxToDuplicate}
@@ -1186,7 +2112,8 @@ export function GameBoxesTab({
               Duplicate Game Box
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Create an independent copy of this game box along with all of its components and photos.
+              Create an independent copy of this game box along with all of its components and
+              photos.
             </DialogDescription>
           </DialogHeader>
 
@@ -1205,7 +2132,10 @@ export function GameBoxesTab({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duplicate-box-name" className="text-xs font-bold uppercase tracking-wider">
+              <Label
+                htmlFor="duplicate-box-name"
+                className="text-xs font-bold uppercase tracking-wider"
+              >
                 New Box Name
               </Label>
               <Input
@@ -1253,6 +2183,41 @@ export function GameBoxesTab({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Reset Actual Quantities Confirmation Alert */}
+      <AlertDialog
+        open={!!boxToResetActual}
+        onOpenChange={(open) => {
+          if (!open) setBoxToResetActual(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-400" />
+              Reset Actual Quantities: {boxToResetActual?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will set the actual quantities of all components in this game box to 0. Expected
+              quantities will not be changed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingActual}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleResetActualQuantities();
+              }}
+              disabled={isResettingActual}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            >
+              {isResettingActual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reset to 0
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Box Confirmation Alert */}
       <AlertDialog

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CollectionClient } from "./miniatures-client";
 import { getSavedFilters } from "@/app/actions/saved-filters";
 import { STATUS_GROUP_IN_PROGRESS, STATUS_GROUP_BACKLOG } from "@/lib/constants/miniature-status";
+import { resolveMiniatureGameBox, extractExplicitBoxCode } from "@/lib/game-box-resolver";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function MiniaturesPage({
     { data: baseShapesData },
     { data: baseTypesData },
     { data: miniatureStatusRows },
+    { data: allGameBoxes },
   ] = await Promise.all([
     supabase.from("factions").select("id, name").order("name"),
     supabase.from("tags").select("id, name, color").order("name"),
@@ -44,6 +46,9 @@ export default async function MiniaturesPage({
     supabase.from("base_shapes").select("id, name").order("name"),
     supabase.from("base_types").select("id, name").order("name"),
     supabase.from("miniature_statuses").select("name, display_order").order("display_order"),
+    supabase
+      .from("game_boxes")
+      .select("id, name, location, game_id, edition_id, expansion_id, box_type"),
   ]);
 
   // Process recipes and unit types
@@ -91,6 +96,7 @@ export default async function MiniaturesPage({
       quantity,
       created_at,
       storage_box_id,
+      game_box_id,
       unit_type,
       base_id,
       base_shape_id,
@@ -136,13 +142,6 @@ export default async function MiniaturesPage({
       query = query.eq("base_id", params.base_size);
     }
   }
-  if (params.storage && params.storage !== "all") {
-    if (params.storage === "none") {
-      query = query.is("storage_box_id", null);
-    } else {
-      query = query.eq("storage_box_id", params.storage);
-    }
-  }
 
   query = query.order("created_at", { ascending: false });
 
@@ -170,23 +169,65 @@ export default async function MiniaturesPage({
   }
 
   // Apply client-side filters
-  let filteredMiniatures = allMiniatures.map((m) => ({
-    ...m,
-    factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
-    miniature_status: Array.isArray(m.miniature_status)
-      ? m.miniature_status[0]
-      : m.miniature_status,
-    miniature_photos: (m.miniature_photos || []).sort((a: any, b: any) => {
-      const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
-      const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
-      if (orderA !== orderB) return orderA - orderB;
-      return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
-    }),
-    storage_box: Array.isArray(m.storage_boxes) ? m.storage_boxes[0] : m.storage_boxes,
-    bases: Array.isArray(m.bases) ? m.bases[0] : m.bases,
-    base_shapes: Array.isArray(m.base_shapes) ? m.base_shapes[0] : m.base_shapes,
-    base_types: Array.isArray(m.base_types) ? m.base_types[0] : m.base_types,
-  }));
+  let filteredMiniatures = allMiniatures.map((m) => {
+    const storageBox = Array.isArray(m.storage_boxes) ? m.storage_boxes[0] : m.storage_boxes;
+    const resolvedBoxInfo = resolveMiniatureGameBox(
+      {
+        game_box_id: m.game_box_id,
+        storage_box: storageBox,
+        notes: m.notes,
+        miniature_games: m.miniature_games || [],
+      },
+      allGameBoxes || []
+    );
+
+    return {
+      ...m,
+      clean_notes: resolvedBoxInfo ? resolvedBoxInfo.cleanNotes : m.notes,
+      linked_game_box: resolvedBoxInfo?.box || null,
+      factions: Array.isArray(m.factions) ? m.factions[0] : m.factions,
+      miniature_status: Array.isArray(m.miniature_status)
+        ? m.miniature_status[0]
+        : m.miniature_status,
+      miniature_photos: (m.miniature_photos || []).sort((a: any, b: any) => {
+        const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(a.uploaded_at || 0).getTime() - new Date(b.uploaded_at || 0).getTime();
+      }),
+      storage_box: storageBox,
+      bases: Array.isArray(m.bases) ? m.bases[0] : m.bases,
+      base_shapes: Array.isArray(m.base_shapes) ? m.base_shapes[0] : m.base_shapes,
+      base_types: Array.isArray(m.base_types) ? m.base_types[0] : m.base_types,
+    };
+  });
+
+  // Box filter (matching linked physical game box or explicit storage box)
+  const boxParam = params.box || params.gameBoxId;
+  if (boxParam && boxParam !== "all") {
+    const targetLower = boxParam.toLowerCase();
+    const matchingGameBox = (allGameBoxes || []).find(
+      (b) => b.id.toLowerCase() === targetLower || b.name.toLowerCase() === targetLower
+    );
+    const targetId = matchingGameBox ? matchingGameBox.id : boxParam;
+
+    filteredMiniatures = filteredMiniatures.filter((m) => {
+      // 1. Matched by resolved linked game box (storage IN BOX and game_box_id matching)
+      if (m.linked_game_box?.id === targetId) {
+        return true;
+      }
+
+      // 2. Storage box directly matching the box
+      if (
+        m.storage_box?.id === targetId ||
+        m.storage_box?.name.toLowerCase() === targetLower
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+  }
 
   // Tag filter
   if (params.tag && params.tag !== "all") {
@@ -282,6 +323,31 @@ export default async function MiniaturesPage({
     });
   }
 
+  // Determine available storage boxes when universe, game, edition, expansion, or faction filters are active
+  const isStorageFilterConstrained =
+    (params.universe && params.universe !== "all") ||
+    (params.game && params.game !== "all") ||
+    (params.edition && params.edition !== "all") ||
+    (params.expansion && params.expansion !== "all") ||
+    (params.faction && params.faction !== "all");
+
+  let availableStorageBoxes = storageBoxes || [];
+  if (isStorageFilterConstrained) {
+    const availableBoxIds = new Set(
+      filteredMiniatures.map((m) => m.storage_box_id).filter((id): id is string => Boolean(id))
+    );
+    availableStorageBoxes = (storageBoxes || []).filter((box) => availableBoxIds.has(box.id));
+  }
+
+  // Apply storage filter to displayed miniatures
+  if (params.storage && params.storage !== "all") {
+    if (params.storage === "none") {
+      filteredMiniatures = filteredMiniatures.filter((m) => !m.storage_box_id);
+    } else {
+      filteredMiniatures = filteredMiniatures.filter((m) => m.storage_box_id === params.storage);
+    }
+  }
+
   // Get user's saved filters
   const savedFilters = await getSavedFilters();
 
@@ -294,6 +360,8 @@ export default async function MiniaturesPage({
       collections={collections || []}
       universes={universes || []}
       storageBoxes={storageBoxes || []}
+      availableStorageBoxes={availableStorageBoxes}
+      gameBoxes={(allGameBoxes || []).map((b) => ({ id: b.id, name: b.name }))}
       recipes={recipes || []}
       games={(allGames || []).map((game: any) => ({
         id: game.id,
@@ -313,6 +381,7 @@ export default async function MiniaturesPage({
         status: params.status || "all",
         tagId: params.tag || "all",
         storageBoxId: params.storage || "all",
+        gameBoxId: boxParam || "all",
         universeId: params.universe || "all",
         gameId: params.game || "all",
         editionId: params.edition || "all",

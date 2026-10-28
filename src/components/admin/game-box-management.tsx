@@ -49,8 +49,15 @@ import {
   FolderOpen,
   Filter,
   Copy,
+  RotateCcw,
 } from "lucide-react";
-import { createGameBox, updateGameBox, deleteGameBox, duplicateGameBox } from "@/app/actions/game-boxes";
+import {
+  createGameBox,
+  updateGameBox,
+  deleteGameBox,
+  duplicateGameBox,
+} from "@/app/actions/game-boxes";
+import { resetGameBoxActualQuantities } from "@/app/actions/game-components";
 import type { GameBox } from "@/types";
 import { toast } from "sonner";
 
@@ -139,6 +146,10 @@ export function GameBoxManagement({
   const [duplicateNewName, setDuplicateNewName] = useState("");
   const [isDuplicating, setIsDuplicating] = useState(false);
 
+  // Reset actual quantities state
+  const [boxToResetActual, setBoxToResetActual] = useState<AdminGameBoxItem | null>(null);
+  const [isResettingActual, setIsResettingActual] = useState(false);
+
   const handleConfirmDuplicate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!boxToDuplicate || !duplicateNewName.trim()) return;
@@ -154,6 +165,21 @@ export function GameBoxManagement({
       toast.error(err instanceof Error ? err.message : "Failed to duplicate game box");
     } finally {
       setIsDuplicating(false);
+    }
+  };
+
+  const handleResetActualConfirm = async () => {
+    if (!boxToResetActual) return;
+    setIsResettingActual(true);
+    try {
+      await resetGameBoxActualQuantities(boxToResetActual.id);
+      toast.success(`Actual quantities in "${boxToResetActual.name}" set to 0`);
+      setBoxToResetActual(null);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset actual quantities");
+    } finally {
+      setIsResettingActual(false);
     }
   };
 
@@ -510,6 +536,16 @@ export function GameBoxManagement({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10"
+                        onClick={() => setBoxToResetActual(box)}
+                        title="Reset Actual Quantities to 0"
+                        aria-label="Reset Actual Quantities to 0"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-primary"
                         onClick={() => {
                           setBoxToDuplicate(box);
@@ -845,7 +881,10 @@ export function GameBoxManagement({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="admin-duplicate-box-name" className="text-xs font-bold uppercase tracking-wider">
+              <Label
+                htmlFor="admin-duplicate-box-name"
+                className="text-xs font-bold uppercase tracking-wider"
+              >
                 New Box Name
               </Label>
               <Input
@@ -893,6 +932,39 @@ export function GameBoxManagement({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Reset Actual Quantities Confirmation Dialog */}
+      <AlertDialog
+        open={Boolean(boxToResetActual)}
+        onOpenChange={(open) => !open && setBoxToResetActual(null)}
+      >
+        <AlertDialogContent className="warhammer-card border-amber-500/40">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
+              <RotateCcw className="h-5 w-5" />
+              Reset Actual Quantities: {boxToResetActual?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              This will set the actual quantities of all components in this game box to 0. Expected
+              quantities will not be changed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingActual}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleResetActualConfirm();
+              }}
+              disabled={isResettingActual}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            >
+              {isResettingActual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reset to 0
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

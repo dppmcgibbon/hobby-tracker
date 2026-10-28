@@ -2,9 +2,19 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen } from "lucide-react";
+import { Check, Trash2, Tag, FolderPlus, X, Gamepad2, Archive, BookOpen, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { bulkUpdateStatus, bulkDelete, bulkUpdateStorageBox, bulkUpdateBases, bulkUpdateFaction, bulkUpdateMetadata } from "@/app/actions/miniatures";
+import {
+  bulkUpdateStatus,
+  bulkDelete,
+  bulkUpdateStorageBox,
+  bulkUpdateGameBox,
+  bulkUpdateBases,
+  bulkUpdateFaction,
+  bulkUpdateMetadata,
+  bulkAppendNotes,
+  bulkClearNotes,
+} from "@/app/actions/miniatures";
 import { bulkAddTags } from "@/app/actions/tags";
 import { addMiniaturesToCollection } from "@/app/actions/collections";
 import { bulkLinkMinaturesToGame } from "@/app/actions/games";
@@ -12,6 +22,16 @@ import { bulkLinkRecipes } from "@/app/actions/recipes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -68,6 +88,14 @@ interface StorageBox {
   location?: string | null;
 }
 
+interface GameBox {
+  id: string;
+  name: string;
+  location?: string | null;
+  game_id?: string;
+  game?: { name: string } | null;
+}
+
 interface Recipe {
   id: string;
   name: string;
@@ -106,6 +134,7 @@ interface BatchOperationsBarProps {
   tags: Tag[];
   collections: Collection[];
   storageBoxes?: StorageBox[];
+  gameBoxes?: GameBox[];
   recipes?: Recipe[];
   games?: Game[];
   editions?: Edition[];
@@ -114,6 +143,7 @@ interface BatchOperationsBarProps {
   baseShapes?: BaseShape[];
   baseTypes?: BaseType[];
   factions?: Faction[];
+  allSelectedInBox?: boolean;
 }
 
 export function BatchOperationsBar({
@@ -123,6 +153,7 @@ export function BatchOperationsBar({
   tags,
   collections,
   storageBoxes = [],
+  gameBoxes = [],
   recipes = [],
   games = [],
   editions = [],
@@ -131,6 +162,7 @@ export function BatchOperationsBar({
   baseShapes = [],
   baseTypes = [],
   factions = [],
+  allSelectedInBox = false,
 }: BatchOperationsBarProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -139,6 +171,7 @@ export function BatchOperationsBar({
   const [selectedTagId, setSelectedTagId] = useState<string>("");
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
   const [selectedStorageBoxId, setSelectedStorageBoxId] = useState<string>("");
+  const [selectedGameBoxId, setSelectedGameBoxId] = useState<string>("");
   const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedEditionId, setSelectedEditionId] = useState<string>("");
@@ -150,6 +183,9 @@ export function BatchOperationsBar({
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedMaterial, setSelectedMaterial] = useState<string>("");
   const [selectedSculptor, setSelectedSculptor] = useState<string>("");
+  const [noteToAppend, setNoteToAppend] = useState<string>("");
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState<boolean>(false);
+  const [isConfirmingClearNotes, setIsConfirmingClearNotes] = useState<boolean>(false);
   const [availableEditions, setAvailableEditions] = useState<Edition[]>([]);
   const [availableExpansions, setAvailableExpansions] = useState<Expansion[]>([]);
 
@@ -271,6 +307,28 @@ export function BatchOperationsBar({
     });
   };
 
+  const handleUpdateGameBox = () => {
+    if (!selectedGameBoxId) return;
+
+    startTransition(async () => {
+      try {
+        await bulkUpdateGameBox(
+          selectedIds,
+          selectedGameBoxId === "none" ? null : selectedGameBoxId
+        );
+        toast.success(
+          selectedGameBoxId === "none"
+            ? `Cleared game box for ${selectedIds.length} miniature(s)`
+            : `Assigned game box for ${selectedIds.length} miniature(s)`
+        );
+        setSelectedGameBoxId("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update game box");
+      }
+    });
+  };
+
   const handleLinkRecipes = () => {
     if (selectedRecipeIds.length === 0) return;
 
@@ -377,8 +435,40 @@ export function BatchOperationsBar({
     });
   };
 
+  const handleAppendNotes = () => {
+    const trimmed = noteToAppend.trim();
+    if (!trimmed) return;
+
+    startTransition(async () => {
+      try {
+        await bulkAppendNotes(selectedIds, trimmed);
+        toast.success(`Appended note to ${selectedIds.length} miniature(s)`);
+        setNoteToAppend("");
+        setIsNoteDialogOpen(false);
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to append notes");
+      }
+    });
+  };
+
+  const handleClearNotes = () => {
+    startTransition(async () => {
+      try {
+        await bulkClearNotes(selectedIds);
+        toast.success(`Cleared notes for ${selectedIds.length} miniature(s)`);
+        setNoteToAppend("");
+        setIsNoteDialogOpen(false);
+        setIsConfirmingClearNotes(false);
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to clear notes");
+      }
+    });
+  };
+
   return (
-    <Card className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-2xl">
+    <Card className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-2xl max-w-[95vw] max-h-[85vh] overflow-y-auto">
       <div className="flex flex-col gap-4 p-4">
         {/* First Row */}
         <div className="flex items-center gap-4">
@@ -498,6 +588,34 @@ export function BatchOperationsBar({
                 disabled={!selectedStorageBoxId || isPending}
               >
                 <Archive className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Update Game Box (only displayed if all selected miniatures have storage of "IN BOX") */}
+          {gameBoxes.length > 0 && allSelectedInBox && (
+            <div className="flex items-center gap-2">
+              <Select value={selectedGameBoxId} onValueChange={setSelectedGameBoxId}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Set game box..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Game Box</SelectItem>
+                  {gameBoxes.map((box) => (
+                    <SelectItem key={box.id} value={box.id}>
+                      {box.name}
+                      {box.game?.name ? ` (${box.game.name})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleUpdateGameBox}
+                disabled={!selectedGameBoxId || isPending}
+                title="Assign Game Box"
+              >
+                Apply
               </Button>
             </div>
           )}
@@ -744,6 +862,155 @@ export function BatchOperationsBar({
             >
               Apply
             </Button>
+          </div>
+        </div>
+
+        {/* Fifth Row - Notes */}
+        <div className="flex items-center gap-4 pt-2 border-t">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            <span className="font-medium text-sm">Notes:</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              type="text"
+              placeholder="Add note to append to all selected..."
+              value={noteToAppend}
+              onChange={(e) => setNoteToAppend(e.target.value)}
+              className="w-[280px]"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && noteToAppend.trim()) {
+                  e.preventDefault();
+                  handleAppendNotes();
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={handleAppendNotes}
+              disabled={!noteToAppend.trim() || isPending}
+            >
+              Append
+            </Button>
+
+            <Dialog
+              open={isNoteDialogOpen}
+              onOpenChange={(open) => {
+                setIsNoteDialogOpen(open);
+                if (!open) setIsConfirmingClearNotes(false);
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" title="Open multi-line note editor">
+                  Multi-line...
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Notes for {selectedIds.length} Miniature{selectedIds.length > 1 ? "s" : ""}</DialogTitle>
+                  <DialogDescription>
+                    Append note text to existing notes, or clear all notes for the selected miniature{selectedIds.length > 1 ? "s" : ""}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-2">
+                  <Textarea
+                    placeholder="Enter note text to append..."
+                    value={noteToAppend}
+                    onChange={(e) => setNoteToAppend(e.target.value)}
+                    rows={4}
+                    className="w-full"
+                  />
+                </div>
+                <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
+                  <div>
+                    {isConfirmingClearNotes ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-destructive font-medium">Clear all notes?</span>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={handleClearNotes}
+                        >
+                          Confirm Clear
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => setIsConfirmingClearNotes(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() => setIsConfirmingClearNotes(true)}
+                        title="Clear all existing notes on selected miniatures"
+                      >
+                        Clear Notes
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsNoteDialogOpen(false);
+                        setIsConfirmingClearNotes(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAppendNotes}
+                      disabled={!noteToAppend.trim() || isPending}
+                    >
+                      Append to {selectedIds.length} Miniature{selectedIds.length > 1 ? "s" : ""}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={isPending}
+                  title="Clear notes from selected miniatures"
+                >
+                  Clear Notes
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear notes on {selectedIds.length} miniature(s)?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently remove all notes from the {selectedIds.length} selected miniature{selectedIds.length > 1 ? "s" : ""}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearNotes}
+                    disabled={isPending}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Clear Notes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

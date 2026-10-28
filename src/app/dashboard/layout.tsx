@@ -15,6 +15,7 @@ import {
   Home,
   Package,
   Gamepad2,
+  Box,
   Palette,
   User,
   FolderOpen,
@@ -63,6 +64,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               <Gamepad2 className="h-4 w-4 inline-block mr-1.5" />
               Games
+            </Link>
+            <Link
+              href="/dashboard/boxes"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 transition-all hover:text-primary hover:bg-primary/10 rounded border border-transparent hover:border-primary/30 whitespace-nowrap"
+            >
+              <Box className="h-4 w-4 inline-block mr-1.5" />
+              BOXES
             </Link>
             <Link
               href="/dashboard/miniatures"

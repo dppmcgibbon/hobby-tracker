@@ -891,6 +891,7 @@ export type Database = {
           quantity: number | null;
           sculptor: string | null;
           storage_box_id: string | null;
+          game_box_id: string | null;
           unit_type: string | null;
           updated_at: string | null;
           year: number | null;
@@ -909,6 +910,7 @@ export type Database = {
           quantity?: number | null;
           sculptor?: string | null;
           storage_box_id?: string | null;
+          game_box_id?: string | null;
           unit_type?: string | null;
           updated_at?: string | null;
           year?: number | null;
@@ -927,6 +929,7 @@ export type Database = {
           quantity?: number | null;
           sculptor?: string | null;
           storage_box_id?: string | null;
+          game_box_id?: string | null;
           unit_type?: string | null;
           updated_at?: string | null;
           year?: number | null;
@@ -965,6 +968,13 @@ export type Database = {
             columns: ["storage_box_id"];
             isOneToOne: false;
             referencedRelation: "storage_boxes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "miniatures_game_box_id_fkey";
+            columns: ["game_box_id"];
+            isOneToOne: false;
+            referencedRelation: "game_boxes";
             referencedColumns: ["id"];
           },
         ];

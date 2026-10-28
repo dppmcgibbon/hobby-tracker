@@ -53,6 +53,14 @@ interface BaseType {
   name: string;
 }
 
+interface GameBox {
+  id: string;
+  name: string;
+  location?: string | null;
+  game_id?: string;
+  game?: { name: string } | null;
+}
+
 /** Rows from `miniature_statuses` (ordered by `display_order` on the server). */
 export interface MiniatureStatusRow {
   name: string;
@@ -67,6 +75,7 @@ interface MiniatureFormProps {
   bases?: Base[];
   baseShapes?: BaseShape[];
   baseTypes?: BaseType[];
+  gameBoxes?: GameBox[];
   existingRecipeIds?: string[];
   miniature?: Miniature;
   onSuccess?: () => void;
@@ -80,6 +89,7 @@ export function MiniatureForm({
   bases = [],
   baseShapes = [],
   baseTypes = [],
+  gameBoxes = [],
   existingRecipeIds = [],
   miniature,
   onSuccess,
@@ -112,6 +122,7 @@ export function MiniatureForm({
           year: miniature.year || undefined,
           notes: miniature.notes || undefined,
           storage_box_id: (miniature as any).storage_box_id || undefined,
+          game_box_id: (miniature as any).game_box_id || undefined,
           status: (miniature as any).status?.status ?? "backlog",
           magnetised: (miniature as any).status?.magnetised ?? false,
           based: (miniature as any).status?.based ?? false,
@@ -130,6 +141,8 @@ export function MiniatureForm({
   const factionId = watch("faction_id");
   // eslint-disable-next-line react-hooks/incompatible-library
   const storageBoxId = watch("storage_box_id");
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const gameBoxId = watch("game_box_id");
   // eslint-disable-next-line react-hooks/incompatible-library
   const baseId = watch("base_id");
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -267,7 +280,14 @@ export function MiniatureForm({
           <Label htmlFor="storage_box_id">Storage Location</Label>
           <Select
             value={storageBoxId || "none"}
-            onValueChange={(value) => setValue("storage_box_id", value === "none" ? null : value)}
+            onValueChange={(value) => {
+              const newStorage = value === "none" ? null : value;
+              setValue("storage_box_id", newStorage);
+              const selected = storageBoxes.find((b) => b.id === newStorage);
+              if (!selected || selected.name.trim().toUpperCase() !== "IN BOX") {
+                setValue("game_box_id", null);
+              }
+            }}
             disabled={isLoading}
           >
             <SelectTrigger>
@@ -287,6 +307,48 @@ export function MiniatureForm({
           )}
         </div>
       </div>
+
+      {(() => {
+        const selectedStorage = storageBoxes.find((b) => b.id === storageBoxId);
+        const isInBox = selectedStorage
+          ? selectedStorage.name.trim().toUpperCase() === "IN BOX"
+          : false;
+
+        if (!isInBox) return null;
+
+        return (
+          <div className="space-y-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+            <Label htmlFor="game_box_id" className="font-semibold text-primary">
+              Game Box (Box Inventory)
+            </Label>
+            <Select
+              value={gameBoxId || "none"}
+              onValueChange={(value) => setValue("game_box_id", value === "none" ? null : value)}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="game_box_id">
+                <SelectValue placeholder="Select game box..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Game Box</SelectItem>
+                {gameBoxes.map((box) => (
+                  <SelectItem key={box.id} value={box.id}>
+                    {box.name}
+                    {box.game?.name ? ` (${box.game.name})` : ""}
+                    {box.location ? ` - ${box.location}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Link this miniature directly to its physical game box.
+            </p>
+            {errors.game_box_id && (
+              <p className="text-sm text-destructive">{errors.game_box_id.message}</p>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="space-y-2">
         <Label htmlFor="unit_type">Unit Type</Label>

@@ -58,10 +58,24 @@ export function SavedFiltersSheet({ savedFilters }: SavedFiltersSheetProps) {
 
   const handleLoadFilter = (filters: Record<string, string>) => {
     const params = new URLSearchParams();
-    
+    const keyMap: Record<string, string> = {
+      gameBoxId: "box",
+      storageBoxId: "storage",
+      factionId: "faction",
+      tagId: "tag",
+      universeId: "universe",
+      gameId: "game",
+      editionId: "edition",
+      expansionId: "expansion",
+      unitType: "unit",
+      baseSize: "base_size",
+      hasPhotos: "photos",
+    };
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value && value !== "all" && value !== "") {
-        params.set(key, value);
+        const paramKey = keyMap[key] || key;
+        params.set(paramKey, value);
       }
     });
 

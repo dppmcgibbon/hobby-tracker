@@ -29,7 +29,8 @@ export default async function EditMiniaturePage({ params }: PageProps) {
     notFound();
   }
 
-  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows] =
+  const supabase = await createClient();
+  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows, { data: gameBoxes }] =
     await Promise.all([
       getFactions(),
       getStorageBoxes(user.id),
@@ -38,10 +39,13 @@ export default async function EditMiniaturePage({ params }: PageProps) {
       getBaseShapes(),
       getBaseTypes(),
       getMiniatureStatuses(),
+      supabase
+        .from("game_boxes")
+        .select("id, name, location, game_id, game:games(name)")
+        .order("name"),
     ]);
 
   // Get existing recipe links
-  const supabase = await createClient();
   const { data: miniatureRecipes } = await supabase
     .from("miniature_recipes")
     .select("recipe_id")
@@ -70,6 +74,7 @@ export default async function EditMiniaturePage({ params }: PageProps) {
             bases={bases}
             baseShapes={baseShapes}
             baseTypes={baseTypes}
+            gameBoxes={(gameBoxes as any) || []}
             existingRecipeIds={existingRecipeIds}
             miniature={miniature}
           />

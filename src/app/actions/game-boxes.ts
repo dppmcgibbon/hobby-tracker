@@ -3,6 +3,7 @@
 import { requireAuth } from "@/lib/auth/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { GameComponentPhoto } from "@/types";
 
 async function getAdminSupabase() {
   await requireAuth();
@@ -59,6 +60,7 @@ export async function createGameBox(data: GameBoxInput) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
 
@@ -97,6 +99,7 @@ export async function updateGameBox(id: string, data: Partial<GameBoxInput>) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
 
@@ -133,6 +136,7 @@ export async function deleteGameBox(id: string) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin");
 
@@ -220,7 +224,7 @@ export async function duplicateGameBox(sourceBoxId: string, newName: string) {
       }
 
       // 5. Duplicate photos
-      let sourcePhotos: any[] = [];
+      let sourcePhotos: GameComponentPhoto[] = [];
       try {
         const { data: photos, error: photosErr } = await supabase
           .from("game_component_photos")
@@ -316,6 +320,7 @@ export async function duplicateGameBox(sourceBoxId: string, newName: string) {
 
   revalidatePath("/dashboard/games");
   revalidatePath("/dashboard/games/detail");
+  revalidatePath("/dashboard/boxes");
   revalidatePath("/dashboard/admin/game-boxes");
   revalidatePath("/dashboard/admin/game-components");
   revalidatePath("/dashboard/admin");

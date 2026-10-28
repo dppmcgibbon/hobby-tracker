@@ -10,7 +10,7 @@ import { StatusIcon } from "./status-icon";
 import { DuplicateMiniatureButton } from "./duplicate-miniature-button";
 import { getR2PublicUrl } from "@/lib/r2";
 import { getPhotoImageUrl } from "@/lib/photos";
-import { Copy } from "lucide-react";
+import { Copy, Box } from "lucide-react";
 
 interface MiniatureCardProps {
   miniature: {
@@ -28,6 +28,7 @@ interface MiniatureCardProps {
     } | null;
     miniature_photos: { storage_path: string; image_updated_at?: string | null }[];
     storage_box?: { id: string; name: string; location?: string | null } | null;
+    linked_game_box?: { id: string; name: string; location?: string | null } | null;
   };
   selectable?: boolean;
   selected?: boolean;
@@ -154,11 +155,22 @@ export function MiniatureCard({
                 </Badge>
               )}
             </div>
-            {miniature.storage_box && (
-              <div className="flex items-center">
-                <Badge variant="outline" className="text-xs">
-                  📦 {miniature.storage_box.name}
-                </Badge>
+            {(miniature.linked_game_box || miniature.storage_box) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {miniature.linked_game_box ? (
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-primary/40 text-primary bg-primary/10 flex items-center gap-1 font-semibold"
+                    title={`In Game Box: ${miniature.linked_game_box.name}${miniature.linked_game_box.location ? ` (${miniature.linked_game_box.location})` : ""}`}
+                  >
+                    <Box className="h-3 w-3 text-primary shrink-0" />
+                    <span>{miniature.linked_game_box.name}</span>
+                  </Badge>
+                ) : miniature.storage_box ? (
+                  <Badge variant="outline" className="text-xs">
+                    📦 {miniature.storage_box.name}
+                  </Badge>
+                ) : null}
               </div>
             )}
           </div>

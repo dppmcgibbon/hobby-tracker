@@ -37,6 +37,7 @@ export function SaveFilterDialog({ currentFilters }: SaveFilterDialogProps) {
     currentFilters.status !== "all" ||
     currentFilters.tagId !== "all" ||
     currentFilters.storageBoxId !== "all" ||
+    (currentFilters.gameBoxId && currentFilters.gameBoxId !== "all") ||
     currentFilters.universeId !== "all" ||
     currentFilters.gameId !== "all" ||
     currentFilters.editionId !== "all" ||

@@ -13,13 +13,14 @@ import { DeleteMiniatureButton } from "@/components/miniatures/delete-miniature-
 import { DuplicateMiniatureButton } from "@/components/miniatures/duplicate-miniature-button";
 import { TagManager } from "@/components/miniatures/tag-manager";
 import { STATUS_LABELS } from "@/lib/constants/miniature-status";
-import { ArrowLeft, Edit, Calendar, Check } from "lucide-react";
+import { ArrowLeft, Edit, Calendar, Check, Box, ExternalLink } from "lucide-react";
 import { getRecipes } from "@/lib/queries/recipes";
 import { LinkRecipeDialog } from "@/components/recipes/link-recipe-dialog";
 import { unlinkRecipeFromMiniature } from "@/app/actions/recipes";
 import { BookOpen, X } from "lucide-react";
 import { GameLinkManager } from "@/components/games/game-link-manager";
 import { BackToMiniaturesButton } from "@/components/miniatures/back-to-miniatures-button";
+import { resolveMiniatureGameBox } from "@/lib/game-box-resolver";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -41,6 +42,7 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
     { data: allTags },
     { data: miniatureTags },
     { data: miniatureGames },
+    { data: allGameBoxes },
   ] = await Promise.all([
     supabase.from("miniature_recipes").select("recipe_id").eq("miniature_id", id),
     supabase.from("tags").select("id, name, color").order("name"),
@@ -58,7 +60,21 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
       `
       )
       .eq("miniature_id", id),
+    supabase
+      .from("game_boxes")
+      .select("id, name, location, game_id, edition_id, expansion_id, box_type"),
   ]);
+
+  const resolvedBoxInfo = resolveMiniatureGameBox(
+    {
+      game_box_id: (miniature as any).game_box_id,
+      storage_box: (miniature as any).storage_box,
+      notes: miniature.notes,
+      miniature_games: miniatureGames || [],
+    },
+    allGameBoxes || []
+  );
+  const displayNotes = resolvedBoxInfo ? resolvedBoxInfo.cleanNotes : miniature.notes;
 
   const linkedRecipeIds = miniatureRecipes?.map((mr) => mr.recipe_id) || [];
   const linkedRecipes = recipes.filter((r) => linkedRecipeIds.includes(r.id));
@@ -137,17 +153,42 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                   <p className="font-medium">{miniature.quantity}</p>
                 </div>
 
-                {(miniature as any).storage_box && (
+                {((miniature as any).storage_box || resolvedBoxInfo?.box) && (
                   <div>
                     <p className="text-sm text-muted-foreground">Storage Location</p>
-                    <Link
-                      href={`/dashboard/storage/${(miniature as any).storage_box.id}`}
-                      className="font-medium hover:text-primary hover:underline"
-                    >
-                      {(miniature as any).storage_box.name}
-                      {(miniature as any).storage_box.location &&
-                        ` (${(miniature as any).storage_box.location})`}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      {(miniature as any).storage_box && (
+                        <Link
+                          href={`/dashboard/storage/${(miniature as any).storage_box.id}`}
+                          className="font-medium hover:text-primary hover:underline"
+                        >
+                          {(miniature as any).storage_box.name}
+                          {(miniature as any).storage_box.location &&
+                            ` (${(miniature as any).storage_box.location})`}
+                        </Link>
+                      )}
+                      {resolvedBoxInfo?.box && (
+                        <>
+                          {(miniature as any).storage_box && (
+                            <span className="text-muted-foreground text-xs">&rarr;</span>
+                          )}
+                          <Link
+                            href={`/dashboard/boxes?search=${encodeURIComponent(resolvedBoxInfo.box.name)}`}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold border border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                            title={`In Game Box: ${resolvedBoxInfo.box.name}${resolvedBoxInfo.box.location ? ` (${resolvedBoxInfo.box.location})` : ""}`}
+                          >
+                            <Box className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{resolvedBoxInfo.box.name}</span>
+                            {resolvedBoxInfo.box.location && (
+                              <span className="text-[10px] font-normal text-muted-foreground">
+                                ({resolvedBoxInfo.box.location})
+                              </span>
+                            )}
+                            <ExternalLink className="h-2.5 w-2.5 opacity-70 ml-0.5" />
+                          </Link>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -229,13 +270,13 @@ export default async function MiniatureDetailPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {miniature.notes && (
+              {displayNotes && (
                 <>
                   <Separator />
                   <div>
                     <h4 className="text-sm font-medium mb-2">Notes</h4>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {miniature.notes}
+                      {displayNotes}
                     </p>
                   </div>
                 </>

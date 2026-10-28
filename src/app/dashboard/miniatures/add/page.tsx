@@ -8,12 +8,14 @@ import {
   getMiniatureStatuses,
 } from "@/lib/queries/miniatures";
 import { getRecipes } from "@/lib/queries/recipes";
+import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniatureForm } from "@/components/miniatures/miniature-form";
 
 export default async function AddMiniaturePage() {
   const user = await requireAuth();
-  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows] =
+  const supabase = await createClient();
+  const [factions, storageBoxes, recipes, bases, baseShapes, baseTypes, statusRows, { data: gameBoxes }] =
     await Promise.all([
       getFactions(),
       getStorageBoxes(user.id),
@@ -22,6 +24,10 @@ export default async function AddMiniaturePage() {
       getBaseShapes(),
       getBaseTypes(),
       getMiniatureStatuses(),
+      supabase
+        .from("game_boxes")
+        .select("id, name, location, game_id, game:games(name)")
+        .order("name"),
     ]);
 
   return (
@@ -47,6 +53,7 @@ export default async function AddMiniaturePage() {
             bases={bases}
             baseShapes={baseShapes}
             baseTypes={baseTypes}
+            gameBoxes={(gameBoxes as any) || []}
           />
         </CardContent>
       </Card>

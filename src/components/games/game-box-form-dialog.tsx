@@ -28,7 +28,7 @@ import { toast } from "sonner";
 
 interface GameBoxFormDialogProps {
   box?: GameBox | null;
-  gameId: string;
+  gameId?: string;
   editionId?: string | null;
   expansionId?: string | null;
   availableEditions?: Edition[];
@@ -114,7 +114,7 @@ export function GameBoxFormDialog({
       if (box) {
         const res = await updateGameBox(box.id, {
           name: name.trim(),
-          game_id: gameId,
+          game_id: box.game_id || gameId || "",
           edition_id: selectedEditionId,
           expansion_id: selectedExpansionId,
           box_type: boxType,
@@ -128,7 +128,7 @@ export function GameBoxFormDialog({
       } else {
         const res = await createGameBox({
           name: name.trim(),
-          game_id: gameId,
+          game_id: gameId || "",
           edition_id: selectedEditionId,
           expansion_id: selectedExpansionId,
           box_type: boxType,
